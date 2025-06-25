@@ -1,0 +1,91 @@
+
+import React, { useEffect, useState } from 'react';
+import { ToastMessage } from '../../types';
+import { CheckCircleIcon, XCircleIcon, InformationCircleIcon, ExclamationTriangleIcon } from './Icons'; // Assuming ExclamationTriangle for warning/error too
+
+interface ToastProps extends ToastMessage {
+  onDismiss: (id: string) => void;
+}
+
+export const Toast: React.FC<ToastProps> = ({ id, message, type, duration = 5000, onDismiss }) => {
+  const [isVisible, setIsVisible] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      handleDismiss();
+    }, duration);
+    return () => clearTimeout(timer);
+  }, [id, duration, onDismiss]);
+
+  const handleDismiss = () => {
+    setIsVisible(false);
+    // Give time for fade-out animation before calling onDismiss
+    setTimeout(() => onDismiss(id), 300); // Match animation duration
+  };
+
+  const typeStyles = {
+    success: {
+      bg: 'bg-green-500',
+      icon: <CheckCircleIcon className="w-6 h-6 text-white" />,
+      progressBar: 'bg-green-700',
+    },
+    error: {
+      bg: 'bg-danger',
+      icon: <XCircleIcon className="w-6 h-6 text-white" />,
+      progressBar: 'bg-red-700',
+    },
+    info: {
+      bg: 'bg-blue-500',
+      icon: <InformationCircleIcon className="w-6 h-6 text-white" />,
+      progressBar: 'bg-blue-700',
+    },
+     warning: { // Added for completeness, if needed
+      bg: 'bg-warning',
+      icon: <ExclamationTriangleIcon className="w-6 h-6 text-white" />,
+      progressBar: 'bg-amber-700',
+    }
+  };
+
+  const currentStyles = typeStyles[type] || typeStyles.info;
+
+  return (
+    <div
+      role="alert"
+      aria-live="assertive"
+      aria-atomic="true"
+      className={`
+        ${currentStyles.bg} text-white p-4 rounded-md shadow-lg 
+        flex items-start space-x-3 w-full max-w-sm
+        transition-all duration-300 ease-in-out
+        ${isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-full'}
+      `}
+    >
+      <div className="shrink-0 pt-0.5">{currentStyles.icon}</div>
+      <div className="flex-1 text-sm">
+        <p>{message}</p>
+      </div>
+      <button
+        onClick={handleDismiss}
+        aria-label="Dismiss notification"
+        className="p-1 -m-1 rounded-full hover:bg-black hover:bg-opacity-20 transition-colors"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+       {/* Optional: Progress bar for auto-dismiss visual cue */}
+      {/* <div className="absolute bottom-0 left-0 right-0 h-1">
+        <div 
+          className={`${currentStyles.progressBar} h-full`} 
+          style={{ animation: `shrink ${duration}ms linear forwards` }}
+        ></div>
+      </div>
+      <style>{`
+        @keyframes shrink {
+          from { width: 100%; }
+          to { width: 0%; }
+        }
+      `}</style> */}
+    </div>
+  );
+};
