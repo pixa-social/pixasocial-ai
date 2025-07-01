@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { NavItem, ViewName } from '../types';
 import { APP_TITLE, NAVIGATION_ITEMS } from '../constants';
 import { Button } from './ui/Button'; 
@@ -12,7 +11,7 @@ interface NavbarProps {
   onLogout?: () => void;
 }
 
-const NavLink: React.FC<{
+const NavLinkComponent: React.FC<{
   item: NavItem;
   isActive: boolean;
   onClick: () => void;
@@ -37,8 +36,9 @@ const NavLink: React.FC<{
     </button>
   );
 };
+const NavLink = React.memo(NavLinkComponent);
 
-const MobileNavLink: React.FC<{
+const MobileNavLinkComponent: React.FC<{
   item: NavItem;
   isActive: boolean;
   onClick: () => void;
@@ -58,8 +58,9 @@ const MobileNavLink: React.FC<{
     </button>
   );
 }
+const MobileNavLink = React.memo(MobileNavLinkComponent);
 
-const DropdownIcon: React.FC<{ isOpen: boolean }> = ({ isOpen }) => (
+const DropdownIconComponent: React.FC<{ isOpen: boolean }> = ({ isOpen }) => (
   <svg
     className={`ml-1 h-5 w-5 transform transition-transform duration-150 ${isOpen ? 'rotate-180' : ''}`}
     xmlns="http://www.w3.org/2000/svg"
@@ -74,6 +75,7 @@ const DropdownIcon: React.FC<{ isOpen: boolean }> = ({ isOpen }) => (
     />
   </svg>
 );
+const DropdownIcon = React.memo(DropdownIconComponent);
 
 
 export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, isAuthenticated, onLogout }) => {
@@ -82,29 +84,27 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, isAuthe
   const dropdownRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
-  const handleToggleDropdown = (label: string) => {
+  const handleToggleDropdown = useCallback((label: string) => {
     setOpenDropdownLabel(prev => (prev === label ? null : label));
-  };
+  }, []);
 
-  const handleNavigate = (viewName?: ViewName) => {
+  const handleNavigate = useCallback((viewName?: ViewName) => {
     if (viewName) {
       onNavigate(viewName);
     }
     setOpenDropdownLabel(null); 
-    setIsMobileMenuOpen(false); // Close mobile menu on navigation
-  };
+    setIsMobileMenuOpen(false); 
+  }, [onNavigate]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node) && openDropdownLabel) {
-        // Check if the click is outside all dropdown triggers to prevent immediate re-open
         const isClickOnDropdownTrigger = (event.target as HTMLElement).closest('[aria-haspopup="true"]');
         if(!isClickOnDropdownTrigger || (isClickOnDropdownTrigger && isClickOnDropdownTrigger.getAttribute('aria-label') !== openDropdownLabel) ) {
             setOpenDropdownLabel(null);
         }
       }
       if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node) && isMobileMenuOpen) {
-        // Prevent closing if click is on the hamburger button
         if (!(event.target as HTMLElement).closest('#mobile-menu-button')) {
           setIsMobileMenuOpen(false);
         }
@@ -116,7 +116,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, isAuthe
     };
   }, [openDropdownLabel, isMobileMenuOpen]);
 
-  const isViewActive = (item: NavItem, currentViewToCheck: ViewName): boolean => {
+  const isViewActive = useCallback((item: NavItem, currentViewToCheck: ViewName): boolean => {
     if (item.viewName) {
       return currentViewToCheck === item.viewName;
     }
@@ -124,25 +124,23 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, isAuthe
       return item.children.some(child => child.viewName === currentViewToCheck);
     }
     return false;
-  };
+  }, []);
 
   return (
     <nav className="bg-blue-700 shadow-lg border-b border-blue-800 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20"> {/* Increased height */}
+        <div className="flex items-center justify-between h-20"> 
           <div className="flex items-center">
             <span 
               className="font-bold text-xl sm:text-2xl text-white cursor-pointer transition-opacity hover:opacity-80"
               onClick={() => { 
-                  if (isAuthenticated) { onNavigate(ViewName.Dashboard) } 
-                  // In a real app with public pages: else { onNavigateToPublicHome() }
+                  if (isAuthenticated) { handleNavigate(ViewName.Dashboard) } 
               }}
             >
               {APP_TITLE}
             </span>
           </div>
 
-          {/* Desktop Navigation */}
           {isAuthenticated && (
             <div className="hidden md:flex items-center">
               <div className="ml-10 flex items-baseline space-x-1">
@@ -155,11 +153,12 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, isAuthe
                           aria-label={item.label}
                           className={`px-3 py-2.5 rounded-md text-sm font-medium flex items-center transition-colors duration-150 ease-in-out
                             ${isViewActive(item, currentView)
-                              ? 'bg-blue-800 text-white' // Darker active for dropdown parent
+                              ? 'bg-blue-800 text-white' 
                               : 'text-blue-100 hover:bg-blue-600 hover:text-white'
                             }`}
                           aria-expanded={openDropdownLabel === item.label}
                           aria-haspopup="true"
+                          title={item.label}
                         >
                           {item.icon && <span className="mr-1.5">{item.icon}</span>}
                           {item.label}
@@ -170,7 +169,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, isAuthe
                             className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-card ring-1 ring-black ring-opacity-5 focus:outline-none z-50 py-1 transition-all duration-150 ease-out transform opacity-0 scale-95 group-focus-within:opacity-100 group-focus-within:scale-100"
                             role="menu"
                             aria-orientation="vertical"
-                            style={{ opacity: 1, transform: 'scale(1)' }} // Control with state if needed, or rely on focus/CSS
+                            style={{ opacity: 1, transform: 'scale(1)' }} 
                           >
                             {item.children.map((child) => (
                               <NavLink
@@ -199,8 +198,9 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, isAuthe
                   onClick={onLogout} 
                   variant="ghost" 
                   size="sm"
-                  className="ml-6 text-blue-100 hover:bg-blue-600 hover:text-white px-3 py-2" // Adjusted padding
+                  className="ml-6 text-blue-100 hover:bg-blue-600 hover:text-white px-3 py-2" 
                   leftIcon={<ArrowRightOnRectangleIcon className="h-5 w-5 transform rotate-180" />}
+                  title="Logout"
                 >
                   Logout
                 </Button>
@@ -208,7 +208,6 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, isAuthe
             </div>
           )}
 
-          {/* Mobile Menu Button */}
           {isAuthenticated && (
             <div className="md:hidden flex items-center">
               {onLogout && !isMobileMenuOpen && (
@@ -218,6 +217,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, isAuthe
                     size="sm"
                     className="text-blue-100 hover:bg-blue-600 hover:text-white p-2 mr-2"
                     aria-label="Logout"
+                    title="Logout"
                   >
                     <ArrowRightOnRectangleIcon className="h-6 w-6 transform rotate-180" />
                   </Button>
@@ -229,6 +229,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, isAuthe
                 aria-controls="mobile-menu"
                 aria-expanded={isMobileMenuOpen}
                 aria-label={isMobileMenuOpen ? "Close main menu" : "Open main menu"}
+                title={isMobileMenuOpen ? "Close main menu" : "Open main menu"}
               >
                 {isMobileMenuOpen ? <XMarkIcon className="block h-7 w-7" /> : <Bars3Icon className="block h-7 w-7" />}
               </button>
@@ -237,12 +238,11 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, isAuthe
         </div>
       </div>
 
-      {/* Mobile Menu Panel */}
       {isAuthenticated && isMobileMenuOpen && (
         <div 
           id="mobile-menu" 
           ref={mobileMenuRef}
-          className="md:hidden fixed inset-0 bg-blue-700 bg-opacity-95 backdrop-blur-sm z-40 pt-20 overflow-y-auto" // Start from below navbar
+          className="md:hidden fixed inset-0 bg-blue-700 bg-opacity-95 backdrop-blur-sm z-40 pt-20 overflow-y-auto" 
         >
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
             {NAVIGATION_ITEMS.map((item) => (
@@ -276,6 +276,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, isAuthe
                   variant="ghost" 
                   className="w-full text-blue-100 hover:bg-blue-600 hover:text-white justify-start px-3 py-3"
                   leftIcon={<ArrowRightOnRectangleIcon className="h-5 w-5 mr-2 transform rotate-180" />}
+                  title="Logout"
                 >
                   Logout
                 </Button>

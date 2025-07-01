@@ -1,14 +1,14 @@
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
-import { CampaignData, ViewName, ScheduledPost } from '../types';
+import { CampaignData, ViewName, ScheduledPost, SocialPlatformType, ContentDraft } from '../types';
 import { format } from 'date-fns';
-import { LoadingSpinner } from './ui/LoadingSpinner'; // If needed for async data in future
+import { DashboardSkeleton } from './skeletons/DashboardSkeleton';
 import { 
-    UsersIcon, BeakerIcon, DocumentTextIcon, CalendarDaysIcon, LinkIcon, // Generic Icons
-    ArrowRightIcon, PlusCircleIcon
-} from './ui/Icons'; // Assuming you have or will add these
+    UsersIcon, BeakerIcon, DocumentTextIcon, CalendarDaysIcon, LinkIcon, 
+    ArrowRightIcon, PlusCircleIcon, ExclamationTriangleIcon
+} from './ui/Icons'; 
+import { CONTENT_PLATFORMS } from '../constants';
 
 // Helper function to get a limited preview of content
 const getContentPreview = (content: string, length: number = 50): string => {
@@ -22,12 +22,21 @@ interface DashboardViewProps {
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ campaignData, onNavigate }) => {
+  const [isLoading, setIsLoading] = useState(true); 
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 750); 
+    return () => clearTimeout(timer);
+  }, []);
+
   const { personas, operators, contentDrafts, scheduledPosts, connectedAccounts } = campaignData;
 
   const upcomingPosts = scheduledPosts
     .filter(post => new Date(post.start) >= new Date())
     .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
-    .slice(0, 5); // Show next 5
+    .slice(0, 5);
 
   const latestPersona = personas.length > 0 ? personas[personas.length - 1] : null;
   const latestOperator = operators.length > 0 ? operators[operators.length - 1] : null;
@@ -38,34 +47,112 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ campaignData, onNa
     { label: "Design Operator", view: ViewName.OperatorBuilder, icon: <PlusCircleIcon className="w-5 h-5 mr-2" /> },
     { label: "Plan Content", view: ViewName.ContentPlanner, icon: <PlusCircleIcon className="w-5 h-5 mr-2" /> },
     { label: "View Calendar", view: ViewName.Calendar, icon: <CalendarDaysIcon className="w-5 h-5 mr-2" /> },
-    { label: "Manage Settings", view: ViewName.Settings, icon: <LinkIcon className="w-5 h-5 mr-2" /> }, // Placeholder for CogIcon
+    { label: "Manage Settings", view: ViewName.Settings, icon: <LinkIcon className="w-5 h-5 mr-2" /> },
   ];
   
   const summaryMetrics = [
-    { title: "Audience Personas", value: personas.length, icon: <UsersIcon className="w-8 h-8 text-primary" /> },
-    { title: "Campaign Operators", value: operators.length, icon: <BeakerIcon className="w-8 h-8 text-accent" /> },
-    { title: "Content Drafts", value: contentDrafts.length, icon: <DocumentTextIcon className="w-8 h-8 text-yellow-500" /> },
-    { title: "Upcoming Posts", value: upcomingPosts.length, icon: <CalendarDaysIcon className="w-8 h-8 text-blue-500" /> },
-    { title: "Connected Accounts", value: connectedAccounts.length, icon: <LinkIcon className="w-8 h-8 text-green-500" /> },
+    { title: "Audience Personas", value: personas.length, icon: <UsersIcon className="w-8 h-8 text-primary" />, navigateTo: ViewName.AudienceModeling },
+    { title: "Campaign Operators", value: operators.length, icon: <BeakerIcon className="w-8 h-8 text-accent" />, navigateTo: ViewName.OperatorBuilder },
+    { title: "Content Drafts", value: contentDrafts.length, icon: <DocumentTextIcon className="w-8 h-8 text-yellow-500" />, navigateTo: ViewName.ContentPlanner },
+    { title: "Upcoming Posts", value: upcomingPosts.length, icon: <CalendarDaysIcon className="w-8 h-8 text-blue-500" />, navigateTo: ViewName.Calendar },
+    { title: "Connected Accounts", value: connectedAccounts.length, icon: <LinkIcon className="w-8 h-8 text-green-500" />, navigateTo: ViewName.Settings },
   ];
 
+  // "Needs Attention" calculations
+  const scheduledDraftIds = new Set(scheduledPosts.map(sp => sp.resource.contentDraftId));
+  const draftsNotScheduledCount = contentDrafts.filter(d => !scheduledDraftIds.has(d.id)).length;
+
+  const operatorTargetAudienceIds = new Set(operators.map(op => op.targetAudienceId));
+  const personasWithoutOperatorsCount = personas.filter(p => !operatorTargetAudienceIds.has(p.id)).length;
+  
+  const connectedPlatformTypes = new Set(connectedAccounts.map(acc => acc.platform as string));
+  const postsForDisconnectedPlatformsCount = scheduledPosts.filter(post => {
+    const platformConfig = CONTENT_PLATFORMS.find(p => p.key === post.resource.platformKey);
+    // Consider a platform "social" if it's not an Email or a Poster type
+    const isSocialPlatform = platformConfig && !platformConfig.isPoster && platformConfig.key !== 'Email';
+    if (isSocialPlatform) {
+      // The platformKey from CONTENT_PLATFORMS (e.g., "X") should directly match SocialPlatformType enum values
+      return !connectedPlatformTypes.has(post.resource.platformKey as SocialPlatformType);
+    }
+    return false;
+  }).length;
+
+  const needsAttentionItems = [
+    { 
+      label: "Drafts Not Scheduled", 
+      count: draftsNotScheduledCount, 
+      navigateTo: ViewName.ContentPlanner, 
+      icon: <DocumentTextIcon className="w-5 h-5 text-yellow-600" /> 
+    },
+    { 
+      label: "Personas Without Operators", 
+      count: personasWithoutOperatorsCount, 
+      navigateTo: ViewName.OperatorBuilder, 
+      icon: <UsersIcon className="w-5 h-5 text-blue-600" /> 
+    },
+    { 
+      label: "Posts for Disconnected Platforms", 
+      count: postsForDisconnectedPlatformsCount, 
+      navigateTo: ViewName.Settings, 
+      icon: <LinkIcon className="w-5 h-5 text-red-600" /> 
+    },
+  ].filter(item => item.count > 0); // Only show items that need attention
+
+  if (isLoading) {
+    return <DashboardSkeleton />;
+  }
 
   return (
     <div className="p-4 md:p-6 space-y-6">
       <h2 className="text-3xl font-bold text-textPrimary">Dashboard Overview</h2>
       
-      {/* Summary Metrics */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-6">
         {summaryMetrics.map(metric => (
-          <Card key={metric.title} className="text-center p-4" shadow="soft-md">
-            <div className="flex justify-center mb-2">{metric.icon}</div>
-            <p className="text-3xl font-bold text-textPrimary">{metric.value}</p>
-            <p className="text-sm text-textSecondary">{metric.title}</p>
-          </Card>
+          <div 
+            key={metric.title} 
+            onClick={() => onNavigate(metric.navigateTo)}
+            className="cursor-pointer transition-all duration-150 ease-in-out hover:shadow-md hover:-translate-y-1"
+            role="button"
+            tabIndex={0}
+            onKeyPress={(e) => { if (e.key === 'Enter') onNavigate(metric.navigateTo); }}
+            aria-label={`View ${metric.title}`}
+          >
+            <Card className="text-center p-4 h-full flex flex-col justify-center items-center" shadow="soft-md">
+              <div className="flex justify-center mb-2">{metric.icon}</div>
+              <p className="text-3xl font-bold text-textPrimary">{metric.value}</p>
+              <p className="text-sm text-textSecondary">{metric.title}</p>
+            </Card>
+          </div>
         ))}
       </div>
 
-      {/* Quick Actions */}
+      {/* Needs Attention Section */}
+      {needsAttentionItems.length > 0 && (
+        <Card title="Needs Attention" shadow="soft-md" className="border-l-4 border-warning bg-yellow-50">
+            <div className="space-y-3">
+            {needsAttentionItems.map(item => (
+                <div 
+                    key={item.label}
+                    onClick={() => item.count > 0 && onNavigate(item.navigateTo)}
+                    className={`flex items-center justify-between p-3 rounded-lg transition-colors ${item.count > 0 ? 'cursor-pointer hover:bg-yellow-100' : 'opacity-70'}`}
+                    role={item.count > 0 ? "button" : undefined}
+                    tabIndex={item.count > 0 ? 0 : -1}
+                    onKeyPress={(e) => { if (e.key === 'Enter' && item.count > 0) onNavigate(item.navigateTo); }}
+                    aria-label={`${item.label}: ${item.count} items. Click to view.`}
+                >
+                <div className="flex items-center">
+                    {item.icon}
+                    <p className="ml-3 text-sm font-medium text-textPrimary">{item.label}</p>
+                </div>
+                <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-warning text-yellow-800">
+                    {item.count}
+                </span>
+                </div>
+            ))}
+            </div>
+        </Card>
+      )}
+
       <Card title="Quick Actions" shadow="soft-md">
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
           {quickActionButtons.map(action => (
@@ -83,7 +170,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ campaignData, onNa
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Upcoming Scheduled Posts */}
         <Card title="Upcoming Scheduled Posts" className="lg:col-span-2" shadow="soft-md">
           {upcomingPosts.length > 0 ? (
             <div className="space-y-3 max-h-96 overflow-y-auto">
@@ -128,7 +214,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ campaignData, onNa
           </Button>
         </Card>
 
-        {/* Recent Activity */}
         <Card title="Recent Activity" shadow="soft-md">
           <div className="space-y-4">
             {latestPersona && (

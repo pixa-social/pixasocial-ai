@@ -1,5 +1,10 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import Gun from 'gun/gun'; 
+import 'gun/lib/radix'; 
+import 'gun/lib/radisk'; 
+import 'gun/lib/store'; 
+import 'gun/lib/rindexed'; 
+
 import { User, ChatMessage, ChatMessageAttachment, CustomChannel } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
@@ -9,16 +14,23 @@ import { PaperAirplaneIcon, PaperClipIcon, UserCircleIcon, HashtagIcon, PlusIcon
 import { useToast } from './ui/ToastProvider';
 import { ACCEPTED_CHAT_FILE_TYPES, CHAT_IMAGE_PREVIEW_MAX_SIZE_BYTES, GENERAL_CHAT_CHANNEL_ID, GENERAL_CHAT_CHANNEL_NAME } from '../constants';
 import { format } from 'date-fns';
+import { ChatMessageItem } from './chat/ChatMessageItem'; 
 
 interface ChatViewProps {
   currentUser: User;
   teamMembers: string[];
   customChannels: CustomChannel[];
-  chatMessages: ChatMessage[];
-  onAddChatMessage: (message: ChatMessage) => void;
   onAddCustomChannel: (name: string) => void;
   onRemoveCustomChannel: (channelId: string) => void;
 }
+
+const gun = Gun({ 
+  peers: ['https://gun-manhattan.herokuapp.com/gun'], 
+  localStorage: false, 
+  radisk: true, 
+  rindexed: 'PixaSocialChat'
+});
+
 
 const formatBytes = (bytes: number, decimals = 2) => {
   if (bytes === 0) return '0 Bytes';
@@ -30,8 +42,8 @@ const formatBytes = (bytes: number, decimals = 2) => {
 };
 
 export const ChatView: React.FC<ChatViewProps> = ({ 
-    currentUser, teamMembers, customChannels, chatMessages, 
-    onAddChatMessage, onAddCustomChannel, onRemoveCustomChannel 
+    currentUser, teamMembers, customChannels, 
+    onAddCustomChannel, onRemoveCustomChannel 
 }) => {
   const { showToast } = useToast();
   const [activeChannelId, setActiveChannelId] = useState<string>(GENERAL_CHAT_CHANNEL_ID);
@@ -40,27 +52,85 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showAddChannelInput, setShowAddChannelInput] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
+  const [currentChannelMessages, setCurrentChannelMessages] = useState<ChatMessage[]>([]);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
 
-  const scrollToBottom = () => {
+  const gunMessagesRef = useRef<any>(null); 
+
+  const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  },[]);
 
-  useEffect(scrollToBottom, [chatMessages, activeChannelId]);
+  useEffect(scrollToBottom, [currentChannelMessages, scrollToBottom]);
   
-  // Reset new channel input when active channel changes or input is hidden
   useEffect(() => {
     if (!showAddChannelInput) {
         setNewChannelName('');
     }
   }, [showAddChannelInput, activeChannelId]);
 
+  useEffect(() => {
+    setCurrentChannelMessages([]); 
+    setIsLoadingMessages(true);
 
-  const getDmChannelId = (memberEmail: string): string => {
+    if (gunMessagesRef.current) {
+      gunMessagesRef.current.off(); 
+    }
+
+    const channelMessagesPath = gun.get('pixasocial/chat/messages').get(activeChannelId);
+    gunMessagesRef.current = channelMessagesPath; 
+
+    const loadedMsgs: Record<string, ChatMessage> = {};
+    let initialLoadComplete = false;
+    let loadTimeout: ReturnType<typeof setTimeout>;
+
+    channelMessagesPath.map().on((data: ChatMessage | null, id: string) => {
+      if (data) {
+        if (typeof data === 'object' && data !== null && data.id && data.timestamp) {
+          loadedMsgs[id] = { ...data, timestamp: new Date(data.timestamp).toISOString() }; 
+          
+          if(initialLoadComplete) { 
+             setCurrentChannelMessages(prevMsgs => {
+                const existingMsgIndex = prevMsgs.findIndex(m => m.id === data.id);
+                if (existingMsgIndex > -1) {
+                    const updated = [...prevMsgs];
+                    updated[existingMsgIndex] = data;
+                    return updated.sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+                }
+                return [...prevMsgs, data].sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+             });
+          }
+        }
+      } else if (data === null && loadedMsgs[id]) { 
+        delete loadedMsgs[id];
+        if(initialLoadComplete) {
+            setCurrentChannelMessages(Object.values(loadedMsgs).sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()));
+        }
+      }
+    });
+
+    loadTimeout = setTimeout(() => {
+        initialLoadComplete = true;
+        setCurrentChannelMessages(Object.values(loadedMsgs).sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()));
+        setIsLoadingMessages(false);
+    }, 750); 
+
+
+    return () => {
+      if (gunMessagesRef.current) {
+        gunMessagesRef.current.off();
+      }
+      clearTimeout(loadTimeout);
+    };
+  }, [activeChannelId]);
+
+
+  const getDmChannelId = useCallback((memberEmail: string): string => {
     const emails = [currentUser.email, memberEmail].sort();
     return `dm_${emails[0]}_${emails[1]}`;
-  };
+  }, [currentUser.email]);
   
-  const getChannelDisplayName = (channelId: string): string => {
+  const getChannelDisplayName = useCallback((channelId: string): string => {
     if (channelId === GENERAL_CHAT_CHANNEL_ID) return GENERAL_CHAT_CHANNEL_NAME;
     
     const customChannel = customChannels.find(c => c.id === channelId);
@@ -69,33 +139,43 @@ export const ChatView: React.FC<ChatViewProps> = ({
     if (channelId.startsWith('dm_')) {
         const parts = channelId.split('_');
         const otherUserEmail = parts.find(part => part !== currentUser.email && part !== 'dm');
-        const otherUserName = teamMembers.find(email => email === otherUserEmail)?.split('@')[0] || otherUserEmail || "Direct Message";
-        return otherUserName;
+        const otherUser = teamMembers.find(email => email === otherUserEmail);
+        return otherUser?.split('@')[0] || otherUserEmail || "Direct Message";
     }
-    return channelId; // Fallback
-  };
+    return channelId; 
+  }, [customChannels, currentUser.email, teamMembers]);
 
-  const currentChannelMessages = chatMessages.filter(msg => msg.channelId === activeChannelId)
-                                         .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
-  const handleSendMessage = (text: string, attachment?: ChatMessageAttachment) => {
+  const handleSendMessage = useCallback((text: string, attachment?: ChatMessageAttachment) => {
     if (!text.trim() && !attachment) return;
 
-    const newMessage: ChatMessage = {
-      id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
+    const newMessageData: Partial<ChatMessage> = { 
+      id: Date.now().toString() + Math.random().toString(36).slice(2, 9),
       channelId: activeChannelId,
       senderEmail: currentUser.email,
       senderName: currentUser.name || currentUser.email.split('@')[0],
       timestamp: new Date().toISOString(),
-      text: text.trim() || undefined,
-      attachment: attachment,
     };
-    onAddChatMessage(newMessage);
+
+    if (text.trim()) {
+      newMessageData.text = text.trim();
+    }
+    if (attachment) {
+      newMessageData.attachment = attachment;
+    }
+    
+    gun.get('pixasocial/chat/messages').get(activeChannelId).get(newMessageData.id as string).put(newMessageData as ChatMessage, (ack) => {
+        if ((ack as any).err) { 
+            showToast(`Error sending message: ${(ack as any).err}`, 'error');
+            console.error('GunDB send error:', (ack as any).err);
+        }
+    });
+
     setMessageInput('');
     if (fileInputRef.current) fileInputRef.current.value = '';
-  };
+  }, [activeChannelId, currentUser, showToast]);
   
-  const handleFileAttach = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileAttach = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       if (!ACCEPTED_CHAT_FILE_TYPES.includes(file.type)) {
@@ -130,9 +210,9 @@ export const ChatView: React.FC<ChatViewProps> = ({
         handleSendMessage(messageInput, attachmentInfo);
       }
     }
-  };
+  }, [showToast, handleSendMessage, messageInput]);
 
-  const handleCreateChannel = () => {
+  const handleCreateChannel = useCallback(() => {
     if (!newChannelName.trim()) {
       showToast("Channel name cannot be empty.", "error");
       return;
@@ -141,30 +221,30 @@ export const ChatView: React.FC<ChatViewProps> = ({
     if (!channelName.startsWith('#')) {
         channelName = `#${channelName}`;
     }
-    onAddCustomChannel(channelName);
+    onAddCustomChannel(channelName); 
     setNewChannelName('');
     setShowAddChannelInput(false);
-  };
+  }, [newChannelName, onAddCustomChannel, showToast]);
 
-  const handleDeleteChannel = (channelId: string, channelName: string) => {
+  const handleDeleteChannel = useCallback((channelId: string, channelName: string) => {
     if (window.confirm(`Are you sure you want to delete the channel "${channelName}"? This action cannot be undone.`)) {
         onRemoveCustomChannel(channelId);
-        if (activeChannelId === channelId) { // If active channel is deleted, switch to general
+        if (activeChannelId === channelId) { 
             setActiveChannelId(GENERAL_CHAT_CHANNEL_ID);
         }
     }
-  };
+  }, [onRemoveCustomChannel, activeChannelId]);
 
 
   return (
     <div className="flex flex-col h-[calc(100vh-12rem)] md:h-[calc(100vh-10rem)] bg-card shadow-lg rounded-lg overflow-hidden">
       <header className="bg-primary text-white p-4 flex items-center justify-between shadow-md">
         <h2 className="text-xl font-semibold">{getChannelDisplayName(activeChannelId)}</h2>
-        <span className="text-xs opacity-80">Team Chat</span>
+        <span className="text-xs opacity-80">Team Chat (Decentralized with GunDB)</span>
       </header>
       
       <div className="flex flex-1 overflow-hidden">
-        <aside className="w-1/4 min-w-[220px] max-w-[300px] bg-gray-100 border-r border-lightBorder p-3 space-y-3 overflow-y-auto">
+        <aside className="w-1/4 min-w-[220px] max-w-[300px] bg-gray-50 border-r border-lightBorder p-3 space-y-3 overflow-y-auto"> 
           <div>
             <div className="flex justify-between items-center mb-1">
                 <h3 className="text-xs font-semibold text-textSecondary uppercase tracking-wider">Channels</h3>
@@ -188,7 +268,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             <button
               onClick={() => setActiveChannelId(GENERAL_CHAT_CHANNEL_ID)}
               className={`w-full text-left px-2.5 py-1.5 rounded-md text-sm flex items-center group
-                ${activeChannelId === GENERAL_CHAT_CHANNEL_ID ? 'bg-blue-100 text-primary font-medium' : 'text-textPrimary hover:bg-gray-200'}`}
+                ${activeChannelId === GENERAL_CHAT_CHANNEL_ID ? 'bg-blue-100 text-primary font-medium' : 'text-textPrimary hover:bg-gray-200'}`} 
             >
               <HashtagIcon className="w-4 h-4 mr-1.5 text-gray-500"/> {GENERAL_CHAT_CHANNEL_NAME}
             </button>
@@ -197,13 +277,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 <button
                   onClick={() => setActiveChannelId(channel.id)}
                   className={`w-full text-left px-2.5 py-1.5 rounded-md text-sm flex items-center flex-grow
-                    ${activeChannelId === channel.id ? 'bg-blue-100 text-primary font-medium' : 'text-textPrimary hover:bg-gray-200'}`}
+                    ${activeChannelId === channel.id ? 'bg-blue-100 text-primary font-medium' : 'text-textPrimary hover:bg-gray-200'}`} 
                   title={channel.name}
                 >
                   <HashtagIcon className="w-4 h-4 mr-1.5 text-gray-500"/> 
                   <span className="truncate">{channel.name}</span>
                 </button>
-                {/* Show delete button only if channel is custom and not #general */}
                 {channel.id !== GENERAL_CHAT_CHANNEL_ID && (
                     <Button 
                         variant="ghost" 
@@ -230,7 +309,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                     key={memberEmail}
                     onClick={() => setActiveChannelId(dmId)}
                     className={`w-full text-left px-2.5 py-1.5 rounded-md text-sm flex items-center group
-                      ${activeChannelId === dmId ? 'bg-blue-100 text-primary font-medium' : 'text-textPrimary hover:bg-gray-200'}`}
+                      ${activeChannelId === dmId ? 'bg-blue-100 text-primary font-medium' : 'text-textPrimary hover:bg-gray-200'}`} 
                   >
                     <UserCircleIcon className="w-4 h-4 mr-1.5 text-gray-500" />
                     <span className="truncate">{memberEmail.split('@')[0]}</span>
@@ -245,46 +324,15 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
         <main className="flex-1 flex flex-col bg-background">
           <div className="flex-1 p-4 space-y-4 overflow-y-auto">
-            {currentChannelMessages.length === 0 && (
+            {isLoadingMessages && <div className="text-center text-textSecondary py-10">Loading messages...</div>}
+            {!isLoadingMessages && currentChannelMessages.length === 0 && (
               <div className="text-center text-textSecondary py-10">
                 No messages in {getChannelDisplayName(activeChannelId)} yet. Be the first!
               </div>
             )}
-            {currentChannelMessages.map(msg => {
-              const isCurrentUser = msg.senderEmail === currentUser.email;
-              return (
-                <div key={msg.id} className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-xs md:max-w-md lg:max-w-lg p-3 rounded-lg shadow ${
-                      isCurrentUser ? 'bg-primary text-white rounded-br-none' : 'bg-gray-200 text-textPrimary rounded-bl-none'
-                    }`}
-                  >
-                    {!isCurrentUser && (
-                      <p className="text-xs font-semibold mb-0.5 opacity-80">{msg.senderName}</p>
-                    )}
-                    {msg.text && <p className="text-sm whitespace-pre-wrap">{msg.text}</p>}
-                    {msg.attachment && (
-                      <div className={`mt-2 p-2 rounded-md ${isCurrentUser ? 'bg-blue-600' : 'bg-gray-300'}`}>
-                        <div className="flex items-center space-x-2">
-                          <PaperClipIcon className={`w-4 h-4 ${isCurrentUser ? 'text-blue-100' : 'text-gray-600'}`} />
-                          <span className={`text-xs font-medium truncate ${isCurrentUser ? 'text-blue-50' : 'text-gray-700'}`} title={msg.attachment.name}>
-                            {msg.attachment.name}
-                          </span>
-                        </div>
-                        <p className={`text-xxs opacity-70 ${isCurrentUser ? 'text-blue-200' : 'text-gray-500'}`}>
-                          {msg.attachment.type} - {formatBytes(msg.attachment.size)}
-                        </p>
-                        {msg.attachment.dataUrl && msg.attachment.type.startsWith('image/') && (
-                           <img src={msg.attachment.dataUrl} alt="Preview" className="mt-1 max-w-[100px] max-h-20 rounded object-contain"/>
-                        )}
-                      </div>
-                    )}
-                    <p className={`text-xxs mt-1.5 ${isCurrentUser ? 'text-right opacity-70' : 'text-left opacity-60'}`}>
-                      {format(new Date(msg.timestamp), 'p')}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
+            {currentChannelMessages.map(msg => (
+              <ChatMessageItem key={msg.id} msg={msg} currentUser={currentUser} />
+            ))}
             <div ref={messagesEndRef} />
           </div>
 
@@ -323,6 +371,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 disabled={!messageInput.trim() && !fileInputRef.current?.files?.length}
                 aria-label="Send message"
                 className="p-2"
+                title="Send message"
               >
                 <PaperAirplaneIcon className="w-5 h-5"/>
               </Button>
@@ -335,11 +384,14 @@ export const ChatView: React.FC<ChatViewProps> = ({
   );
 };
 
-const style = document.createElement('style');
-style.innerHTML = `
-  .text-xxs {
-    font-size: 0.65rem; 
-    line-height: 0.8rem;
-  }
-`;
-document.head.appendChild(style);
+if (!document.getElementById('pixasocial-text-xxs-style')) {
+  const style = document.createElement('style');
+  style.id = 'pixasocial-text-xxs-style';
+  style.innerHTML = `
+    .text-xxs {
+      font-size: 0.65rem; 
+      line-height: 0.8rem;
+    }
+  `;
+  document.head.appendChild(style);
+}

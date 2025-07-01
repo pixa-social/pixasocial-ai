@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { ToastMessage, ToastContextType } from '../../types';
 import { Toast } from './Toast';

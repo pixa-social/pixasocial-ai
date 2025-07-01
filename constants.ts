@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { ViewName, NavItem, AuditStep, Persona, MediaType, AiProviderType, AiProviderConfig, RSTTraitLevel, RSTProfile, SocialPlatformType } from './types';
 import type { Operator } from './types';
@@ -7,7 +6,7 @@ import {
     PinterestIcon, TikTokIcon, YouTubeIcon, LinkIcon,
     PhotoIcon,
     DocumentDuplicateIcon,
-    ChatBubbleLeftEllipsisIcon // Added Chat Icon
+    ChatBubbleLeftEllipsisIcon 
 } from './components/ui/Icons';
 
 export const APP_TITLE = "PixaSocial Ai";
@@ -26,7 +25,7 @@ export const NAVIGATION_ITEMS: NavItem[] = [
       { label: ViewName.AuditTool, viewName: ViewName.AuditTool },
     ],
   },
-  { label: ViewName.TeamChat, viewName: ViewName.TeamChat, icon: React.createElement(ChatBubbleLeftEllipsisIcon) }, // Added Team Chat
+  { label: ViewName.TeamChat, viewName: ViewName.TeamChat, icon: React.createElement(ChatBubbleLeftEllipsisIcon) }, 
   { label: ViewName.Methodology, viewName: ViewName.Methodology },
   { label: ViewName.AdminPanel, viewName: ViewName.AdminPanel },
   { label: ViewName.Settings, viewName: ViewName.Settings }, 
@@ -114,7 +113,7 @@ export const CONTENT_PLATFORMS: Array<{
   },
   { 
     key: 'Poster169', 
-    label: 'Poster (1:9 Landscape)', 
+    label: 'Poster (16:9 Landscape)', 
     styleGuideline: "Focus on generating a detailed 'imagePrompt' for a visually rich landscape (16:9 aspect ratio, e.g., 1280x720px) image suitable for a poster. Also provide 'memeText' if applicable. No post content or hashtags needed for AI generation for this platform.", 
     icon: React.createElement(DocumentDuplicateIcon, { className: "w-4 h-4 inline-block" }),
     isPoster: true,
@@ -123,13 +122,18 @@ export const CONTENT_PLATFORMS: Array<{
   },
 ];
 
-// RST Constants
 export const RST_TRAIT_LEVELS: RSTTraitLevel[] = ['Not Assessed', 'Low', 'Medium', 'High'];
 
 export const RST_TRAIT_LEVEL_OPTIONS: Array<{ value: RSTTraitLevel; label: string }> = RST_TRAIT_LEVELS.map(level => ({
   value: level,
   label: level,
 }));
+
+export const RST_FILTER_OPTIONS: Array<{ value: RSTTraitLevel | 'Any'; label: string }> = [
+  { value: 'Any', label: 'Any Level' },
+  ...RST_TRAIT_LEVEL_OPTIONS
+];
+
 
 export const RST_TRAITS: Array<{ key: keyof RSTProfile; label: string; description: string }> = [
     { key: 'bas', label: 'Behavioral Approach System (BAS)', description: 'Sensitivity to rewards, positive outcomes, and approach motivation. High BAS individuals are often impulsive and seek novelty.' },
@@ -162,8 +166,8 @@ export const TONE_OF_VOICE_OPTIONS: Array<{ value: string; label: string }> = [
 export const LOCAL_STORAGE_AI_CONFIG_KEY = 'pixasocial_ai_provider_configs';
 export const LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY = 'pixasocial_active_ai_provider';
 export const LOCAL_STORAGE_CAMPAIGN_DATA_KEY = 'pixasocial_campaign_data';
-export const LOCAL_STORAGE_USERS_KEY = 'pixasocial_users'; // For mock user registration
-export const LOCAL_STORAGE_AUTH_TOKEN_KEY = 'pixasocial_auth_token'; // For mock login state
+export const LOCAL_STORAGE_USERS_KEY = 'pixasocial_users'; 
+export const LOCAL_STORAGE_AUTH_TOKEN_KEY = 'pixasocial_auth_token'; 
 
 
 export const AI_PROVIDERS_CONFIG_TEMPLATE: AiProviderConfig[] = [
@@ -252,15 +256,62 @@ export const SOCIAL_PLATFORMS_TO_CONNECT: Array<{ id: SocialPlatformType; name: 
   { id: SocialPlatformType.YouTube, name: 'YouTube', icon: YouTubeIcon, description: "Manage video uploads and scheduling for your YouTube channels.", brandColor: "text-red-500" },
 ];
 
-export const MAX_FILE_UPLOAD_SIZE_MB = 2; // Kept small for localStorage
-export const CHAT_IMAGE_PREVIEW_MAX_SIZE_BYTES = 100 * 1024; // 100KB for chat image previews
+export const MAX_FILE_UPLOAD_SIZE_MB = 2; 
+export const CHAT_IMAGE_PREVIEW_MAX_SIZE_BYTES = 100 * 1024; 
 export const MAX_FILE_UPLOAD_SIZE_BYTES = MAX_FILE_UPLOAD_SIZE_MB * 1024 * 1024;
 export const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-export const ACCEPTED_VIDEO_TYPES = ['video/mp4', 'video/webm']; // Note: Video previews in chat won't be a focus
-export const ACCEPTED_CHAT_FILE_TYPES = [...ACCEPTED_IMAGE_TYPES, ...ACCEPTED_VIDEO_TYPES, 'application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']; // Broader for chat
+export const ACCEPTED_VIDEO_TYPES = ['video/mp4', 'video/webm']; 
+export const ACCEPTED_CHAT_FILE_TYPES = [...ACCEPTED_IMAGE_TYPES, ...ACCEPTED_VIDEO_TYPES, 'application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']; 
 export const ACCEPTED_MEDIA_TYPES = [...ACCEPTED_IMAGE_TYPES, ...ACCEPTED_VIDEO_TYPES];
 
 
-export const MAX_TEAM_MEMBERS = 3; // Added for team management
+export const MAX_TEAM_MEMBERS = 3; 
 export const GENERAL_CHAT_CHANNEL_ID = "general";
 export const GENERAL_CHAT_CHANNEL_NAME = "#general";
+
+// Font Customization Constants
+export const DEFAULT_FONT_FAMILY = 'Roboto'; // Matches a Google Font
+export const DEFAULT_FONT_COLOR = '#FFFFFF';
+
+export const CURATED_FONT_OPTIONS: Array<{ value: string; label: string; style: React.CSSProperties }> = [
+  { value: 'system-default', label: 'System Default', style: { fontFamily: 'Arial, sans-serif' } },
+  { value: 'AI Suggested', label: 'AI Suggested', style: { fontStyle: 'italic', color: '#1E40AF' } },
+  { value: 'Roboto', label: 'Roboto', style: { fontFamily: "'Roboto', sans-serif" } },
+  { value: 'Open Sans', label: 'Open Sans', style: { fontFamily: "'Open Sans', sans-serif" } },
+  { value: 'Lato', label: 'Lato', style: { fontFamily: "'Lato', sans-serif" } },
+  { value: 'Montserrat', label: 'Montserrat', style: { fontFamily: "'Montserrat', sans-serif" } },
+  { value: 'Impact', label: 'Impact', style: { fontFamily: 'Impact, sans-serif' } },
+  { value: 'Anton', label: 'Anton', style: { fontFamily: "'Anton', sans-serif" } },
+  { value: 'Bangers', label: 'Bangers', style: { fontFamily: "'Bangers', cursive" } },
+  { value: 'Creepster', label: 'Creepster', style: { fontFamily: "'Creepster', cursive" } },
+  { value: 'Pacifico', label: 'Pacifico', style: { fontFamily: "'Pacifico', cursive" } },
+  { value: 'Lobster', label: 'Lobster', style: { fontFamily: "'Lobster', cursive" } },
+];
+
+export const FONT_CATEGORY_MAP: Record<string, string> = {
+  'default': DEFAULT_FONT_FAMILY,
+  'playful-script': 'Pacifico',
+  'bold-impactful': 'Anton',
+  'horror-themed': 'Creepster',
+  'modern-clean': 'Roboto',
+  'comic-fun': 'Bangers',
+  'elegant-serif': 'Lato', 
+  'retro-script': 'Lobster',
+  'sans-serif': 'Open Sans',
+  'geometric-sans': 'Montserrat',
+  'impactful-display': 'Impact',
+};
+
+export const MEME_TEXT_COLOR_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: '#FFFFFF', label: 'White' },
+  { value: '#000000', label: 'Black' },
+  { value: '#FFFF00', label: 'Yellow' },
+  { value: '#FF0000', label: 'Red' },
+  { value: '#00FF00', label: 'Lime Green' },
+  { value: '#00FFFF', label: 'Cyan' },
+  { value: '#FF00FF', label: 'Magenta' },
+  { value: '#FFC0CB', label: 'Pink' },
+  { value: '#FFA500', label: 'Orange' },
+];
+
+export const ITEMS_PER_PAGE = 6;

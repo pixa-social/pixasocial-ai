@@ -1,8 +1,8 @@
 import React from 'react';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
-  size?: 'sm' | 'md' | 'lg';
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'success' | 'outline' | 'link'; // Added 'link'
+  size?: 'xs' | 'sm' | 'md' | 'lg';
   isLoading?: boolean;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
@@ -18,18 +18,22 @@ export const Button: React.FC<ButtonProps> = ({
   className = '',
   ...props
 }) => {
-  const baseStyles = 'font-semibold rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 transition-colors duration-150 flex items-center justify-center disabled:opacity-70 disabled:cursor-not-allowed';
+  const baseStyles = 'font-semibold rounded-md focus:outline-none focus:ring-2 focus:ring-offset-1 transition-colors duration-150 flex items-center justify-center disabled:opacity-70 disabled:cursor-not-allowed';
   
   const variantStyles = {
-    primary: 'bg-primary text-white hover:bg-blue-700 focus:ring-blue-500',
-    secondary: 'bg-secondary text-white hover:bg-gray-700 focus:ring-gray-500',
-    danger: 'bg-danger text-white hover:bg-red-600 focus:ring-red-500',
-    ghost: 'bg-transparent text-primary hover:bg-blue-100 focus:ring-blue-500'
+    primary: 'bg-primary text-white hover:bg-blue-600 focus:ring-primary focus:ring-offset-0', // Adjusted hover, offset
+    secondary: 'bg-secondary text-white hover:bg-gray-700 focus:ring-secondary focus:ring-offset-0',
+    danger: 'bg-danger text-white hover:bg-red-600 focus:ring-danger focus:ring-offset-0',
+    ghost: 'bg-transparent text-primary hover:bg-blue-100 focus:ring-primary focus:ring-offset-0',
+    success: 'bg-accent text-white hover:bg-emerald-600 focus:ring-accent focus:ring-offset-0',
+    outline: 'bg-transparent text-primary border border-primary hover:bg-primary hover:text-white focus:ring-primary focus:ring-offset-0',
+    link: 'bg-transparent text-primary hover:text-blue-600 hover:underline focus:ring-primary focus:ring-offset-0', // Added link styles
   };
 
   const sizeStyles = {
-    sm: 'px-3.5 py-2 text-sm', // slightly more padding
-    md: 'px-5 py-2.5 text-base', // slightly more padding
+    xs: 'px-2.5 py-1.5 text-xs',
+    sm: 'px-3.5 py-2 text-sm',
+    md: 'px-5 py-2.5 text-base',
     lg: 'px-6 py-3 text-lg'
   };
 

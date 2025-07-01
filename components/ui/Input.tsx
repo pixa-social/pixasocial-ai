@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -10,7 +9,7 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 
 export const Input: React.FC<InputProps> = ({ label, id, error, className = '', containerClassName = '', leftIcon, ...props }) => {
   const hasIcon = !!leftIcon;
-  const baseStyles = `block w-full px-3 py-2 border border-mediumBorder rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:text-sm bg-white text-textPrimary ${hasIcon ? 'pl-10' : ''}`;
+  const baseStyles = `block w-full px-3 py-2 border border-mediumBorder rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:text-sm bg-white text-textPrimary ${hasIcon ? 'pl-10' : ''} focus:bg-gray-50`; // Added focus:bg-gray-50
   const errorStyles = error ? 'border-danger focus:ring-danger focus:border-danger' : 'border-mediumBorder';
 
   return (

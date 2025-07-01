@@ -1,4 +1,3 @@
-
 export enum ViewName {
   Dashboard = 'Dashboard',
   AudienceModeling = 'Audience Modeling',
@@ -20,9 +19,9 @@ export type AuthViewType = 'home' | 'login' | 'register';
 
 export interface User {
   id: string;
+  supabaseId?: string; // Optional: to store Supabase user ID
   name?: string;
   email: string;
-  passwordHash: string; // In a real app, this would be a securely hashed password
   walletAddress?: string;
   teamMembers?: string[];
 }
@@ -81,6 +80,11 @@ export interface PlatformContentDetail {
   processedImageUrl?: string; 
 
   videoIdea?: string;
+
+  // New fields for font customization
+  fontFamily?: string; // e.g., 'Roboto', 'Impact', or 'system-default'
+  fontColor?: string;  // e.g., '#FFFFFF', '#000000'
+  aiSuggestedFontCategory?: string; // Raw category from AI like "playful-script"
 }
 
 export type PlatformContentMap = Record<string, PlatformContentDetail>;
@@ -91,6 +95,8 @@ export interface ContentDraft {
   personaId: string;
   customPrompt: string;
   platformContents: PlatformContentMap;
+  keyMessage?: string; 
+  platformSpecificMediaTypes_INTERNAL_DO_NOT_USE?: Record<string, MediaType | 'global'>;
 }
 
 export interface FeedbackSimulationResult {
@@ -130,13 +136,16 @@ export interface AiProviderModelSet {
 export interface AiProviderConfig {
   id: AiProviderType;
   name: string;
-  apiKey: string | null;
+  apiKey: string | null; 
   isEnabled: boolean;
   isGemini?: boolean;
   models: AiProviderModelSet;
   notes?: string;
   baseURL?: string;
 }
+
+export type AiProviderConfigForExport = Omit<AiProviderConfig, 'apiKey'> & { apiKey?: null };
+
 
 export interface GroundingChunk {
   web?: {
@@ -162,8 +171,8 @@ export interface ScheduledPostResource {
 export interface ScheduledPost {
   id: string;
   title: string;
-  start: Date;
-  end: Date;
+  start: Date; 
+  end: Date;   
   allDay?: boolean;
   resource: ScheduledPostResource;
 }
@@ -194,7 +203,8 @@ export interface ContentLibraryAsset {
   fileName: string;
   fileType: string; 
   size: number; 
-  uploadedAt: string; 
+  uploadedAt: string;
+  tags?: string[]; 
 }
 
 export interface ChatMessageAttachment {
@@ -216,9 +226,9 @@ export interface ChatMessage {
 
 export interface CustomChannel {
   id: string;
-  name: string; // User-defined channel name, e.g., "#marketing-campaign"
-  createdBy: string; // Email of the user who created it
-  createdAt: string; // ISO date string
+  name: string; 
+  createdBy: string; 
+  createdAt: string; 
 }
 
 export interface CampaignData {
@@ -228,8 +238,9 @@ export interface CampaignData {
   scheduledPosts: ScheduledPost[];
   connectedAccounts: ConnectedAccount[]; 
   contentLibraryAssets: ContentLibraryAsset[];
-  customChannels: CustomChannel[]; // Added for custom chat channels
-  chatMessages: ChatMessage[];
+  customChannels: CustomChannel[];
+  chatMessages?: ChatMessage[]; 
+  aiProviderConfigs?: AiProviderConfigForExport[]; 
 }
 
 export interface AISuggestionRequest {

@@ -1,6 +1,5 @@
-
-import React, { useState } from 'react';
-import { Operator, Persona, RSTProfile, RSTTraitLevel } from '../types';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { Operator, Persona, RSTProfile, RSTTraitLevel, ViewName } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
@@ -9,36 +8,40 @@ import { Select } from './ui/Select';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { generateJson } from '../services/aiService';
 import { OPERATOR_TYPES, RST_TRAITS } from '../constants';
-import { useToast } from './ui/ToastProvider'; // Import useToast
+import { useToast } from './ui/ToastProvider'; 
+import RstVisualBar from './audience-modeling/RstVisualBar'; 
+import { PrerequisiteMessageCard } from './ui/PrerequisiteMessageCard';
+import { useNavigateToView } from '../hooks/useNavigateToView';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 
 interface OperatorBuilderViewProps {
   operators: Operator[];
   personas: Persona[];
   onAddOperator: (operator: Operator) => void;
   onUpdateOperator: (operator: Operator) => void;
+  onNavigate?: (view: ViewName) => void;
 }
 
-// Helper component for RST Visual Bar
-const RstVisualBar: React.FC<{ level: RSTTraitLevel }> = ({ level }) => {
-  const levelMap: Record<RSTTraitLevel, { width: string; color: string; label: string }> = {
-    'Not Assessed': { width: 'w-1/4', color: 'bg-gray-300', label: 'NA' },
-    'Low': { width: 'w-1/2', color: 'bg-green-500', label: 'L' },
-    'Medium': { width: 'w-3/4', color: 'bg-yellow-500', label: 'M' },
-    'High': { width: 'w-full', color: 'bg-red-500', label: 'H' },
-  };
-  const currentLevel = levelMap[level] || levelMap['Not Assessed'];
-  return (
-    <div className="w-full bg-gray-200 rounded-full h-2.5 my-1" title={level}>
-      <div className={`${currentLevel.color} h-2.5 rounded-full ${currentLevel.width}`}></div>
-    </div>
-  );
-};
+const operatorFormSchema = z.object({
+  name: z.string().min(1, "Operator name is required"),
+  targetAudienceId: z.string().min(1, "Target audience is required"),
+  type: z.enum(OPERATOR_TYPES as [Operator['type'], ...Operator['type'][]], { // Type assertion for zod
+    errorMap: () => ({ message: "Operator type is required" })
+  }),
+  desiredConditionedResponse: z.string().min(1, "Desired conditioned response is required"),
+  conditionedStimulus: z.string().min(1, "Conditioned stimulus is required"),
+  unconditionedStimulus: z.string().min(1, "Unconditioned stimulus is required"),
+  reinforcementLoop: z.string().min(1, "Reinforcement loop is required"),
+});
 
+type OperatorFormData = z.infer<typeof operatorFormSchema>;
 
 interface OperatorFormProps {
   initialOperator?: Operator;
   personas: Persona[];
-  onSubmit: (operator: Omit<Operator, 'id'>) => void;
+  onSubmitForm: (operator: OperatorFormData) => void; // Changed from Omit<Operator, 'id'> to OperatorFormData
   onCancel?: () => void;
   isLoading?: boolean;
   onSuggestOperatorDetails?: (details: { type: Operator['type'], targetAudienceId: string, desiredCR: string }) => Promise<{cs?: string, us?: string, reinforcementLoop?: string} | null>;
@@ -50,52 +53,59 @@ interface AiOperatorSuggestion {
     reinforcementLoop: string;
 }
 
-const OperatorForm: React.FC<OperatorFormProps> = ({ initialOperator, personas, onSubmit, onCancel, isLoading, onSuggestOperatorDetails }) => {
+const OperatorFormComponent: React.FC<OperatorFormProps> = ({ initialOperator, personas, onSubmitForm, onCancel, isLoading, onSuggestOperatorDetails }) => {
   const { showToast } = useToast();
-  const [name, setName] = useState(initialOperator?.name || '');
-  const [targetAudienceId, setTargetAudienceId] = useState(initialOperator?.targetAudienceId || '');
-  const [type, setType] = useState<Operator['type']>(initialOperator?.type || 'Custom');
-  const [cs, setCs] = useState(initialOperator?.conditionedStimulus || '');
-  const [us, setUs] = useState(initialOperator?.unconditionedStimulus || '');
-  const [desiredCR, setDesiredCR] = useState(initialOperator?.desiredConditionedResponse || '');
-  const [reinforcementLoop, setReinforcementLoop] = useState(initialOperator?.reinforcementLoop || '');
-  const [isSuggesting, setIsSuggesting] = useState(false);
-
-  const selectedPersona = personas.find(p => p.id === targetAudienceId);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!targetAudienceId) {
-        showToast("Please select a target audience.", "error");
-        return;
+  const { control, register, handleSubmit, watch, setValue, formState: { errors } } = useForm<OperatorFormData>({
+    resolver: zodResolver(operatorFormSchema),
+    defaultValues: {
+      name: initialOperator?.name || '',
+      targetAudienceId: initialOperator?.targetAudienceId || '',
+      type: initialOperator?.type || 'Custom',
+      conditionedStimulus: initialOperator?.conditionedStimulus || '',
+      unconditionedStimulus: initialOperator?.unconditionedStimulus || '',
+      desiredConditionedResponse: initialOperator?.desiredConditionedResponse || '',
+      reinforcementLoop: initialOperator?.reinforcementLoop || '',
     }
-    onSubmit({ name, targetAudienceId, type, conditionedStimulus: cs, unconditionedStimulus: us, desiredConditionedResponse: desiredCR, reinforcementLoop });
-  };
+  });
+  
+  const [isSuggesting, setIsSuggesting] = useState(false);
+  const watchTargetAudienceId = watch("targetAudienceId");
+  const watchType = watch("type");
+  const watchDesiredCR = watch("desiredConditionedResponse");
 
-  const handleSuggestClick = async () => {
-    if (!onSuggestOperatorDetails || !targetAudienceId || !type || !desiredCR) {
+  const selectedPersona = useMemo(() => personas.find(p => p.id === watchTargetAudienceId), [personas, watchTargetAudienceId]);
+
+  const handleSuggestClick = useCallback(async () => {
+    if (!onSuggestOperatorDetails || !watchTargetAudienceId || !watchType || !watchDesiredCR) {
         showToast("Please select target audience, operator type, and desired response to get suggestions.", "error");
         return;
     }
     setIsSuggesting(true);
-    const suggestions = await onSuggestOperatorDetails({ type, targetAudienceId, desiredCR });
+    const suggestions = await onSuggestOperatorDetails({ type: watchType, targetAudienceId: watchTargetAudienceId, desiredCR: watchDesiredCR });
     if (suggestions) {
-        if(suggestions.cs) setCs(suggestions.cs);
-        if(suggestions.us) setUs(suggestions.us);
-        if(suggestions.reinforcementLoop) setReinforcementLoop(suggestions.reinforcementLoop);
+        if(suggestions.cs) setValue("conditionedStimulus", suggestions.cs);
+        if(suggestions.us) setValue("unconditionedStimulus", suggestions.us);
+        if(suggestions.reinforcementLoop) setValue("reinforcementLoop", suggestions.reinforcementLoop);
+        showToast("AI suggestions populated!", "success");
     } else {
         showToast("AI suggestion failed or returned no data.", "error");
     }
     setIsSuggesting(false);
-  };
+  }, [onSuggestOperatorDetails, watchTargetAudienceId, watchType, watchDesiredCR, showToast, setValue]);
 
-  const personaOptions = personas.map(p => ({ value: p.id, label: p.name }));
-  const operatorTypeOptions = OPERATOR_TYPES.map(t => ({ value: t, label: t }));
+  const personaOptions = useMemo(() => personas.map(p => ({ value: p.id, label: p.name })), [personas]);
+  const operatorTypeOptions = useMemo(() => OPERATOR_TYPES.map(t => ({ value: t, label: t })), []);
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <Input label="Operator Name" value={name} onChange={(e) => setName(e.target.value)} required />
-      <Select label="Target Audience Persona" value={targetAudienceId} onChange={(e) => setTargetAudienceId(e.target.value)} options={personaOptions} required />
+    <form onSubmit={handleSubmit(onSubmitForm)} className="space-y-4">
+      <Input label="Operator Name" {...register("name")} error={errors.name?.message} aria-invalid={!!errors.name} required />
+      <Controller
+        name="targetAudienceId"
+        control={control}
+        render={({ field }) => (
+          <Select label="Target Audience Persona" {...field} options={personaOptions} error={errors.targetAudienceId?.message} aria-invalid={!!errors.targetAudienceId} required disabled={personas.length === 0} />
+        )}
+      />
       
       {selectedPersona?.rstProfile && (
         <Card title="Selected Persona's RST Profile" className="p-3 bg-indigo-50 border border-indigo-200 text-xs mt-2" shadow="none">
@@ -109,38 +119,49 @@ const OperatorForm: React.FC<OperatorFormProps> = ({ initialOperator, personas, 
         </Card>
       )}
 
-      <Select label="Operator Type (e.g., Hope, Fear)" value={type} onChange={(e) => setType(e.target.value as Operator['type'])} options={operatorTypeOptions} required />
-      <Textarea label="Desired Conditioned Response (CR)" value={desiredCR} onChange={(e) => setDesiredCR(e.target.value)} placeholder="e.g., Increased support, sharing positive content" required />
+      <Controller
+        name="type"
+        control={control}
+        render={({ field }) => (
+          <Select label="Operator Type (e.g., Hope, Fear)" {...field} options={operatorTypeOptions} error={errors.type?.message} aria-invalid={!!errors.type} required />
+        )}
+      />
+      <Textarea label="Desired Conditioned Response (CR)" {...register("desiredConditionedResponse")} error={errors.desiredConditionedResponse?.message} aria-invalid={!!errors.desiredConditionedResponse} placeholder="e.g., Increased support, sharing positive content" required />
+      
       <div className="my-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
         <h4 className="font-semibold text-blue-700 mb-2">AI Suggestions</h4>
         {onSuggestOperatorDetails && (
-            <Button type="button" variant="secondary" size="sm" onClick={handleSuggestClick} isLoading={isSuggesting} disabled={!targetAudienceId || !type || !desiredCR}>
+            <Button type="button" variant="secondary" size="sm" onClick={handleSuggestClick} isLoading={isSuggesting} disabled={!watchTargetAudienceId || !watchType || !watchDesiredCR || isSuggesting}>
             Suggest CS, US & Reinforcement
             </Button>
         )}
         <p className="text-xs text-gray-500 mt-1">AI can suggest Conditioned Stimulus, Unconditioned Stimulus, and Reinforcement Loop based on selections.</p>
       </div>
-      <Textarea label="Conditioned Stimulus (CS)" value={cs} onChange={(e) => setCs(e.target.value)} placeholder="e.g., A specific symbol, phrase, or image type" required />
-      <Textarea label="Unconditioned Stimulus (US)" value={us} onChange={(e) => setUs(e.target.value)} placeholder="e.g., Positive news (for Hope); Threat warnings (for Fear)" required />
-      <Textarea label="Reinforcement Loop" value={reinforcementLoop} onChange={(e) => setReinforcementLoop(e.target.value)} placeholder="e.g., Social validation, repeated exposure, echo chamber effects" required />
+      
+      <Textarea label="Conditioned Stimulus (CS)" {...register("conditionedStimulus")} error={errors.conditionedStimulus?.message} aria-invalid={!!errors.conditionedStimulus} placeholder="e.g., A specific symbol, phrase, or image type" required />
+      <Textarea label="Unconditioned Stimulus (US)" {...register("unconditionedStimulus")} error={errors.unconditionedStimulus?.message} aria-invalid={!!errors.unconditionedStimulus} placeholder="e.g., Positive news (for Hope); Threat warnings (for Fear)" required />
+      <Textarea label="Reinforcement Loop" {...register("reinforcementLoop")} error={errors.reinforcementLoop?.message} aria-invalid={!!errors.reinforcementLoop} placeholder="e.g., Social validation, repeated exposure, echo chamber effects" required />
+      
       <div className="flex justify-end space-x-3">
         {onCancel && <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>}
-        <Button type="submit" variant="primary" isLoading={isLoading}>
+        <Button type="submit" variant="primary" isLoading={isLoading} disabled={isLoading || personas.length === 0}>
           {initialOperator ? 'Update Operator' : 'Create Operator'}
         </Button>
       </div>
     </form>
   );
 };
+const OperatorForm = React.memo(OperatorFormComponent);
 
 
-export const OperatorBuilderView: React.FC<OperatorBuilderViewProps> = ({ operators, personas, onAddOperator, onUpdateOperator }) => {
+export const OperatorBuilderView: React.FC<OperatorBuilderViewProps> = ({ operators, personas, onAddOperator, onUpdateOperator, onNavigate }) => {
   const [showForm, setShowForm] = useState(false);
   const [editingOperator, setEditingOperator] = useState<Operator | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null); // Keep setError for other types of errors
+  const [error, setError] = useState<string | null>(null); 
+  const navigateTo = useNavigateToView(onNavigate);
 
-  const handleCreateOrUpdateOperator = (operatorData: Omit<Operator, 'id'>) => {
+  const handleFormSubmit = useCallback((operatorData: OperatorFormData) => {
     setIsLoading(true);
     setError(null);
     try {
@@ -151,12 +172,12 @@ export const OperatorBuilderView: React.FC<OperatorBuilderViewProps> = ({ operat
       setEditingOperator(undefined);
     } catch (e) { setError((e as Error).message); } 
     finally { setIsLoading(false); }
-  };
+  }, [editingOperator, onAddOperator, onUpdateOperator]);
   
-  const handleSuggestOperatorDetails = async (details: { type: Operator['type'], targetAudienceId: string, desiredCR: string }): Promise<AiOperatorSuggestion | null> => {
+  const handleSuggestOperatorDetails = useCallback(async (details: { type: Operator['type'], targetAudienceId: string, desiredCR: string }): Promise<AiOperatorSuggestion | null> => {
     const persona = personas.find(p => p.id === details.targetAudienceId);
     if (!persona) { setError("Target persona not found for suggestion."); return null; }
-    // ... (rest of AI suggestion logic remains the same, error handling within it might use setError or throw) ...
+
     const prompt = `
       Persona Details:
       Name: ${persona.name}
@@ -173,43 +194,66 @@ export const OperatorBuilderView: React.FC<OperatorBuilderViewProps> = ({ operat
     const systemInstruction = "You are an expert in psychological operations and behavioral marketing. Provide creative, plausible suggestions for conditioning components. Ensure JSON output.";
     const result = await generateJson<AiOperatorSuggestion>(prompt, systemInstruction); 
     if (result.data && result.data.cs && result.data.us && result.data.reinforcementLoop) {
-        return { cs: result.data.cs.replace(/\\n/g, '\n'), us: result.data.us.replace(/\\n/g, '\n'), reinforcementLoop: result.data.reinforcementLoop.replace(/\\n/g, '\n')};
+        return { cs: result.data.cs.replace(/\\n/g, '\\n'), us: result.data.us.replace(/\\n/g, '\\n'), reinforcementLoop: result.data.reinforcementLoop.replace(/\\n/g, '\\n')};
     } else {
       setError(result.error || "AI suggestions for operator details failed or returned invalid format.");
       return null;
     }
-  };
+  }, [personas]);
 
-  const handleEdit = (operator: Operator) => {
+  const handleEdit = useCallback((operator: Operator) => {
     setEditingOperator(operator);
     setShowForm(true);
-  };
+    setError(null);
+  }, []);
   
-  if (personas.length === 0 && !showForm) {
-    return (
-      <div className="p-6">
-        <Card className="text-center">
-            <h2 className="text-2xl font-bold text-textPrimary mb-4">Operator Builder</h2>
-            <p className="text-textSecondary text-lg">Please create at least one Persona in 'Audience Modeling' before building an Operator.</p>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-3xl font-bold text-textPrimary">Operator Builder</h2>
-        {!showForm && (<Button variant="primary" onClick={() => { setShowForm(true); setEditingOperator(undefined); setError(null); }}>Create New Operator</Button>)}
+      <div className="text-center">
+        <h2 className="text-3xl font-bold text-textPrimary mb-2">Operator Builder</h2>
+        <p className="text-textSecondary mb-4">
+            Craft powerful operators to influence and engage your audience with precision.
+        </p>
+        <img 
+          src="/assets/operator-builder-conceptual-diagram.png" 
+          alt="Operator Builder conceptual diagram: Audience Persona -> Operator Builder -> Operator Type" 
+          className="mx-auto mb-6 max-w-lg w-full h-auto rounded-lg shadow-md"
+        />
       </div>
-      {error && <Card className="mb-4 bg-red-100 border-l-4 border-danger text-danger p-4"><p>{error}</p></Card>}
+      <div className="flex justify-between items-center mb-6">
+        {/* Subtitle was here, moved above image for better flow */}
+        {!showForm && (<Button variant="primary" onClick={() => { setShowForm(true); setEditingOperator(undefined); setError(null); }} disabled={personas.length === 0}>Create New Operator</Button>)}
+      </div>
+
+      {personas.length === 0 && (
+        <PrerequisiteMessageCard
+          title="Prerequisite Missing"
+          message="Please create at least one Persona in 'Audience Modeling' before building an Operator. The 'Create New Operator' button will be enabled once a persona exists."
+          action={onNavigate ? { label: 'Go to Audience Modeling', onClick: () => navigateTo(ViewName.AudienceModeling) } : undefined}
+        />
+      )}
+
+      {error && !showForm && <Card className="mb-4 bg-red-100 border-l-4 border-danger text-danger p-4"><p>{error}</p></Card>}
+      
       {showForm ? (
         <Card title={editingOperator ? "Edit Operator" : "Create New Operator"}>
-          <OperatorForm initialOperator={editingOperator} personas={personas} onSubmit={handleCreateOrUpdateOperator} onCancel={() => { setShowForm(false); setEditingOperator(undefined); setError(null);}} isLoading={isLoading} onSuggestOperatorDetails={handleSuggestOperatorDetails} />
+          <OperatorForm 
+            initialOperator={editingOperator} 
+            personas={personas} 
+            onSubmitForm={handleFormSubmit} 
+            onCancel={() => { setShowForm(false); setEditingOperator(undefined); setError(null);}} 
+            isLoading={isLoading} 
+            onSuggestOperatorDetails={handleSuggestOperatorDetails} 
+          />
         </Card>
       ) : (
         <>
-          {operators.length === 0 && !isLoading && ( <Card className="text-center"><p className="text-textSecondary text-lg">No operators created yet.</p><p className="text-textSecondary">Click "Create New Operator" to design one.</p></Card>)}
+          {operators.length === 0 && !isLoading && personas.length > 0 && ( 
+            <Card className="text-center">
+              <p className="text-textSecondary text-lg">No operators created yet.</p>
+              <p className="text-textSecondary">Click "Create New Operator" to design one.</p>
+            </Card>
+          )}
           {isLoading && operators.length === 0 && <LoadingSpinner text="Loading operators..." />}
           <div className="space-y-4">
             {operators.map((op) => {

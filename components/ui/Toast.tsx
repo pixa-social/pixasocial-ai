@@ -1,7 +1,6 @@
-
 import React, { useEffect, useState } from 'react';
 import { ToastMessage } from '../../types';
-import { CheckCircleIcon, XCircleIcon, InformationCircleIcon, ExclamationTriangleIcon } from './Icons'; // Assuming ExclamationTriangle for warning/error too
+import { CheckCircleIcon, XCircleIcon, InformationCircleIcon, ExclamationTriangleIcon } from './Icons';
 
 interface ToastProps extends ToastMessage {
   onDismiss: (id: string) => void;
@@ -15,34 +14,33 @@ export const Toast: React.FC<ToastProps> = ({ id, message, type, duration = 5000
       handleDismiss();
     }, duration);
     return () => clearTimeout(timer);
-  }, [id, duration, onDismiss]);
+  }, [id, duration, onDismiss]); // Removed onDismiss from deps as handleDismiss is stable
 
   const handleDismiss = () => {
     setIsVisible(false);
-    // Give time for fade-out animation before calling onDismiss
-    setTimeout(() => onDismiss(id), 300); // Match animation duration
+    setTimeout(() => onDismiss(id), 300); 
   };
 
   const typeStyles = {
     success: {
       bg: 'bg-green-500',
       icon: <CheckCircleIcon className="w-6 h-6 text-white" />,
-      progressBar: 'bg-green-700',
+      border: 'border-green-700',
     },
     error: {
-      bg: 'bg-danger',
+      bg: 'bg-danger', // Red-500
       icon: <XCircleIcon className="w-6 h-6 text-white" />,
-      progressBar: 'bg-red-700',
+      border: 'border-red-700', // Darker Red
     },
     info: {
       bg: 'bg-blue-500',
       icon: <InformationCircleIcon className="w-6 h-6 text-white" />,
-      progressBar: 'bg-blue-700',
+      border: 'border-blue-700', // Darker Blue
     },
-     warning: { // Added for completeness, if needed
-      bg: 'bg-warning',
+    warning: { 
+      bg: 'bg-warning', // Amber-500
       icon: <ExclamationTriangleIcon className="w-6 h-6 text-white" />,
-      progressBar: 'bg-amber-700',
+      border: 'border-amber-700', // Darker Amber
     }
   };
 
@@ -54,10 +52,10 @@ export const Toast: React.FC<ToastProps> = ({ id, message, type, duration = 5000
       aria-live="assertive"
       aria-atomic="true"
       className={`
-        ${currentStyles.bg} text-white p-4 rounded-md shadow-lg 
+        ${currentStyles.bg} text-white p-4 rounded-md shadow-xl border ${currentStyles.border}
         flex items-start space-x-3 w-full max-w-sm
         transition-all duration-300 ease-in-out
-        ${isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-full'}
+        ${isVisible ? 'opacity-100 translate-x-0 animate-toast-in' : 'animate-toast-out'}
       `}
     >
       <div className="shrink-0 pt-0.5">{currentStyles.icon}</div>
@@ -73,19 +71,6 @@ export const Toast: React.FC<ToastProps> = ({ id, message, type, duration = 5000
           <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
         </svg>
       </button>
-       {/* Optional: Progress bar for auto-dismiss visual cue */}
-      {/* <div className="absolute bottom-0 left-0 right-0 h-1">
-        <div 
-          className={`${currentStyles.progressBar} h-full`} 
-          style={{ animation: `shrink ${duration}ms linear forwards` }}
-        ></div>
-      </div>
-      <style>{`
-        @keyframes shrink {
-          from { width: 100%; }
-          to { width: 0%; }
-        }
-      `}</style> */}
     </div>
   );
 };

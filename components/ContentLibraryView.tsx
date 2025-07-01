@@ -1,21 +1,26 @@
-
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { ContentLibraryAsset } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { LoadingSpinner } from './ui/LoadingSpinner';
-import { ArrowUpTrayIcon, PhotoIcon, TrashIcon, VideoCameraIcon, ExclamationTriangleIcon } from './ui/Icons';
+import { 
+    ArrowUpTrayIcon, PhotoIcon, TrashIcon, VideoCameraIcon, 
+    ExclamationTriangleIcon, TagIcon, PencilSquareIcon, CheckIcon, XMarkIcon
+} from './ui/Icons'; 
 import { useToast } from './ui/ToastProvider';
-import { MAX_FILE_UPLOAD_SIZE_BYTES, MAX_FILE_UPLOAD_SIZE_MB, ACCEPTED_MEDIA_TYPES, ACCEPTED_IMAGE_TYPES, ACCEPTED_VIDEO_TYPES } from '../constants';
+import { MAX_FILE_UPLOAD_SIZE_BYTES, MAX_FILE_UPLOAD_SIZE_MB, ACCEPTED_MEDIA_TYPES } from '../constants';
+import { AssetCard } from './content-library/AssetCard'; 
+import { ContentLibrarySkeleton } from './skeletons/ContentLibrarySkeleton';
+import { ImageLightbox } from './content-library/ImageLightbox';
 
 interface ContentLibraryViewProps {
   assets: ContentLibraryAsset[];
   onAddAsset: (asset: ContentLibraryAsset) => void;
+  onUpdateAsset: (asset: ContentLibraryAsset) => void; 
   onRemoveAsset: (assetId: string) => void;
 }
 
-// Helper to format file size
 const formatBytes = (bytes: number, decimals = 2) => {
   if (bytes === 0) return '0 Bytes';
   const k = 1024;
@@ -25,34 +30,54 @@ const formatBytes = (bytes: number, decimals = 2) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 };
 
-export const ContentLibraryView: React.FC<ContentLibraryViewProps> = ({ assets, onAddAsset, onRemoveAsset }) => {
+export const ContentLibraryView: React.FC<ContentLibraryViewProps> = ({ assets, onAddAsset, onUpdateAsset, onRemoveAsset }) => {
   const { showToast } = useToast();
   const [assetName, setAssetName] = useState('');
+  const [assetTags, setAssetTags] = useState(''); 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // General loading for uploads
+  const [isInitialLoading, setIsInitialLoading] = useState(true); // For skeleton
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const [filterType, setFilterType] = useState<'all' | 'image' | 'video'>('all');
+  const [filterTag, setFilterTag] = useState('');
+  const [filterName, setFilterName] = useState('');
+  const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
+  const [editingTagsForAssetId, setEditingTagsForAssetId] = useState<string | null>(null);
+  const [currentEditingTags, setCurrentEditingTags] = useState('');
+
+  // Lightbox state
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [currentLightboxImageIndex, setCurrentLightboxImageIndex] = useState(0);
+
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsInitialLoading(false), 750);
+    return () => clearTimeout(timer);
+  }, []);
+
+
+  const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       if (!ACCEPTED_MEDIA_TYPES.includes(file.type)) {
         showToast(`Unsupported file type: ${file.type}. Please upload images (JPEG, PNG, GIF, WEBP) or videos (MP4, WEBM).`, 'error');
         setSelectedFile(null);
-        if (fileInputRef.current) fileInputRef.current.value = ""; // Reset file input
+        if (fileInputRef.current) fileInputRef.current.value = "";
         return;
       }
       if (file.size > MAX_FILE_UPLOAD_SIZE_BYTES) {
         showToast(`File is too large (${formatBytes(file.size)}). Maximum size is ${MAX_FILE_UPLOAD_SIZE_MB}MB.`, 'error');
         setSelectedFile(null);
-        if (fileInputRef.current) fileInputRef.current.value = ""; // Reset file input
+        if (fileInputRef.current) fileInputRef.current.value = "";
         return;
       }
       setSelectedFile(file);
-      if (!assetName) { // Auto-fill asset name if empty
+      if (!assetName) {
         setAssetName(file.name.substring(0, file.name.lastIndexOf('.')) || file.name);
       }
     }
-  };
+  }, [showToast, assetName]);
 
   const handleUpload = useCallback(async () => {
     if (!selectedFile || !assetName.trim()) {
@@ -72,11 +97,13 @@ export const ContentLibraryView: React.FC<ContentLibraryViewProps> = ({ assets, 
         fileType: selectedFile.type,
         size: selectedFile.size,
         uploadedAt: new Date().toISOString(),
+        tags: assetTags.split(',').map(tag => tag.trim()).filter(tag => tag),
       };
-      onAddAsset(newAsset); // Toast is handled by onAddAsset in App.tsx
+      onAddAsset(newAsset);
       setAssetName('');
+      setAssetTags('');
       setSelectedFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = ""; // Reset file input
+      if (fileInputRef.current) fileInputRef.current.value = "";
       setIsLoading(false);
     };
     reader.onerror = () => {
@@ -84,13 +111,86 @@ export const ContentLibraryView: React.FC<ContentLibraryViewProps> = ({ assets, 
       setIsLoading(false);
     };
     reader.readAsDataURL(selectedFile);
-  }, [selectedFile, assetName, onAddAsset, showToast]);
+  }, [selectedFile, assetName, assetTags, onAddAsset, showToast]);
 
-  const handleDeleteAsset = (assetId: string) => {
+  const handleDeleteAsset = useCallback((assetId: string) => {
     if (window.confirm('Are you sure you want to delete this asset? This action cannot be undone.')) {
-        onRemoveAsset(assetId); // Toast is handled by onRemoveAsset in App.tsx
+      onRemoveAsset(assetId);
+      setSelectedAssetIds(prev => prev.filter(id => id !== assetId)); 
     }
-  };
+  }, [onRemoveAsset]);
+  
+  const handleStartEditTags = useCallback((asset: ContentLibraryAsset) => {
+    setEditingTagsForAssetId(asset.id);
+    setCurrentEditingTags((asset.tags || []).join(', '));
+  }, []);
+
+  const handleCancelEditTags = useCallback(() => {
+    setEditingTagsForAssetId(null);
+    setCurrentEditingTags('');
+  }, []);
+
+  const handleSaveTags = useCallback((assetId: string) => {
+    const assetToUpdate = assets.find(a => a.id === assetId);
+    if (assetToUpdate) {
+      const updatedTags = currentEditingTags.split(',').map(tag => tag.trim()).filter(tag => tag);
+      onUpdateAsset({ ...assetToUpdate, tags: updatedTags });
+      setEditingTagsForAssetId(null);
+      setCurrentEditingTags('');
+    }
+  }, [assets, currentEditingTags, onUpdateAsset]);
+
+  const filteredAssets = useMemo(() => {
+    return assets.filter(asset => {
+      const typeMatch = filterType === 'all' || asset.type === filterType;
+      const nameMatch = filterName === '' || asset.name.toLowerCase().includes(filterName.toLowerCase());
+      const tagMatch = filterTag === '' || (asset.tags && asset.tags.some(tag => tag.toLowerCase().includes(filterTag.toLowerCase())));
+      return typeMatch && nameMatch && tagMatch;
+    }).sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
+  }, [assets, filterType, filterName, filterTag]);
+
+  const imageAssetsForLightbox = useMemo(() => filteredAssets.filter(asset => asset.type === 'image'), [filteredAssets]);
+
+  const handleImageClick = useCallback((assetId: string) => {
+    const clickedImageIndex = imageAssetsForLightbox.findIndex(asset => asset.id === assetId);
+    if (clickedImageIndex !== -1) {
+      setCurrentLightboxImageIndex(clickedImageIndex);
+      setIsLightboxOpen(true);
+    }
+  }, [imageAssetsForLightbox]);
+
+  const handleSelectAsset = useCallback((assetId: string) => {
+    setSelectedAssetIds(prev => 
+      prev.includes(assetId) ? prev.filter(id => id !== assetId) : [...prev, assetId]
+    );
+  }, []);
+
+  const handleSelectAll = useCallback(() => {
+    if (selectedAssetIds.length === filteredAssets.length) {
+      setSelectedAssetIds([]);
+    } else {
+      setSelectedAssetIds(filteredAssets.map(asset => asset.id));
+    }
+  }, [selectedAssetIds, filteredAssets]);
+  
+  const handleDeleteSelected = useCallback(() => {
+    if (selectedAssetIds.length === 0) {
+        showToast("No assets selected for deletion.", "info");
+        return;
+    }
+    if (window.confirm(`Are you sure you want to delete ${selectedAssetIds.length} selected asset(s)? This action cannot be undone.`)) {
+        selectedAssetIds.forEach(id => onRemoveAsset(id));
+        setSelectedAssetIds([]);
+    }
+  }, [selectedAssetIds, onRemoveAsset, showToast]);
+  
+  const handleCurrentEditingTagsChange = useCallback((tags: string) => {
+    setCurrentEditingTags(tags);
+  }, []);
+
+  if (isInitialLoading && assets.length === 0) {
+    return <ContentLibrarySkeleton />;
+  }
 
   return (
     <div className="p-6">
@@ -104,6 +204,13 @@ export const ContentLibraryView: React.FC<ContentLibraryViewProps> = ({ assets, 
             onChange={(e) => setAssetName(e.target.value)}
             placeholder="e.g., Summer Campaign Banner"
             required
+          />
+          <Input
+            label="Tags (comma-separated)"
+            value={assetTags}
+            onChange={(e) => setAssetTags(e.target.value)}
+            placeholder="e.g., summer24, banner, promo"
+            leftIcon={<TagIcon className="w-4 h-4 text-gray-400" />}
           />
           <div>
             <label htmlFor="media-upload" className="block text-sm font-medium text-textSecondary mb-1">
@@ -143,53 +250,112 @@ export const ContentLibraryView: React.FC<ContentLibraryViewProps> = ({ assets, 
         </div>
       </Card>
 
-      <Card title="Stored Assets" shadow="soft-lg">
-        {isLoading && assets.length === 0 && <LoadingSpinner text="Loading assets..." />}
-        {!isLoading && assets.length === 0 && (
+      <Card title="Filter & Manage Assets" className="mb-8" shadow="soft-lg">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <Input 
+            label="Filter by Name" 
+            value={filterName} 
+            onChange={e => setFilterName(e.target.value)} 
+            placeholder="Search by name..." 
+          />
+          <Input 
+            label="Filter by Tag" 
+            value={filterTag} 
+            onChange={e => setFilterTag(e.target.value)} 
+            placeholder="Search by tag..."
+            leftIcon={<TagIcon className="w-4 h-4 text-gray-400" />}
+          />
+          <div>
+            <label className="block text-sm font-medium text-textSecondary mb-1">Filter by Type</label>
+            <div className="flex space-x-2">
+              {(['all', 'image', 'video'] as const).map(type => (
+                <Button 
+                  key={type} 
+                  size="sm" 
+                  variant={filterType === type ? 'primary' : 'outline'} 
+                  onClick={() => setFilterType(type)}
+                  className="capitalize"
+                >
+                  {type}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-4 border-t border-lightBorder">
+            <div className="flex items-center">
+                <input
+                    type="checkbox"
+                    id="select-all-assets"
+                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded mr-2"
+                    checked={filteredAssets.length > 0 && selectedAssetIds.length === filteredAssets.length}
+                    onChange={handleSelectAll}
+                    disabled={filteredAssets.length === 0}
+                    aria-label="Select all filtered assets"
+                />
+                <label htmlFor="select-all-assets" className="text-sm text-textSecondary">
+                    Select All ({selectedAssetIds.length} / {filteredAssets.length} selected)
+                </label>
+            </div>
+            <div className="flex gap-2">
+                <Button size="sm" variant="ghost" onClick={() => {setFilterType('all'); setFilterName(''); setFilterTag(''); setSelectedAssetIds([]);}} disabled={!filterName && !filterTag && filterType === 'all'}>
+                    Clear Filters
+                </Button>
+                {selectedAssetIds.length > 0 && (
+                    <Button 
+                        size="sm" 
+                        variant="danger" 
+                        onClick={handleDeleteSelected}
+                        leftIcon={<TrashIcon className="w-4 h-4" />}
+                    >
+                        Delete Selected ({selectedAssetIds.length})
+                    </Button>
+                )}
+            </div>
+        </div>
+      </Card>
+
+
+      <Card title={`Showing ${filteredAssets.length} Assets`} shadow="soft-lg">
+        {(isLoading && assets.length === 0 && !isInitialLoading) && <LoadingSpinner text="Loading assets..." />}
+        {!isInitialLoading && assets.length === 0 && (
           <p className="text-textSecondary text-center py-4">
             No media uploaded yet. Use the form above to add assets to your library.
           </p>
         )}
-        {assets.length > 0 && (
+        {!isInitialLoading && assets.length > 0 && filteredAssets.length === 0 && (
+            <p className="text-textSecondary text-center py-4">
+                No assets match your current filters. Try adjusting or clearing filters.
+            </p>
+        )}
+        {filteredAssets.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {assets.slice().sort((a,b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()).map((asset) => (
-              <Card key={asset.id} className="flex flex-col overflow-hidden" shadow="soft-md">
-                <div className="aspect-w-16 aspect-h-9 bg-gray-200 flex items-center justify-center">
-                  {asset.type === 'image' ? (
-                    <img src={asset.dataUrl} alt={asset.name} className="object-contain max-h-40 w-full" />
-                  ) : (
-                    <div className="p-4 flex flex-col items-center justify-center text-center">
-                        <VideoCameraIcon className="w-16 h-16 text-secondary mb-2" />
-                        <p className="text-xs text-textSecondary">Video preview not available here. <br/> Use browser controls if opened directly.</p>
-                         {/* Basic video player for direct display - might be too heavy for many items
-                         <video controls src={asset.dataUrl} className="max-h-40 w-full object-contain">
-                            Your browser does not support the video tag.
-                         </video>
-                         */}
-                    </div>
-                  )}
-                </div>
-                <div className="p-3 flex-grow flex flex-col justify-between">
-                  <div>
-                    <h4 className="font-semibold text-textPrimary truncate" title={asset.name}>{asset.name}</h4>
-                    <p className="text-xs text-textSecondary capitalize">{asset.type} &bull; {formatBytes(asset.size)}</p>
-                    <p className="text-xs text-textSecondary">Uploaded: {new Date(asset.uploadedAt).toLocaleDateString()}</p>
-                  </div>
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    onClick={() => handleDeleteAsset(asset.id)}
-                    leftIcon={<TrashIcon className="w-4 h-4" />}
-                    className="w-full mt-3"
-                  >
-                    Delete
-                  </Button>
-                </div>
-              </Card>
+            {filteredAssets.map((asset) => (
+              <AssetCard
+                key={asset.id}
+                asset={asset}
+                isSelected={selectedAssetIds.includes(asset.id)}
+                editingTagsForAssetId={editingTagsForAssetId}
+                currentEditingTags={currentEditingTags}
+                onSelectAsset={handleSelectAsset}
+                onDeleteAsset={handleDeleteAsset}
+                onStartEditTags={handleStartEditTags}
+                onSaveTags={handleSaveTags}
+                onCancelEditTags={handleCancelEditTags}
+                onCurrentEditingTagsChange={handleCurrentEditingTagsChange}
+                onImageClick={handleImageClick} 
+              />
             ))}
           </div>
         )}
       </Card>
+      {isLightboxOpen && (
+        <ImageLightbox
+          images={imageAssetsForLightbox}
+          startIndex={currentLightboxImageIndex}
+          onClose={() => setIsLightboxOpen(false)}
+        />
+      )}
     </div>
   );
 };

@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -14,7 +13,7 @@
               primary: '#1E40AF', // Blue-700
               secondary: '#4B5563', // Gray-600
               accent: '#10B981', // Emerald-500
-              background: '#F9FAFB', // Gray-50
+              background: '#F3F4F6', // Gray-100 (Updated from Gray-50)
               card: '#FFFFFF',
               textPrimary: '#1F2937', // Gray-800
               textSecondary: '#6B7280', // Gray-500
@@ -25,11 +24,10 @@
             },
             animation: {
               'spin-slow': 'spin 3s linear infinite',
-              // Added for toast animations
               'toast-in': 'toast-in 0.3s ease-out forwards',
               'toast-out': 'toast-out 0.3s ease-in forwards',
             },
-            keyframes: { // Added for toast animations
+            keyframes: {
               'toast-in': {
                 '0%': { opacity: '0', transform: 'translateX(100%)' },
                 '100%': { opacity: '1', transform: 'translateX(0)' },
@@ -42,21 +40,20 @@
             boxShadow: {
               'soft-lg': '0 10px 15px -3px rgba(0, 0, 0, 0.07), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
               'soft-md': '0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.05)',
+              'xl': '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', // Added for Toasts
             }
           }
         },
-        // Ensure JIT compiler includes dynamic classes if needed, 
-        // though CDN version is usually quite good.
-        // For specific percentage widths like w-[25%], Tailwind JIT should pick them up.
-        // safelist: [ // Example, not strictly needed if JIT handles it.
-        //   { pattern: /w-\[(25%|50%|75%|100%)\]/ } 
-        // ]
       }
     </script>
     <link
       rel="stylesheet"
       href="https://esm.sh/react-big-calendar@1.13.0/lib/css/react-big-calendar.css"
     />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Open+Sans:wght@400;700&family=Lato:wght@400;700&family=Montserrat:wght@400;700&family=Impact&family=Anton&family=Bangers&family=Creepster&family=Pacifico&family=Lobster&display=swap" rel="stylesheet">
+
   <script type="importmap">
 {
   "imports": {
@@ -69,20 +66,46 @@
     "react-dom": "https://esm.sh/react-dom@^19.1.0",
     "react-big-calendar": "https://esm.sh/react-big-calendar@1.13.0?external=react,react-dom",
     "date-fns": "https://esm.sh/date-fns@^3.6.0",
-    "date-fns/": "https://esm.sh/date-fns@^3.6.0/"
+    "date-fns/": "https://esm.sh/date-fns@^3.6.0/",
+    "gun": "https://esm.sh/gun@0.2020.1239",
+    "gun/gun": "https://esm.sh/gun@0.2020.1239/gun.js",
+    "gun/sea": "https://esm.sh/gun@0.2020.1239/sea.js",
+    "gun/lib/": "https://esm.sh/gun@0.2020.1239/lib/",
+    "gun/": "https://esm.sh/gun@^0.2020.1240/",
+    "react-hook-form": "https://esm.sh/react-hook-form@^7.52.1",
+    "@hookform/resolvers/zod": "https://esm.sh/@hookform/resolvers@3.9.0/zod/dist/zod.module.js",
+    "zod": "https://esm.sh/zod@^3.23.8",
+    "@hookform/resolvers/": "https://esm.sh/@hookform/resolvers@^5.1.1/"
   }
 }
 </script>
 <style>
-  /* Ensure react-big-calendar popups (like for too many events) are not hidden by toasts if z-indexes conflict.
-     Toasts are z-[9999]. Default Rbc popup z-index is 10. */
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  }
   .rbc-overlay {
-    z-index: 1000 !important; /* Make sure it's high, but less than toasts */
+    z-index: 1000 !important; 
+  }
+  /* Custom scrollbar for webkit browsers */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #D1D5DB; /* mediumBorder */
+    border-radius: 10px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #9CA3AF; /* gray-400 */
   }
 </style>
 <link rel="stylesheet" href="/index.css">
 </head>
-  <body class="bg-background text-textPrimary">
+  <body class="bg-gray-100 text-textPrimary"> <!-- Updated body background class -->
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

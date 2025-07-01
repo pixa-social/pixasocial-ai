@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback } from 'react';
 import { AuditStep } from '../types';
 import { Card } from './ui/Card';
@@ -105,7 +104,7 @@ export const AuditToolView: React.FC<AuditToolViewProps> = () => {
   }, [campaignObjective, initialSteps]);
 
 
-  const exportAuditPlan = (format: 'markdown' | 'text') => {
+  const exportAuditPlan = useCallback((format: 'markdown' | 'text') => {
     if (!isPlanGenerated) {
       alert("Please generate the audit plan first.");
       return;
@@ -127,7 +126,7 @@ export const AuditToolView: React.FC<AuditToolViewProps> = () => {
     });
 
     downloadFile(`8D_Audit_Plan.${fileExtension}`, fileContent, format === 'markdown' ? 'text/markdown' : 'text/plain');
-  };
+  }, [isPlanGenerated, campaignObjective, steps]);
 
   return (
     <div className="p-6">

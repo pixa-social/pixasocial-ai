@@ -1,6 +1,5 @@
-
-import React, { useState, useCallback } from 'react';
-import { Persona, Operator, FeedbackSimulationResult, ContentDraft } from '../types';
+import React, { useState, useCallback, useMemo } from 'react';
+import { Persona, Operator, FeedbackSimulationResult, ContentDraft, ViewName } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Textarea } from './ui/Textarea';
@@ -8,6 +7,9 @@ import { Select } from './ui/Select';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { generateJson } from '../services/aiService'; // Expecting JSON response
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { PrerequisiteMessageCard } from './ui/PrerequisiteMessageCard'; // Added import
+import { useNavigateToView } from '../hooks/useNavigateToView'; // Assuming a custom hook for navigation or pass onNavigate
+
 
 const COLORS = ['#10B981', '#F59E0B', '#EF4444']; // Positive, Neutral, Negative
 
@@ -15,6 +17,7 @@ interface FeedbackSimulatorViewProps {
   personas: Persona[];
   operators: Operator[];
   contentDrafts: ContentDraft[];
+  onNavigate?: (view: ViewName) => void; // Optional navigation prop
 }
 
 const getDraftPreviewContent = (draft: ContentDraft): string => {
@@ -27,22 +30,23 @@ const getDraftPreviewContent = (draft: ContentDraft): string => {
   return 'No content preview';
 };
 
-export const FeedbackSimulatorView: React.FC<FeedbackSimulatorViewProps> = ({ personas, operators, contentDrafts }) => {
+export const FeedbackSimulatorView: React.FC<FeedbackSimulatorViewProps> = ({ personas, operators, contentDrafts, onNavigate }) => {
   const [selectedPersonaId, setSelectedPersonaId] = useState<string>('');
   const [contentToSimulate, setContentToSimulate] = useState<string>('');
   const [simulationResult, setSimulationResult] = useState<FeedbackSimulationResult | null>(null);
+  const navigateTo = useNavigateToView(onNavigate);
   
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const personaOptions = personas.map(p => ({ value: p.id, label: p.name }));
+  const personaOptions = useMemo(() => personas.map(p => ({ value: p.id, label: p.name })), [personas]);
   
-  const contentDraftOptions = contentDrafts.map(d => ({
+  const contentDraftOptions = useMemo(() => contentDrafts.map(d => ({
     value: d.id,
     label: `Draft for ${personas.find(p=>p.id === d.personaId)?.name || 'N/A'} (Op: ${operators.find(o=>o.id === d.operatorId)?.name || 'N/A'}) - ${getDraftPreviewContent(d)}`
-  }));
+  })), [contentDrafts, personas, operators]);
 
-  const handleSelectDraft = (draftId: string) => {
+  const handleSelectDraft = useCallback((draftId: string) => {
     const draft = contentDrafts.find(d => d.id === draftId);
     if (draft) {
       let firstContent = '';
@@ -55,7 +59,7 @@ export const FeedbackSimulatorView: React.FC<FeedbackSimulatorViewProps> = ({ pe
       setContentToSimulate(firstContent);
       setSelectedPersonaId(draft.personaId); // Auto-select persona from draft
     }
-  };
+  }, [contentDrafts]);
 
   const handleSimulateFeedback = useCallback(async () => {
     if (!selectedPersonaId || !contentToSimulate) {
@@ -118,16 +122,7 @@ export const FeedbackSimulatorView: React.FC<FeedbackSimulatorViewProps> = ({ pe
     setIsLoading(false);
   }, [selectedPersonaId, contentToSimulate, personas]);
   
-  if (personas.length === 0) {
-     return (
-      <div className="p-6">
-        <Card className="text-center">
-            <h2 className="text-2xl font-bold text-textPrimary mb-4">Feedback Simulator</h2>
-            <p className="text-textSecondary text-lg">Please create at least one Persona in 'Audience Modeling' before simulating feedback.</p>
-        </Card>
-      </div>
-    );
-  }
+  const showPrerequisiteMessage = personas.length === 0;
 
   const sentimentChartData = simulationResult ? [
     { name: 'Positive', value: simulationResult.sentiment.positive },
@@ -139,16 +134,24 @@ export const FeedbackSimulatorView: React.FC<FeedbackSimulatorViewProps> = ({ pe
     <div className="p-6">
       <h2 className="text-3xl font-bold text-textPrimary mb-6">Feedback Simulator</h2>
       
+      {showPrerequisiteMessage && (
+        <PrerequisiteMessageCard
+          title="Prerequisite Missing"
+          message="Please create at least one Persona in 'Audience Modeling' before simulating feedback. The 'Target Persona' dropdown will populate once personas are available."
+          action={onNavigate ? { label: 'Go to Audience Modeling', onClick: () => navigateTo(ViewName.AudienceModeling) } : undefined }
+        />
+      )}
       {error && <Card className="mb-4 bg-red-100 border-l-4 border-danger text-danger p-4"><p>{error}</p></Card>}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card title="Input for Simulation">
-          <Select label="Target Persona" options={personaOptions} value={selectedPersonaId} onChange={e => setSelectedPersonaId(e.target.value)} required />
+          <Select label="Target Persona" options={personaOptions} value={selectedPersonaId} onChange={e => setSelectedPersonaId(e.target.value)} required disabled={showPrerequisiteMessage} />
           {contentDrafts.length > 0 && (
             <Select 
               label="Or Select a Saved Draft" 
               options={[{value: "", label: "Select a draft..."}, ...contentDraftOptions]} 
               onChange={e => { if(e.target.value) handleSelectDraft(e.target.value); }}
+              disabled={showPrerequisiteMessage}
             />
           )}
           <Textarea 
@@ -158,13 +161,14 @@ export const FeedbackSimulatorView: React.FC<FeedbackSimulatorViewProps> = ({ pe
             placeholder="Paste or type content here..."
             rows={10}
             required 
+            disabled={showPrerequisiteMessage}
           />
           <Button 
             variant="primary" 
             onClick={handleSimulateFeedback} 
             isLoading={isLoading}
             className="w-full mt-4"
-            disabled={!selectedPersonaId || !contentToSimulate}
+            disabled={!selectedPersonaId || !contentToSimulate || isLoading || showPrerequisiteMessage}
           >
             {isLoading ? 'Simulating...' : 'Simulate Feedback'}
           </Button>

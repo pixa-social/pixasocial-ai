@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
@@ -8,6 +7,7 @@ import { AiProviderConfig, AiProviderType } from '../types';
 import { AI_PROVIDERS_CONFIG_TEMPLATE, LOCAL_STORAGE_AI_CONFIG_KEY, LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY } from '../constants';
 import { EyeIcon, EyeSlashIcon, ExclamationTriangleIcon } from './ui/Icons'; 
 import { useToast } from './ui/ToastProvider'; // Import useToast
+import { getStoredAiProviderConfigs, getActiveAiProviderType } from '../services/ai/aiUtils'; // Updated import path
 
 export const AdminPanelView: React.FC = () => {
   const { showToast } = useToast(); // Use the toast hook
@@ -17,34 +17,18 @@ export const AdminPanelView: React.FC = () => {
   // Removed saveMessage state, will use toast directly
 
   const loadConfigs = useCallback(() => {
-    const storedConfigsStr = localStorage.getItem(LOCAL_STORAGE_AI_CONFIG_KEY);
-    let configsToUse = AI_PROVIDERS_CONFIG_TEMPLATE;
-    if (storedConfigsStr) {
-      try {
-        const storedConfigs = JSON.parse(storedConfigsStr) as AiProviderConfig[];
-        configsToUse = AI_PROVIDERS_CONFIG_TEMPLATE.map(templateProv => {
-          const matchingStoredProv = storedConfigs.find(sp => sp.id === templateProv.id);
-          return matchingStoredProv ? { ...templateProv, ...matchingStoredProv } : templateProv;
-        });
-      } catch (e) {
-        console.error("Failed to parse stored AI configs, using template.", e);
-        showToast("Error loading AI configurations from storage.", "error");
-      }
-    }
+    // Use the utility function for loading configs
+    const configsToUse = getStoredAiProviderConfigs();
     setProviderConfigs(configsToUse);
 
-    const storedActiveProvider = localStorage.getItem(LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY) as AiProviderType;
-    if (storedActiveProvider && configsToUse.find(p => p.id === storedActiveProvider && p.isEnabled)) {
-      setActiveProvider(storedActiveProvider);
-    } else {
-      const firstEnabled = configsToUse.find(p => p.isEnabled);
-      setActiveProvider(firstEnabled ? firstEnabled.id : AiProviderType.Gemini);
-    }
-
+    // Use the utility function for getting active provider
+    const currentActiveProvider = getActiveAiProviderType();
+    setActiveProvider(currentActiveProvider);
+    
     const initialShowState: Record<string, boolean> = {};
     configsToUse.forEach(p => initialShowState[p.id] = false);
     setShowApiKeys(initialShowState);
-  }, [showToast]); // Added showToast dependency
+  }, []); // Removed showToast as it's not directly used here for loading
 
   useEffect(() => {
     loadConfigs();
@@ -61,11 +45,14 @@ export const AdminPanelView: React.FC = () => {
       prev.map(p => (p.id === id ? { ...p, isEnabled } : p))
     );
     if (!isEnabled && activeProvider === id) {
-        const nextActive = providerConfigs.find(p => p.isEnabled && p.id !== id) || providerConfigs.find(p => p.id === AiProviderType.Gemini && p.isEnabled);
-        if (nextActive) {
-            setActiveProvider(nextActive.id);
-        } else {
+        // Recalculate the next best active provider based on current (potentially modified) providerConfigs
+        const currentConfigs = providerConfigs.map(p => (p.id === id ? { ...p, isEnabled } : p));
+        const geminiStillEnabled = currentConfigs.find(p => p.id === AiProviderType.Gemini && p.isEnabled);
+        if (geminiStillEnabled) {
             setActiveProvider(AiProviderType.Gemini);
+        } else {
+            const firstStillEnabled = currentConfigs.find(p => p.isEnabled && p.id !== id);
+            setActiveProvider(firstStillEnabled ? firstStillEnabled.id : AiProviderType.Gemini); // Fallback to Gemini if no other enabled
         }
     }
   }
@@ -76,13 +63,14 @@ export const AdminPanelView: React.FC = () => {
 
   const handleSaveConfigs = () => {
     try {
-      const configsToSave = providerConfigs.map(({ id, name, apiKey, isEnabled, isGemini, models, notes, baseURL }) => ({ // Ensure baseURL is saved
+      const configsToSave = providerConfigs.map(({ id, name, apiKey, isEnabled, isGemini, models, notes, baseURL }) => ({ 
         id, name, apiKey, isEnabled, isGemini, models, notes, baseURL
       }));
       localStorage.setItem(LOCAL_STORAGE_AI_CONFIG_KEY, JSON.stringify(configsToSave));
       
       const currentActiveConfig = providerConfigs.find(p => p.id === activeProvider);
       if (!currentActiveConfig || !currentActiveConfig.isEnabled) {
+          // If current active provider is being disabled, find a new one
           const geminiConfig = providerConfigs.find(p => p.id === AiProviderType.Gemini && p.isEnabled);
           if (geminiConfig) {
               localStorage.setItem(LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY, AiProviderType.Gemini);
@@ -93,7 +81,9 @@ export const AdminPanelView: React.FC = () => {
                   localStorage.setItem(LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY, firstEnabled.id);
                   setActiveProvider(firstEnabled.id);
               } else {
-                   localStorage.setItem(LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY, activeProvider); // Fallback to current if no enabled found
+                   // If nothing is enabled, keep the current activeProvider value but it won't work
+                   localStorage.setItem(LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY, activeProvider); 
+                   showToast('Warning: No AI provider is enabled. AI features may not work.', 'error');
               }
           }
       } else {
@@ -101,14 +91,14 @@ export const AdminPanelView: React.FC = () => {
       }
 
       showToast('Configurations saved successfully!', 'success');
-      loadConfigs(); // Re-load to reflect saved state, especially if active provider changed.
+      loadConfigs(); 
     } catch (error) {
       console.error("Error saving AI configurations:", error);
       showToast('Failed to save configurations.', 'error');
     }
   };
   
-  const isGeminiEnvKeyPresent = !!process.env.API_KEY;
+  const isGeminiEnvKeyPresent = !!(typeof process !== 'undefined' && process.env && process.env.API_KEY);
 
   return (
     <div className="p-6">
@@ -174,8 +164,6 @@ export const AdminPanelView: React.FC = () => {
                         value={ (provider.isGemini && provider.apiKey === process.env.API_KEY && isGeminiEnvKeyPresent) ? "" : provider.apiKey || ''}
                         onChange={(e) => handleApiKeyChange(provider.id, e.target.value)}
                         placeholder={usesEnvKeyForGemini ? "Using pre-configured environment key" : "Enter API Key"}
-                        // Removed the conditional disabling: disabled={usesEnvKeyForGemini && !provider.apiKey}
-                        // Input is now always enabled if the provider section is enabled, allowing override.
                         containerClassName="mb-0"
                       />
                       <button
@@ -189,7 +177,7 @@ export const AdminPanelView: React.FC = () => {
                     </div>
                      {provider.isGemini && isGeminiEnvKeyPresent && (
                       <p className="text-xs text-textSecondary">
-                        An API key for Gemini is available via environment variable. You can paste a key above to override it.
+                        An API key for Gemini is available via environment variable. You can paste a key above to override it. If this field is empty, the environment key will be used.
                       </p>
                     )}
                     {provider.notes && <p className="text-xs text-textSecondary italic mt-1">{provider.notes}</p>}

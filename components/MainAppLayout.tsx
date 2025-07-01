@@ -1,8 +1,8 @@
-
 import React from 'react';
 import { Navbar } from './Navbar';
 import { ViewName, CampaignData, ConnectedAccount, ContentLibraryAsset, User, ChatMessage, CustomChannel } from '../types';
 import { APP_TITLE } from '../constants';
+import { Breadcrumbs } from './ui/Breadcrumbs'; // Added import
 
 import { DashboardView } from './DashboardView';
 import { AudienceModelingView } from './AudienceModelingView';
@@ -35,10 +35,11 @@ interface MainAppLayoutProps {
   handleAddConnectedAccount: (account: ConnectedAccount) => void;
   handleRemoveConnectedAccount: (platform: ConnectedAccount['platform']) => void;
   handleAddContentLibraryAsset: (asset: ContentLibraryAsset) => void;
+  handleUpdateContentLibraryAsset: (asset: ContentLibraryAsset) => void;
   handleRemoveContentLibraryAsset: (assetId: string) => void;
-  handleAddChatMessage: (message: ChatMessage) => void;
-  handleAddCustomChannel: (name: string) => void; // New prop
-  handleRemoveCustomChannel: (channelId: string) => void; // New prop
+  handleAddCustomChannel: (name: string) => void; 
+  handleRemoveCustomChannel: (channelId: string) => void; 
+  handleImportCampaignData: (data: CampaignData) => void;
 }
 
 export const MainAppLayout: React.FC<MainAppLayoutProps> = ({
@@ -59,10 +60,11 @@ export const MainAppLayout: React.FC<MainAppLayoutProps> = ({
   handleAddConnectedAccount,
   handleRemoveConnectedAccount,
   handleAddContentLibraryAsset,
+  handleUpdateContentLibraryAsset,
   handleRemoveContentLibraryAsset,
-  handleAddChatMessage,
-  handleAddCustomChannel, // Destructure new prop
-  handleRemoveCustomChannel, // Destructure new prop
+  handleAddCustomChannel, 
+  handleRemoveCustomChannel, 
+  handleImportCampaignData,
 }) => {
   const renderView = () => {
     switch (currentView) {
@@ -71,7 +73,7 @@ export const MainAppLayout: React.FC<MainAppLayoutProps> = ({
       case ViewName.AudienceModeling:
         return <AudienceModelingView personas={campaignData.personas} onAddPersona={handleAddPersona} onUpdatePersona={handleUpdatePersona} />;
       case ViewName.OperatorBuilder:
-        return <OperatorBuilderView operators={campaignData.operators} personas={campaignData.personas} onAddOperator={handleAddOperator} onUpdateOperator={handleUpdateOperator} />;
+        return <OperatorBuilderView operators={campaignData.operators} personas={campaignData.personas} onAddOperator={handleAddOperator} onUpdateOperator={handleUpdateOperator} onNavigate={onNavigate} />;
       case ViewName.ContentPlanner:
         return <ContentPlannerView 
                   contentDrafts={campaignData.contentDrafts} 
@@ -80,6 +82,7 @@ export const MainAppLayout: React.FC<MainAppLayoutProps> = ({
                   onAddContentDraft={handleAddContentDraft}
                   onAddScheduledPost={handleAddScheduledPost}
                   onAddContentLibraryAsset={handleAddContentLibraryAsset} 
+                  onNavigate={onNavigate}
                 />;
       case ViewName.Calendar:
         return <CalendarView 
@@ -89,15 +92,17 @@ export const MainAppLayout: React.FC<MainAppLayoutProps> = ({
                   operators={campaignData.operators}
                   onUpdateScheduledPost={handleUpdateScheduledPost}
                   onDeleteScheduledPost={handleDeleteScheduledPost}
+                  onNavigate={onNavigate}
                 />;
        case ViewName.ContentLibrary:
         return <ContentLibraryView 
                   assets={campaignData.contentLibraryAssets}
                   onAddAsset={handleAddContentLibraryAsset}
+                  onUpdateAsset={handleUpdateContentLibraryAsset}
                   onRemoveAsset={handleRemoveContentLibraryAsset}
                 />;
       case ViewName.FeedbackSimulator:
-        return <FeedbackSimulatorView personas={campaignData.personas} operators={campaignData.operators} contentDrafts={campaignData.contentDrafts} />;
+        return <FeedbackSimulatorView personas={campaignData.personas} operators={campaignData.operators} contentDrafts={campaignData.contentDrafts} onNavigate={onNavigate} />;
       case ViewName.AuditTool:
         return <AuditToolView />;
       case ViewName.Methodology:
@@ -110,17 +115,17 @@ export const MainAppLayout: React.FC<MainAppLayoutProps> = ({
                   onUpdateUser={onUpdateUser} 
                   connectedAccounts={campaignData.connectedAccounts} 
                   onAddConnectedAccount={handleAddConnectedAccount} 
-                  onRemoveConnectedAccount={handleRemoveConnectedAccount} 
+                  onRemoveConnectedAccount={handleRemoveConnectedAccount}
+                  campaignData={campaignData}
+                  onImportCampaignData={handleImportCampaignData}
                 />;
       case ViewName.TeamChat:
         return <ChatView
                   currentUser={currentUser}
                   teamMembers={currentUser.teamMembers || []}
-                  chatMessages={campaignData.chatMessages}
-                  customChannels={campaignData.customChannels} // Pass custom channels
-                  onAddChatMessage={handleAddChatMessage}
-                  onAddCustomChannel={handleAddCustomChannel} // Pass handler
-                  onRemoveCustomChannel={handleRemoveCustomChannel} // Pass handler
+                  customChannels={campaignData.customChannels} 
+                  onAddCustomChannel={handleAddCustomChannel} 
+                  onRemoveCustomChannel={handleRemoveCustomChannel} 
                 />;
       default:
         return <DashboardView campaignData={campaignData} onNavigate={onNavigate} />;
@@ -130,7 +135,8 @@ export const MainAppLayout: React.FC<MainAppLayoutProps> = ({
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Navbar currentView={currentView} onNavigate={onNavigate} onLogout={onLogout} isAuthenticated={true} />
-      <main className="flex-grow container mx-auto px-4 py-8 max-w-7xl">
+      <Breadcrumbs currentView={currentView} onNavigate={onNavigate} />
+      <main className="flex-grow container mx-auto px-4 pb-8 max-w-7xl"> {/* Adjusted padding */}
         {renderView()}
       </main>
       <footer className="bg-gray-800 text-white text-center p-4 text-sm">

@@ -1,26 +1,29 @@
-
-import React, { useState, useCallback, useMemo } from 'react';
-import { Calendar as BigCalendar, dateFnsLocalizer, Views, EventProps, ToolbarProps } from 'react-big-calendar';
-import { format, getDay } from 'date-fns'; // Assuming these are correctly exported from root
-import parse from 'date-fns/parse'; // Trying v1 style default import
-import startOfWeek from 'date-fns/startOfWeek'; // Trying v1 style default import
-import enUS from 'date-fns/locale/en-US';
-import { ScheduledPost, ContentDraft, Persona, Operator, ScheduledPostStatus, PlatformContentDetail } from '../types';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { Calendar as BigCalendar, dateFnsLocalizer, Views, EventProps, ToolbarProps, View, EventInteractionArgs } from 'react-big-calendar';
+import { format, getDay, isValid } from 'date-fns';
+import { parse } from 'date-fns/parse';
+import { startOfWeek } from 'date-fns/startOfWeek';
+import { enUS } from 'date-fns/locale/en-US';
+import { ScheduledPost, ContentDraft, Persona, Operator, ScheduledPostStatus, PlatformContentDetail, ViewName } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Textarea } from './ui/Textarea';
 import { Select } from './ui/Select';
 import { CONTENT_PLATFORMS } from '../constants';
-import { ChevronLeftIcon, ChevronRightIcon } from './ui/Icons';
+import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon } from './ui/Icons';
+import { CopyButton } from './ui/CopyButton';
+import { PrerequisiteMessageCard } from './ui/PrerequisiteMessageCard'; 
+import { useNavigateToView } from '../hooks/useNavigateToView'; 
+import { CalendarSkeleton } from './skeletons/CalendarSkeleton';
 
 const locales = {
   'en-US': enUS,
 };
 const localizer = dateFnsLocalizer({
   format,
-  parse, // Now refers to the default import
-  startOfWeek, // Now refers to the default import
+  parse,
+  startOfWeek,
   getDay,
   locales,
 });
@@ -32,6 +35,7 @@ interface CalendarViewProps {
   operators: Operator[];
   onUpdateScheduledPost: (post: ScheduledPost) => void;
   onDeleteScheduledPost: (postId: string) => void;
+  onNavigate?: (view: ViewName) => void; 
 }
 
 interface EventDetailModalProps {
@@ -45,7 +49,7 @@ interface EventDetailModalProps {
   onDelete: () => void;
 }
 
-const EventDetailModal: React.FC<EventDetailModalProps> = ({ 
+const EventDetailModalComponent: React.FC<EventDetailModalProps> = ({ 
     event, contentDraft, platformDetail, persona, operator, 
     onClose, onUpdate, onDelete 
 }) => {
@@ -55,18 +59,25 @@ const EventDetailModal: React.FC<EventDetailModalProps> = ({
   const [notes, setNotes] = useState(event.resource.notes || '');
   const [status, setStatus] = useState<ScheduledPostStatus>(event.resource.status);
 
-  const platformInfo = CONTENT_PLATFORMS.find(p => p.key === event.resource.platformKey);
+  const platformInfo = useMemo(() => CONTENT_PLATFORMS.find(p => p.key === event.resource.platformKey), [event.resource.platformKey]);
 
-  const handleSaveChanges = () => {
+  const handleSaveChanges = useCallback(() => {
     onUpdate({ scheduledDate, notes, status });
-  };
+  }, [onUpdate, scheduledDate, notes, status]);
   
-  const statusOptions: Array<{value: ScheduledPostStatus, label: string}> = [
+  const statusOptions: Array<{value: ScheduledPostStatus, label: string}> = useMemo(() => [
       {value: 'Scheduled', label: 'Scheduled'},
       {value: 'Published', label: 'Published'},
       {value: 'Missed', label: 'Missed'},
       {value: 'Cancelled', label: 'Cancelled'},
-  ];
+  ], []);
+  
+  const combinedContentForCopy = useCallback(() => {
+    let text = "";
+    if (platformDetail.subject) text += `Subject: ${platformDetail.subject}\n\n`;
+    if (platformDetail.content) text += `${platformDetail.content}`;
+    return text.trim() || undefined;
+  }, [platformDetail]);
 
   return (
     <div className="fixed inset-0 bg-gray-900 bg-opacity-75 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4 transition-opacity duration-300 ease-in-out">
@@ -86,7 +97,7 @@ const EventDetailModal: React.FC<EventDetailModalProps> = ({
             animation: modal-appear 0.3s forwards;
           }
         `}</style>
-        <div className="space-y-4 max-h-[70vh] overflow-y-auto p-1 pr-3"> {/* Added pr-3 for scrollbar */}
+        <div className="space-y-4 max-h-[70vh] overflow-y-auto p-1 pr-3"> 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div><strong className="text-textSecondary">Platform:</strong> <span className="text-textPrimary">{platformInfo?.label}</span></div>
             <div><strong className="text-textSecondary">Persona:</strong> <span className="text-textPrimary">{persona.name}</span></div>
@@ -115,16 +126,35 @@ const EventDetailModal: React.FC<EventDetailModalProps> = ({
             containerClassName="mt-1"
           />
 
-          <div className="mt-3">
-            <h4 className="text-sm font-semibold text-textSecondary mb-1">Content Preview:</h4>
+          <div className="mt-3 relative group">
+            <div className="flex justify-between items-center mb-1">
+                <h4 className="text-sm font-semibold text-textSecondary">Content Preview:</h4>
+                <CopyButton 
+                    textToCopy={combinedContentForCopy()} 
+                    tooltipText="Copy Subject & Content" 
+                    size="xs" 
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    isVisible={!!combinedContentForCopy()}
+                />
+            </div>
             <div className="bg-gray-50 p-3 rounded-md border border-lightBorder max-h-48 overflow-y-auto text-sm">
                 {platformDetail.subject && <p className="font-semibold text-textPrimary mb-1">Subject: {platformDetail.subject}</p>}
                 <pre className="whitespace-pre-wrap text-textPrimary">{platformDetail.content}</pre>
                 {platformDetail.processedImageUrl && (
                     <img src={platformDetail.processedImageUrl} alt="Processed media" className="max-w-xs w-full h-auto max-h-32 rounded my-2 border border-mediumBorder object-contain"/>
                 )}
-                {platformDetail.memeText && <p className="text-xs italic text-textSecondary mt-1">Meme: {platformDetail.memeText}</p>}
-                {platformDetail.videoIdea && <p className="text-xs text-textSecondary mt-1">Video Idea: {platformDetail.videoIdea.substring(0,100)}...</p>}
+                {platformDetail.memeText && (
+                    <div className="flex justify-between items-start mt-1">
+                        <p className="text-xs italic text-textSecondary">Meme: {platformDetail.memeText}</p>
+                        <CopyButton textToCopy={platformDetail.memeText} tooltipText="Copy Meme Text" size="xs" className="ml-2 shrink-0"/>
+                    </div>
+                )}
+                {platformDetail.videoIdea && (
+                    <div className="flex justify-between items-start mt-1">
+                        <p className="text-xs text-textSecondary">Video Idea: {platformDetail.videoIdea.substring(0,100)}...</p>
+                        <CopyButton textToCopy={platformDetail.videoIdea} tooltipText="Copy Video Idea" size="xs" className="ml-2 shrink-0"/>
+                    </div>
+                )}
             </div>
           </div>
         </div>
@@ -139,13 +169,22 @@ const EventDetailModal: React.FC<EventDetailModalProps> = ({
     </div>
   );
 };
+const EventDetailModal = React.memo(EventDetailModalComponent);
 
 
 export const CalendarView: React.FC<CalendarViewProps> = ({ 
     scheduledPosts, contentDrafts, personas, operators,
-    onUpdateScheduledPost, onDeleteScheduledPost 
+    onUpdateScheduledPost, onDeleteScheduledPost, onNavigate
 }) => {
   const [selectedEvent, setSelectedEvent] = useState<ScheduledPost | null>(null);
+  const jumpDateInputRef = useRef<HTMLInputElement>(null);
+  const navigateTo = useNavigateToView(onNavigate);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 750); 
+    return () => clearTimeout(timer);
+  }, []);
 
   const events = useMemo(() => scheduledPosts.map(post => ({
     ...post,
@@ -157,11 +196,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     setSelectedEvent(event);
   }, []);
 
-  const closeModal = () => {
+  const closeModal = useCallback(() => {
     setSelectedEvent(null);
-  };
+  }, []);
   
-  const handleUpdateEventInModal = (updatedData: { scheduledDate: string; notes: string; status: ScheduledPostStatus }) => {
+  const handleUpdateEventInModal = useCallback((updatedData: { scheduledDate: string; notes: string; status: ScheduledPostStatus }) => {
     if (selectedEvent) {
         const newStartDate = new Date(updatedData.scheduledDate);
         const duration = selectedEvent.end.getTime() - selectedEvent.start.getTime();
@@ -179,14 +218,30 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         });
         closeModal();
     }
-  };
+  }, [selectedEvent, onUpdateScheduledPost, closeModal]);
 
-  const handleDeleteEventInModal = () => {
+  const handleDeleteEventInModal = useCallback(() => {
     if (selectedEvent) {
         onDeleteScheduledPost(selectedEvent.id);
         closeModal();
     }
-  };
+  }, [selectedEvent, onDeleteScheduledPost, closeModal]);
+
+  const handleEventDrop = useCallback(({ event, start, end, allDay }: EventInteractionArgs<ScheduledPost>) => {
+    if (event) { 
+        const newStart = typeof start === 'string' ? new Date(start) : start;
+        const newEnd = typeof end === 'string' ? new Date(end) : end;
+        
+        const updatedEvent: ScheduledPost = { 
+            ...event,
+            start: newStart,
+            end: newEnd,
+            allDay: allDay || false, 
+        };
+        onUpdateScheduledPost(updatedEvent);
+    }
+  }, [onUpdateScheduledPost]);
+
 
   const selectedEventFullDetails = useMemo(() => {
     if (!selectedEvent) return { event: null };
@@ -198,25 +253,57 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     return { event: selectedEvent, contentDraft: draft, platformDetail, persona: personaDetails, operator: operatorDetails };
   }, [selectedEvent, contentDrafts, personas, operators]);
 
-  const CustomToolbar: React.FC<ToolbarProps> = (toolbar) => {
+  const CustomToolbar: React.FC<ToolbarProps> = React.memo((toolbar) => {
+    const viewNames: View[] = Array.isArray(toolbar.views) ? toolbar.views : Object.keys(toolbar.views) as View[];
+    
+    const handleJumpToDate = useCallback(() => {
+        if (jumpDateInputRef.current && jumpDateInputRef.current.value) {
+            const dateValue = jumpDateInputRef.current.value;
+            const [year, month, day] = dateValue.split('-').map(Number);
+            const selectedDate = new Date(year, month - 1, day); 
+            if (isValid(selectedDate)) {
+                toolbar.onNavigate('DATE', selectedDate);
+            } else {
+                alert("Invalid date selected.");
+            }
+        }
+    }, [toolbar]);
+
     return (
       <div className="mb-4 p-3 flex flex-col md:flex-row justify-between items-center bg-gray-50 rounded-t-lg border-b border-lightBorder">
         <div className="flex items-center space-x-1 sm:space-x-2 mb-2 md:mb-0">
-          <Button onClick={() => toolbar.onNavigate('PREV')} size="sm" variant="secondary" aria-label="Previous Period" leftIcon={<ChevronLeftIcon className="h-4 w-4"/>} />
-          <Button onClick={() => toolbar.onNavigate('TODAY')} size="sm" variant="primary">Today</Button>
-          <Button onClick={() => toolbar.onNavigate('NEXT')} size="sm" variant="secondary" aria-label="Next Period" rightIcon={<ChevronRightIcon className="h-4 w-4"/>} />
+          <Button onClick={() => toolbar.onNavigate('PREV')} size="sm" variant="secondary" aria-label="Previous Period" title="Previous Period" leftIcon={<ChevronLeftIcon className="h-4 w-4"/>} />
+          <Button onClick={() => toolbar.onNavigate('TODAY')} size="sm" variant="primary" title="Go to Today">Today</Button>
+          <Button onClick={() => toolbar.onNavigate('NEXT')} size="sm" variant="secondary" aria-label="Next Period" title="Next Period" rightIcon={<ChevronRightIcon className="h-4 w-4"/>} />
         </div>
-        <h3 className="text-lg font-semibold text-primary order-first md:order-none mb-2 md:mb-0">
+        
+        <div className="flex items-center space-x-1 sm:space-x-2 mb-2 md:mb-0 order-first md:order-none">
+            <label htmlFor="jump-to-date-input" className="text-sm font-medium text-textSecondary flex items-center">
+                <CalendarIcon className="w-4 h-4 mr-1 text-gray-500"/> Jump to:
+            </label>
+            <input 
+                type="date" 
+                id="jump-to-date-input"
+                ref={jumpDateInputRef}
+                onChange={handleJumpToDate} 
+                className="px-2 py-1 border border-mediumBorder rounded-md shadow-sm text-sm focus:ring-primary focus:border-primary"
+                aria-label="Jump to date"
+                title="Select a date to jump to"
+            />
+        </div>
+
+        <h3 className="text-lg font-semibold text-primary order-first md:order-none mb-2 md:mb-0 hidden sm:block">
           {toolbar.label}
         </h3>
         <div className="flex space-x-1 sm:space-x-2">
-          {(toolbar.views as string[]).map(view => (
+          {viewNames.map(view => (
             <Button
               key={view}
               onClick={() => toolbar.onView(view)}
               size="sm"
               variant={toolbar.view === view ? 'primary' : 'ghost'}
               className={`capitalize ${toolbar.view === view ? '' : 'text-textSecondary hover:text-primary'}`}
+              title={`Switch to ${view} view`}
             >
               {view}
             </Button>
@@ -224,9 +311,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         </div>
       </div>
     );
-  };
+  });
   
-  const EventComponent: React.FC<EventProps<ScheduledPost>> = ({ event }) => {
+  const EventComponent: React.FC<EventProps<ScheduledPost>> = React.memo(({ event }) => {
     const platformInfo = CONTENT_PLATFORMS.find(p => p.key === event.resource.platformKey);
     let bgColor = 'bg-blue-500 hover:bg-blue-600';
     let textColor = 'text-white';
@@ -238,72 +325,85 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         case 'Cancelled': bgColor = 'bg-gray-400 hover:bg-gray-500'; textColor = 'text-gray-800'; borderColor = 'border-gray-600'; break;
     }
     
-    const iconDisplay = platformInfo?.icon;
+    const platformIcon = platformInfo?.icon;
+    let iconDisplay = null;
+    if (typeof platformIcon === 'string') {
+        iconDisplay = <span className="mr-1.5 text-xs opacity-90">{platformIcon}</span>;
+    } else if (React.isValidElement(platformIcon)) {
+        iconDisplay = <span className="mr-1.5">{React.cloneElement(platformIcon, { className: 'w-3 h-3 inline-block' })}</span>;
+    }
 
     return (
-        <div className={`p-1.5 rounded-md ${textColor} ${bgColor} h-full overflow-hidden transition-all duration-150 ease-in-out border-l-4 ${borderColor} cursor-pointer`}>
+        <div 
+          className={`p-1.5 rounded ${textColor} ${bgColor} h-full overflow-hidden transition-all duration-150 ease-in-out border-l-4 ${borderColor} cursor-pointer shadow-sm hover:shadow-md`}
+          title={`${platformInfo?.label}: ${event.title}\nStatus: ${event.resource.status}`}
+        >
             <div className="flex items-center text-xs mb-0.5">
-              {typeof iconDisplay === 'string' && <span className="mr-1 text-sm">{iconDisplay}</span>}
-              {React.isValidElement(iconDisplay) && <span className="mr-1">{iconDisplay}</span>}
-              <strong className="font-medium truncate" title={event.title}>{event.title}</strong>
+              {iconDisplay}
+              <strong className="font-medium truncate flex-1">{event.title}</strong>
             </div>
-            <p className="text-xs opacity-90 capitalize">{event.resource.status}</p>
+            <p className="text-xxs opacity-90 capitalize">{event.resource.status}</p>
         </div>
     );
-  };
+  });
 
-  if (contentDrafts.length === 0 && scheduledPosts.length === 0) {
-    return (
-        <div className="p-6">
-            <Card className="text-center" shadow="soft-md">
-                <h2 className="text-3xl font-bold text-textPrimary mb-4">Content Calendar</h2>
-                <p className="text-textSecondary text-lg">No content drafts available to schedule, and no posts currently scheduled.</p>
-                <p className="text-textSecondary">Please create some content in the 'Content Planner' and save drafts first.</p>
-            </Card>
-        </div>
-    );
+  const showPrerequisiteMessage = contentDrafts.length === 0 && scheduledPosts.length === 0;
+
+  if (isLoading) {
+    return <CalendarSkeleton />;
   }
 
   return (
     <div className="p-2 md:p-4">
-      <div className="bg-card shadow-soft-lg rounded-lg">
+      <h2 className="text-3xl font-bold text-textPrimary mb-6 ml-2 md:ml-0">Content Calendar</h2>
+      {showPrerequisiteMessage && (
+        <PrerequisiteMessageCard
+          title="Calendar Information"
+          message="No content drafts available to schedule, and no posts currently scheduled. The calendar will populate once you save drafts in the 'Content Planner' and schedule them."
+          action={ onNavigate ? { label: 'Go to Content Planner', onClick: () => navigateTo(ViewName.ContentPlanner) } : undefined }
+        />
+      )}
+      <div className="bg-card shadow-soft-lg rounded-lg p-2 md:p-4 rbc-calendar" style={{ height: 'calc(100vh - 15rem)' }}>
         <BigCalendar
           localizer={localizer}
           events={events}
           startAccessor="start"
           endAccessor="end"
-          style={{ height: 'calc(100vh - 10rem)' }} // Adjusted height
-          className="p-2 md:p-4 rbc-calendar" 
           onSelectEvent={handleSelectEvent}
+          onEventDrop={handleEventDrop} 
           views={[Views.MONTH, Views.WEEK, Views.DAY, Views.AGENDA]}
           components={{
               toolbar: CustomToolbar,
               event: EventComponent,
           }}
           selectable 
-          popup // Enable popup for overflowing events
+          popup 
           dayPropGetter={(date) => {
             const isToday = format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
             return {
-              className: isToday ? 'bg-blue-50 rbc-today' : 'hover:bg-gray-50', // Subtle hover for days
+              className: `${isToday ? 'bg-blue-50 rbc-today' : 'hover:bg-gray-50'} transition-colors duration-150`,
               style: {
-                minHeight: '100px', // Ensure cells have some min height
+                minHeight: '100px',
               },
             };
           }}
-          slotPropGetter={() => ({
-             className: 'hover:bg-gray-50' // Subtle hover for time slots in week/day view
-          })}
+          slotPropGetter={(date) => {
+            return {
+              className: 'hover:bg-gray-50 transition-colors duration-150',
+              style: {},
+            };
+          }}
         />
       </div>
        <style>{`
         .rbc-calendar { font-family: inherit; }
         .rbc-toolbar button { text-transform: capitalize; }
-        .rbc-event { padding: 2px 5px; border-radius: 4px; border: none; }
+        .rbc-event { padding: 0; border-radius: 4px; border: none; background-color: transparent; } 
         .rbc-agenda-date-cell, .rbc-agenda-time-cell { font-weight: 500; }
         .rbc-header { padding: 8px 5px; text-align: center; font-weight: 600; border-bottom: 1px solid #e5e7eb; background-color: #f9fafb; }
-        .rbc-today { background-color: #eff6ff !important; } /* Tailwind blue-50 */
-        .rbc-day-bg:hover { background-color: #f9fafb; } /* Tailwind gray-50 */
+        .rbc-today { background-color: #eff6ff !important; } 
+        .rbc-day-bg:hover, .rbc-time-slot:hover { background-color: #f9fafb !important; }
+        .text-xxs { font-size: 0.65rem; line-height: 0.85rem; }
        `}</style>
       {selectedEventFullDetails.event && (
         <EventDetailModal

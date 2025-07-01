@@ -1,8 +1,9 @@
 import React from 'react';
 
-interface SelectOption {
+export interface SelectOption { // Exporting for potential use elsewhere if needed
   value: string | number;
   label: string;
+  style?: React.CSSProperties; // Added style property
 }
 
 interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
@@ -26,7 +27,13 @@ export const Select: React.FC<SelectProps> = ({ label, id, options, error, class
       >
         <option value="">Select...</option>
         {options.map(option => (
-          <option key={option.value} value={option.value}>{option.label}</option>
+          <option 
+            key={option.value} 
+            value={option.value}
+            style={option.style} // Apply inline style here
+          >
+            {option.label}
+          </option>
         ))}
       </select>
       {error && <p className="mt-1 text-xs text-danger">{error}</p>}
