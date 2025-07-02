@@ -20,48 +20,51 @@ interface PersonaCardProps {
 
 const PersonaCardComponent: React.FC<PersonaCardProps> = ({ persona, onEdit, onRefreshVulnerabilities, isRefreshingVulnerabilities }) => {
   return (
-    <Card title={persona.name} className="flex flex-col justify-between">
+    <Card title={persona.name} className="flex flex-col justify-between p-5 bg-surface border-border rounded-2xl shadow hover:shadow-xl transition-shadow duration-300">
       <div>
         <img 
           src={persona.avatarUrl || DEFAULT_PERSONA_AVATAR} 
           alt={persona.name} 
-          className="w-24 h-24 rounded-full mx-auto mb-4 border-2 border-primary object-cover" 
+          className="w-28 h-28 rounded-full mx-auto mb-5 border-3 border-primary object-cover transform hover:scale-105 transition-transform duration-200" 
           onError={(e) => (e.currentTarget.src = DEFAULT_PERSONA_AVATAR)}
         />
-        <p className="text-sm text-textSecondary mb-1"><strong>Demographics:</strong> {persona.demographics}</p>
-        <p className="text-sm text-textSecondary mb-1"><strong>Psychographics:</strong> {persona.psychographics}</p>
-        <p className="text-sm text-textSecondary mb-3"><strong>Initial Beliefs:</strong> {persona.initialBeliefs}</p>
+        <div className="space-y-3">
+          <p className="text-sm text-textSecondary leading-relaxed"><strong className="text-textPrimary">Demographics:</strong> {persona.demographics}</p>
+          <p className="text-sm text-textSecondary leading-relaxed"><strong className="text-textPrimary">Psychographics:</strong> {persona.psychographics}</p>
+          <p className="text-sm text-textSecondary leading-relaxed"><strong className="text-textPrimary">Initial Beliefs:</strong> {persona.initialBeliefs}</p>
+        </div>
         
         {persona.rstProfile && (
-          <div className="mt-2 mb-3 p-3 bg-indigo-50 rounded-md border border-indigo-200">
-              <h4 className="font-semibold text-sm text-indigo-700 mb-1">RST Profile:</h4>
-              {RST_TRAITS.map(traitInfo => (
-                  <div key={traitInfo.key} className="text-xs text-indigo-600 mb-1.5">
-                      <span className="font-medium">{traitInfo.label.split(' (')[0]}: </span>
-                      <span>{persona.rstProfile?.[traitInfo.key] || 'Not Assessed'}</span>
-                      <RstVisualBar level={persona.rstProfile?.[traitInfo.key] || 'Not Assessed'} />
-                  </div>
-              ))}
+          <div className="mt-4 mb-4 p-4 bg-indigo-50 rounded-xl border border-indigo-200">
+            <h4 className="font-semibold text-sm text-indigo-700 mb-2">RST Profile:</h4>
+            {RST_TRAITS.map(traitInfo => (
+              <div key={traitInfo.key} className="text-xs text-indigo-600 mb-2">
+                <span className="font-medium">{traitInfo.label.split(' (')[0]}: </span>
+                <span>{persona.rstProfile?.[traitInfo.key] || 'Not Assessed'}</span>
+                <RstVisualBar level={persona.rstProfile?.[traitInfo.key] || 'Not Assessed'} />
+              </div>
+            ))}
           </div>
         )}
 
         {persona.vulnerabilities && persona.vulnerabilities.length > 0 && (
-          <div className="mt-2 mb-3">
-            <h4 className="font-semibold text-sm text-textPrimary">Vulnerabilities:</h4>
-            <ul className="list-disc list-inside text-xs text-textSecondary">
+          <div className="mt-3 mb-4">
+            <h4 className="font-semibold text-sm text-textPrimary mb-2">Vulnerabilities:</h4>
+            <ul className="list-disc list-inside text-xs text-textSecondary space-y-1">
               {persona.vulnerabilities.map((vul, idx) => <li key={idx}>{vul}</li>)}
             </ul>
           </div>
         )}
       </div>
-      <div className="mt-4 pt-4 border-t border-gray-200 flex flex-wrap gap-2">
-        <Button size="sm" variant="ghost" onClick={() => onEdit(persona)}>Edit</Button>
+      <div className="mt-5 pt-4 border-t border-gray-200 flex flex-wrap gap-2 justify-center">
+        <Button size="sm" variant="ghost" onClick={() => onEdit(persona)} className="rounded-xl">Edit</Button>
         <Button 
           size="sm" 
           variant="secondary" 
           onClick={() => onRefreshVulnerabilities(persona)} 
           isLoading={isRefreshingVulnerabilities}
           leftIcon={<SparklesIcon />}
+          className="rounded-xl"
         >
           Refresh Vulnerabilities (AI)
         </Button>

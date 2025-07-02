@@ -2,16 +2,17 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Persona, ViewName } from '../../types';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
+import { Input } from '../ui/Input';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { generateJson } from '../../services/aiService';
 import { useToast } from '../ui/ToastProvider';
-import { PrerequisiteMessageCard } from '../ui/PrerequisiteMessageCard';
 import { useNavigateToView } from '../../hooks/useNavigateToView';
 import { PersonaCard } from './PersonaCard';
 import { PersonaForm } from './PersonaForm';
 import { fetchPersonas, savePersona, updatePersona, deletePersona, importPersonasFromJson } from '../../services/personaService';
 import { downloadJsonFile } from '../../utils/fileUtils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Select } from '../ui/Select';
 
 interface AudienceModelingViewProps {
   onNavigate?: (view: ViewName) => void;
@@ -27,6 +28,12 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ onNa
   const [itemsPerPage] = useState(5);
   const { showToast } = useToast();
   const navigateTo = useNavigateToView(onNavigate);
+
+  // Filter states
+  const [filterName, setFilterName] = useState('');
+  const [filterDemographic, setFilterDemographic] = useState('');
+  const [filterPsychographic, setFilterPsychographic] = useState('');
+  const [filterRstProfile, setFilterRstProfile] = useState('all');
 
   const loadPersonas = useCallback(async () => {
     setIsLoading(true);
@@ -165,52 +172,73 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ onNa
     reader.readAsText(file);
   }, [showToast]);
 
-  // Pagination logic
-  const totalPages = useMemo(() => Math.ceil(personas.length / itemsPerPage), [personas.length, itemsPerPage]);
+  // Filter personas based on criteria
+  const filteredPersonas = useMemo(() => {
+    return personas.filter(persona => {
+      const nameMatch = filterName === '' || persona.name.toLowerCase().includes(filterName.toLowerCase());
+      const demographicMatch = filterDemographic === '' || persona.demographics.toLowerCase().includes(filterDemographic.toLowerCase());
+      const psychographicMatch = filterPsychographic === '' || persona.psychographics.toLowerCase().includes(filterPsychographic.toLowerCase());
+      const rstProfileMatch = filterRstProfile === 'all' || 
+        (filterRstProfile === 'bas-high' && persona.rstProfile?.bas === 'High') ||
+        (filterRstProfile === 'bis-high' && persona.rstProfile?.bis === 'High') ||
+        (filterRstProfile === 'fffs-high' && persona.rstProfile?.fffs === 'High');
+      return nameMatch && demographicMatch && psychographicMatch && rstProfileMatch;
+    });
+  }, [personas, filterName, filterDemographic, filterPsychographic, filterRstProfile]);
+
+  // Pagination logic for filtered personas
+  const totalPages = useMemo(() => Math.ceil(filteredPersonas.length / itemsPerPage), [filteredPersonas.length, itemsPerPage]);
   const paginatedPersonas = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
-    return personas.slice(startIndex, endIndex);
-  }, [personas, currentPage, itemsPerPage]);
+    return filteredPersonas.slice(startIndex, endIndex);
+  }, [filteredPersonas, currentPage, itemsPerPage]);
 
   const handlePageChange = useCallback((page: number) => {
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
+  const handleClearFilters = useCallback(() => {
+    setFilterName('');
+    setFilterDemographic('');
+    setFilterPsychographic('');
+    setFilterRstProfile('all');
+  }, []);
+
   return (
-    <div className="p-6 bg-background min-h-screen">
+    <div className="p-8 bg-background min-h-screen">
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="text-center mb-8"
+        className="text-center mb-10"
       >
-        <h2 className="text-4xl font-bold text-textPrimary mb-2">Audience Modeling</h2>
-        <p className="text-textSecondary text-lg mb-4">
-          Build detailed personas to understand and segment your audience for targeted campaigns.
+        <h2 className="text-5xl font-bold text-textPrimary mb-3 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Audience Modeling</h2>
+        <p className="text-textSecondary text-xl mb-6 max-w-3xl mx-auto">
+          Craft detailed personas to deeply understand and segment your audience for precision-targeted campaigns.
         </p>
         <img 
           src="/assets/audience-modeling-conceptual-diagram.png" 
           alt="Audience Modeling conceptual diagram: Audience Data -> Persona Builder -> Persona Card" 
-          className="mx-auto mb-6 max-w-lg w-full h-auto rounded-2xl shadow-lg"
+          className="mx-auto mb-8 max-w-lg w-full h-auto rounded-2xl shadow-xl transform hover:scale-105 transition-transform duration-300"
         />
       </motion.div>
-      <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
+      <div className="flex flex-wrap justify-between items-center mb-8 gap-4">
         {!showForm && (
           <motion.div 
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.3 }}
-            className="flex gap-2"
+            className="flex gap-3"
           >
-            <Button variant="primary" onClick={() => { setShowForm(true); setEditingPersona(undefined); setError(null); }}>
+            <Button variant="primary" onClick={() => { setShowForm(true); setEditingPersona(undefined); setError(null); }} className="rounded-xl px-6 py-2">
               Create New Persona
             </Button>
-            <Button variant="secondary" onClick={handleDownloadPersonas} disabled={personas.length === 0}>
+            <Button variant="secondary" onClick={handleDownloadPersonas} disabled={personas.length === 0} className="rounded-xl px-6 py-2">
               Download Personas
             </Button>
-            <Button variant="ghost" onClick={() => document.getElementById('uploadPersonas')?.click()}>
+            <Button variant="ghost" onClick={() => document.getElementById('uploadPersonas')?.click()} className="rounded-xl px-6 py-2">
               Upload Personas
             </Button>
             <input
@@ -223,21 +251,78 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ onNa
           </motion.div>
         )}
         {personas.length > 0 && (
-          <div className="text-textSecondary text-sm">
-            Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, personas.length)} of {personas.length} personas
+          <div className="text-textSecondary text-sm bg-surface p-3 rounded-xl shadow-sm">
+            Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredPersonas.length)} of {filteredPersonas.length} personas
           </div>
         )}
       </div>
 
-      {error && !showForm && <Card className="mb-4 bg-red-100 border-l-4 border-danger text-danger p-4"><p>{error}</p></Card>}
+      {error && !showForm && <Card className="mb-6 bg-red-100 border-l-4 border-danger text-danger p-4 rounded-xl"><p>{error}</p></Card>}
       
+      {!showForm && (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="mb-8"
+        >
+          <Card title="Filter Personas" className="shadow-md rounded-2xl bg-surface border-border p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+              <Input 
+                label="Filter by Name" 
+                value={filterName} 
+                onChange={e => setFilterName(e.target.value)} 
+                placeholder="Search by name..." 
+                className="rounded-xl"
+              />
+              <Input 
+                label="Filter by Demographic" 
+                value={filterDemographic} 
+                onChange={e => setFilterDemographic(e.target.value)} 
+                placeholder="e.g., age, location..."
+                className="rounded-xl"
+              />
+              <Input 
+                label="Filter by Psychographic" 
+                value={filterPsychographic} 
+                onChange={e => setFilterPsychographic(e.target.value)} 
+                placeholder="e.g., values, interests..."
+                className="rounded-xl"
+              />
+              <Select 
+                label="RST Profile (High)"
+                value={filterRstProfile}
+                onChange={e => setFilterRstProfile(e.target.value)}
+                options={[
+                  { value: 'all', label: 'All Profiles' },
+                  { value: 'bas-high', label: 'BAS High (Reward-Driven)' },
+                  { value: 'bis-high', label: 'BIS High (Risk-Averse)' },
+                  { value: 'fffs-high', label: 'FFFS High (Fear-Driven)' }
+                ]}
+                containerClassName="mb-0"
+              />
+            </div>
+            <div className="flex justify-end">
+              <Button 
+                variant="ghost" 
+                onClick={handleClearFilters} 
+                disabled={!filterName && !filterDemographic && !filterPsychographic && filterRstProfile === 'all'}
+                className="rounded-xl"
+              >
+                Clear Filters
+              </Button>
+            </div>
+          </Card>
+        </motion.div>
+      )}
+
       {showForm ? (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <Card title={editingPersona ? "Edit Persona" : "Create New Persona"} className="shadow-md rounded-2xl bg-surface border-border">
+          <Card title={editingPersona ? "Edit Persona" : "Create New Persona"} className="shadow-lg rounded-2xl bg-surface border-border p-6">
             <PersonaForm 
               initialPersona={editingPersona} 
               onSubmit={handleFormSubmit} 
@@ -249,7 +334,7 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ onNa
       ) : (
         <>
           {personas.length === 0 && !isLoading && ( 
-            <Card className="text-center shadow-md rounded-2xl bg-surface border-border">
+            <Card className="text-center shadow-md rounded-2xl bg-surface border-border p-6">
               <p className="text-textSecondary text-lg">No personas created yet.</p>
               <p className="text-textSecondary">Click "Create New Persona" to build one.</p>
             </Card>
@@ -276,8 +361,8 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ onNa
               ))}
             </div>
           </AnimatePresence>
-          {personas.length > 0 && (
-            <div className="flex flex-col items-center mt-6 space-y-2">
+          {filteredPersonas.length > 0 && (
+            <div className="flex flex-col items-center mt-8 space-y-3">
               <div className="flex space-x-2">
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
                   <Button
