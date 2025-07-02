@@ -9,6 +9,7 @@ import {
     ArrowRightIcon, PlusCircleIcon, ExclamationTriangleIcon
 } from './ui/Icons'; 
 import { CONTENT_PLATFORMS } from '../constants';
+import { fetchDashboardData, subscribeToDashboardData, DashboardData } from '../services/dashboardService';
 
 // Helper function to get a limited preview of content
 const getContentPreview = (content: string, length: number = 50): string => {
@@ -23,12 +24,43 @@ interface DashboardViewProps {
 
 export const DashboardView: React.FC<DashboardViewProps> = ({ campaignData, onNavigate }) => {
   const [isLoading, setIsLoading] = useState(true); 
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 750); 
-    return () => clearTimeout(timer);
+    const loadDashboardData = async () => {
+      try {
+        const data = await fetchDashboardData();
+        if (data) {
+          setDashboardData(data);
+        } else {
+          console.warn('No dashboard data found for user.');
+        }
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Failed to load dashboard data:', error);
+        setIsLoading(false);
+      }
+    };
+
+    loadDashboardData();
+
+    let subscription: { unsubscribe: () => void } | null = null;
+    // Subscribe to real-time updates
+    subscribeToDashboardData((updatedData) => {
+      setDashboardData(updatedData);
+    }).then(sub => {
+      subscription = sub;
+      console.log('Subscribed to dashboard data updates.');
+    }).catch(err => {
+      console.error('Failed to subscribe to dashboard data:', err);
+    });
+
+    return () => {
+      if (subscription) {
+        subscription.unsubscribe();
+        console.log('Unsubscribed from dashboard data updates.');
+      }
+    };
   }, []);
 
   const { personas, operators, contentDrafts, scheduledPosts, connectedAccounts } = campaignData;
@@ -51,11 +83,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ campaignData, onNa
   ];
   
   const summaryMetrics = [
-    { title: "Audience Personas", value: personas.length, icon: <UsersIcon className="w-8 h-8 text-primary" />, navigateTo: ViewName.AudienceModeling },
-    { title: "Campaign Operators", value: operators.length, icon: <BeakerIcon className="w-8 h-8 text-accent" />, navigateTo: ViewName.OperatorBuilder },
-    { title: "Content Drafts", value: contentDrafts.length, icon: <DocumentTextIcon className="w-8 h-8 text-yellow-500" />, navigateTo: ViewName.ContentPlanner },
-    { title: "Upcoming Posts", value: upcomingPosts.length, icon: <CalendarDaysIcon className="w-8 h-8 text-blue-500" />, navigateTo: ViewName.Calendar },
-    { title: "Connected Accounts", value: connectedAccounts.length, icon: <LinkIcon className="w-8 h-8 text-green-500" />, navigateTo: ViewName.Settings },
+    { title: "Audience Personas", value: dashboardData?.personas_count ?? 0, icon: <UsersIcon className="w-8 h-8 text-primary" />, navigateTo: ViewName.AudienceModeling },
+    { title: "Campaign Operators", value: dashboardData?.operators_count ?? 0, icon: <BeakerIcon className="w-8 h-8 text-accent" />, navigateTo: ViewName.OperatorBuilder },
+    { title: "Content Drafts", value: dashboardData?.content_drafts_count ?? 0, icon: <DocumentTextIcon className="w-8 h-8 text-yellow-500" />, navigateTo: ViewName.ContentPlanner },
+    { title: "Upcoming Posts", value: dashboardData?.upcoming_posts_count ?? 0, icon: <CalendarDaysIcon className="w-8 h-8 text-blue-500" />, navigateTo: ViewName.Calendar },
+    { title: "Connected Accounts", value: dashboardData?.connected_accounts_count ?? 0, icon: <LinkIcon className="w-8 h-8 text-green-500" />, navigateTo: ViewName.Settings },
   ];
 
   // "Needs Attention" calculations

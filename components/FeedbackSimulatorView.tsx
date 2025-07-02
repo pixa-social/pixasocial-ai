@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Persona, Operator, FeedbackSimulationResult, ContentDraft, ViewName } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
@@ -9,12 +9,12 @@ import { generateJson } from '../services/aiService'; // Expecting JSON response
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { PrerequisiteMessageCard } from './ui/PrerequisiteMessageCard'; // Added import
 import { useNavigateToView } from '../hooks/useNavigateToView'; // Assuming a custom hook for navigation or pass onNavigate
+import { fetchPersonas } from '../services/personaService'; // Import the service to fetch personas from backend
 
 
 const COLORS = ['#10B981', '#F59E0B', '#EF4444']; // Positive, Neutral, Negative
 
 interface FeedbackSimulatorViewProps {
-  personas: Persona[];
   operators: Operator[];
   contentDrafts: ContentDraft[];
   onNavigate?: (view: ViewName) => void; // Optional navigation prop
@@ -30,13 +30,15 @@ const getDraftPreviewContent = (draft: ContentDraft): string => {
   return 'No content preview';
 };
 
-export const FeedbackSimulatorView: React.FC<FeedbackSimulatorViewProps> = ({ personas, operators, contentDrafts, onNavigate }) => {
+export const FeedbackSimulatorView: React.FC<FeedbackSimulatorViewProps> = ({ operators, contentDrafts, onNavigate }) => {
+  const [personas, setPersonas] = useState<Persona[]>([]);
   const [selectedPersonaId, setSelectedPersonaId] = useState<string>('');
   const [contentToSimulate, setContentToSimulate] = useState<string>('');
   const [simulationResult, setSimulationResult] = useState<FeedbackSimulationResult | null>(null);
   const navigateTo = useNavigateToView(onNavigate);
   
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingPersonas, setIsLoadingPersonas] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const personaOptions = useMemo(() => personas.map(p => ({ value: p.id, label: p.name })), [personas]);
@@ -45,6 +47,22 @@ export const FeedbackSimulatorView: React.FC<FeedbackSimulatorViewProps> = ({ pe
     value: d.id,
     label: `Draft for ${personas.find(p=>p.id === d.personaId)?.name || 'N/A'} (Op: ${operators.find(o=>o.id === d.operatorId)?.name || 'N/A'}) - ${getDraftPreviewContent(d)}`
   })), [contentDrafts, personas, operators]);
+
+  useEffect(() => {
+    const loadPersonas = async () => {
+      setIsLoadingPersonas(true);
+      try {
+        const fetchedPersonas = await fetchPersonas();
+        setPersonas(fetchedPersonas);
+      } catch (err) {
+        setError("Failed to load personas from the backend. Please try again.");
+        console.error("Error fetching personas:", err);
+      } finally {
+        setIsLoadingPersonas(false);
+      }
+    };
+    loadPersonas();
+  }, []);
 
   const handleSelectDraft = useCallback((draftId: string) => {
     const draft = contentDrafts.find(d => d.id === draftId);
@@ -122,7 +140,7 @@ export const FeedbackSimulatorView: React.FC<FeedbackSimulatorViewProps> = ({ pe
     setIsLoading(false);
   }, [selectedPersonaId, contentToSimulate, personas]);
   
-  const showPrerequisiteMessage = personas.length === 0;
+  const showPrerequisiteMessage = !isLoadingPersonas && personas.length === 0;
 
   const sentimentChartData = simulationResult ? [
     { name: 'Positive', value: simulationResult.sentiment.positive },
@@ -142,87 +160,90 @@ export const FeedbackSimulatorView: React.FC<FeedbackSimulatorViewProps> = ({ pe
         />
       )}
       {error && <Card className="mb-4 bg-red-100 border-l-4 border-danger text-danger p-4"><p>{error}</p></Card>}
+      {isLoadingPersonas && <LoadingSpinner text="Loading personas from backend..." />}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card title="Input for Simulation">
-          <Select label="Target Persona" options={personaOptions} value={selectedPersonaId} onChange={e => setSelectedPersonaId(e.target.value)} required disabled={showPrerequisiteMessage} />
-          {contentDrafts.length > 0 && (
-            <Select 
-              label="Or Select a Saved Draft" 
-              options={[{value: "", label: "Select a draft..."}, ...contentDraftOptions]} 
-              onChange={e => { if(e.target.value) handleSelectDraft(e.target.value); }}
+      {!isLoadingPersonas && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card title="Input for Simulation">
+            <Select label="Target Persona" options={personaOptions} value={selectedPersonaId} onChange={e => setSelectedPersonaId(e.target.value)} required disabled={showPrerequisiteMessage} />
+            {contentDrafts.length > 0 && (
+              <Select 
+                label="Or Select a Saved Draft" 
+                options={[{value: "", label: "Select a draft..."}, ...contentDraftOptions]} 
+                onChange={e => { if(e.target.value) handleSelectDraft(e.target.value); }}
+                disabled={showPrerequisiteMessage}
+              />
+            )}
+            <Textarea 
+              label="Content to Simulate" 
+              value={contentToSimulate} 
+              onChange={e => setContentToSimulate(e.target.value)}
+              placeholder="Paste or type content here..."
+              rows={10}
+              required 
               disabled={showPrerequisiteMessage}
             />
-          )}
-          <Textarea 
-            label="Content to Simulate" 
-            value={contentToSimulate} 
-            onChange={e => setContentToSimulate(e.target.value)}
-            placeholder="Paste or type content here..."
-            rows={10}
-            required 
-            disabled={showPrerequisiteMessage}
-          />
-          <Button 
-            variant="primary" 
-            onClick={handleSimulateFeedback} 
-            isLoading={isLoading}
-            className="w-full mt-4"
-            disabled={!selectedPersonaId || !contentToSimulate || isLoading || showPrerequisiteMessage}
-          >
-            {isLoading ? 'Simulating...' : 'Simulate Feedback'}
-          </Button>
-        </Card>
+            <Button 
+              variant="primary" 
+              onClick={handleSimulateFeedback} 
+              isLoading={isLoading}
+              className="w-full mt-4"
+              disabled={!selectedPersonaId || !contentToSimulate || isLoading || showPrerequisiteMessage}
+            >
+              {isLoading ? 'Simulating...' : 'Simulate Feedback'}
+            </Button>
+          </Card>
 
-        <Card title="Simulation Results">
-          {isLoading && <LoadingSpinner text="AI is forecasting feedback..." />}
-          {!isLoading && !simulationResult && !error && <p className="text-textSecondary">Results will appear here after simulation.</p>}
-          {simulationResult && (
-            <div className="space-y-4">
-              <div>
-                <h4 className="font-semibold text-textPrimary">Sentiment Distribution:</h4>
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie
-                      data={sentimentChartData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    >
-                      {sentimentChartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div>
-                <h4 className="font-semibold text-textPrimary">Engagement Forecast:</h4>
-                <p className={`text-lg font-medium ${
-                  simulationResult.engagementForecast === 'High' ? 'text-accent' :
-                  simulationResult.engagementForecast === 'Medium' ? 'text-yellow-500' : 'text-danger'
-                }`}>
-                  {simulationResult.engagementForecast}
-                </p>
-              </div>
-              {simulationResult.potentialRisks && simulationResult.potentialRisks.length > 0 && (
+          <Card title="Simulation Results">
+            {isLoading && <LoadingSpinner text="AI is forecasting feedback..." />}
+            {!isLoading && !simulationResult && !error && <p className="text-textSecondary">Results will appear here after simulation.</p>}
+            {simulationResult && (
+              <div className="space-y-4">
                 <div>
-                  <h4 className="font-semibold text-textPrimary">Potential Risks:</h4>
-                  <ul className="list-disc list-inside text-sm text-danger space-y-1">
-                    {simulationResult.potentialRisks.map((risk, idx) => <li key={idx}>{risk}</li>)}
-                  </ul>
+                  <h4 className="font-semibold text-textPrimary">Sentiment Distribution:</h4>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie
+                        data={sentimentChartData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {sentimentChartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
-              )}
-            </div>
-          )}
-        </Card>
-      </div>
+                <div>
+                  <h4 className="font-semibold text-textPrimary">Engagement Forecast:</h4>
+                  <p className={`text-lg font-medium ${
+                    simulationResult.engagementForecast === 'High' ? 'text-accent' :
+                    simulationResult.engagementForecast === 'Medium' ? 'text-yellow-500' : 'text-danger'
+                  }`}>
+                    {simulationResult.engagementForecast}
+                  </p>
+                </div>
+                {simulationResult.potentialRisks && simulationResult.potentialRisks.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold text-textPrimary">Potential Risks:</h4>
+                    <ul className="list-disc list-inside text-sm text-danger space-y-1">
+                      {simulationResult.potentialRisks.map((risk, idx) => <li key={idx}>{risk}</li>)}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
     </div>
   );
 };
