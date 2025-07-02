@@ -1,33 +1,32 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { Operator, Persona, RSTProfile, RSTTraitLevel, ViewName } from '../types';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Operator, Persona, ViewName } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
-import { Input } from './ui/Input';
-import { Textarea } from './ui/Textarea';
-import { Select } from './ui/Select';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { generateJson } from '../services/aiService';
-import { OPERATOR_TYPES, RST_TRAITS } from '../constants';
 import { useToast } from './ui/ToastProvider'; 
-import RstVisualBar from './audience-modeling/RstVisualBar'; 
 import { PrerequisiteMessageCard } from './ui/PrerequisiteMessageCard';
 import { useNavigateToView } from '../hooks/useNavigateToView';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { OPERATOR_TYPES, RST_TRAITS } from '../constants';
+import RstVisualBar from './audience-modeling/RstVisualBar'; 
+import { Input } from './ui/Input';
+import { Textarea } from './ui/Textarea';
+import { Select } from './ui/Select';
+import { fetchOperators, saveOperator, updateOperator, deleteOperator } from '../services/operatorService';
+import { fetchPersonas } from '../services/personaService';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface OperatorBuilderViewProps {
-  operators: Operator[];
-  personas: Persona[];
-  onAddOperator: (operator: Operator) => void;
-  onUpdateOperator: (operator: Operator) => void;
   onNavigate?: (view: ViewName) => void;
 }
 
 const operatorFormSchema = z.object({
   name: z.string().min(1, "Operator name is required"),
   targetAudienceId: z.string().min(1, "Target audience is required"),
-  type: z.enum(OPERATOR_TYPES as [Operator['type'], ...Operator['type'][]], { // Type assertion for zod
+  type: z.enum(OPERATOR_TYPES as [Operator['type'], ...Operator['type'][]], {
     errorMap: () => ({ message: "Operator type is required" })
   }),
   desiredConditionedResponse: z.string().min(1, "Desired conditioned response is required"),
@@ -41,16 +40,10 @@ type OperatorFormData = z.infer<typeof operatorFormSchema>;
 interface OperatorFormProps {
   initialOperator?: Operator;
   personas: Persona[];
-  onSubmitForm: (operator: OperatorFormData) => void; // Changed from Omit<Operator, 'id'> to OperatorFormData
+  onSubmitForm: (operator: OperatorFormData) => void;
   onCancel?: () => void;
   isLoading?: boolean;
   onSuggestOperatorDetails?: (details: { type: Operator['type'], targetAudienceId: string, desiredCR: string }) => Promise<{cs?: string, us?: string, reinforcementLoop?: string} | null>;
-}
-
-interface AiOperatorSuggestion {
-    cs: string;
-    us: string;
-    reinforcementLoop: string;
 }
 
 const OperatorFormComponent: React.FC<OperatorFormProps> = ({ initialOperator, personas, onSubmitForm, onCancel, isLoading, onSuggestOperatorDetails }) => {
@@ -153,30 +146,68 @@ const OperatorFormComponent: React.FC<OperatorFormProps> = ({ initialOperator, p
 };
 const OperatorForm = React.memo(OperatorFormComponent);
 
-
-export const OperatorBuilderView: React.FC<OperatorBuilderViewProps> = ({ operators, personas, onAddOperator, onUpdateOperator, onNavigate }) => {
+export const OperatorBuilderView: React.FC<OperatorBuilderViewProps> = ({ onNavigate }) => {
   const [showForm, setShowForm] = useState(false);
   const [editingOperator, setEditingOperator] = useState<Operator | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null); 
+  const [error, setError] = useState<string | null>(null);
+  const [operators, setOperators] = useState<Operator[]>([]);
+  const [personas, setPersonas] = useState<Persona[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(5);
+  const { showToast } = useToast();
   const navigateTo = useNavigateToView(onNavigate);
 
-  const handleFormSubmit = useCallback((operatorData: OperatorFormData) => {
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const operatorsData = await fetchOperators();
+      setOperators(operatorsData);
+      const personasData = await fetchPersonas();
+      setPersonas(personasData);
+    } catch (err) {
+      setError('Failed to load data from Pixasocial.');
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleFormSubmit = useCallback(async (operatorData: OperatorFormData) => {
     setIsLoading(true);
     setError(null);
     try {
       const newOrUpdatedOperator: Operator = { ...operatorData, id: editingOperator?.id || Date.now().toString() };
-      if (editingOperator) onUpdateOperator(newOrUpdatedOperator);
-      else onAddOperator(newOrUpdatedOperator);
+      if (editingOperator) {
+        const updatedOperator = await updateOperator(newOrUpdatedOperator.id, newOrUpdatedOperator);
+        setOperators(prev => prev.map(op => (op.id === updatedOperator.id ? updatedOperator : op)));
+      } else {
+        const newOperator = await saveOperator(operatorData);
+        setOperators(prev => [...prev, newOperator]);
+      }
       setShowForm(false);
       setEditingOperator(undefined);
-    } catch (e) { setError((e as Error).message); } 
-    finally { setIsLoading(false); }
-  }, [editingOperator, onAddOperator, onUpdateOperator]);
-  
-  const handleSuggestOperatorDetails = useCallback(async (details: { type: Operator['type'], targetAudienceId: string, desiredCR: string }): Promise<AiOperatorSuggestion | null> => {
+      showToast(editingOperator ? 'Operator updated successfully!' : 'Operator created successfully!', 'success');
+    } catch (err) {
+      setError(editingOperator ? 'Failed to update operator on Pixasocial.' : 'Failed to save operator to Pixasocial.');
+      console.error(err);
+      showToast(editingOperator ? 'Failed to update operator.' : 'Failed to create operator.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [editingOperator, showToast]);
+
+  const handleSuggestOperatorDetails = useCallback(async (details: { type: Operator['type'], targetAudienceId: string, desiredCR: string }): Promise<{cs?: string, us?: string, reinforcementLoop?: string} | null> => {
     const persona = personas.find(p => p.id === details.targetAudienceId);
-    if (!persona) { setError("Target persona not found for suggestion."); return null; }
+    if (!persona) {
+      setError("Target persona not found for suggestion.");
+      return null;
+    }
 
     const prompt = `
       Persona Details:
@@ -192,9 +223,9 @@ export const OperatorBuilderView: React.FC<OperatorBuilderViewProps> = ({ operat
       Return your suggestions as a JSON object with the EXACT keys "cs", "us", and "reinforcementLoop".
     `;
     const systemInstruction = "You are an expert in psychological operations and behavioral marketing. Provide creative, plausible suggestions for conditioning components. Ensure JSON output.";
-    const result = await generateJson<AiOperatorSuggestion>(prompt, systemInstruction); 
+    const result = await generateJson<{ cs: string; us: string; reinforcementLoop: string }>(prompt, systemInstruction); 
     if (result.data && result.data.cs && result.data.us && result.data.reinforcementLoop) {
-        return { cs: result.data.cs.replace(/\\n/g, '\\n'), us: result.data.us.replace(/\\n/g, '\\n'), reinforcementLoop: result.data.reinforcementLoop.replace(/\\n/g, '\\n')};
+      return { cs: result.data.cs.replace(/\\n/g, '\n'), us: result.data.us.replace(/\\n/g, '\n'), reinforcementLoop: result.data.reinforcementLoop.replace(/\\n/g, '\n') };
     } else {
       setError(result.error || "AI suggestions for operator details failed or returned invalid format.");
       return null;
@@ -206,23 +237,117 @@ export const OperatorBuilderView: React.FC<OperatorBuilderViewProps> = ({ operat
     setShowForm(true);
     setError(null);
   }, []);
-  
+
+  const handleDownloadOperators = useCallback(() => {
+    const operatorsJson = JSON.stringify(operators, null, 2);
+    const blob = new Blob([operatorsJson], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'operators.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Operators downloaded successfully!', 'success');
+  }, [operators, showToast]);
+
+  const handleUploadOperators = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      showToast('No file selected for upload.', 'error');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const jsonData = e.target?.result as string;
+        const uploadedOperators = JSON.parse(jsonData) as Operator[];
+        if (!Array.isArray(uploadedOperators) || uploadedOperators.length === 0) {
+          showToast('Invalid file format or empty data.', 'error');
+          return;
+        }
+
+        setIsLoading(true);
+        const newOperators: Operator[] = [];
+        for (const op of uploadedOperators) {
+          const { id, ...operatorData } = op;
+          const savedOperator = await saveOperator(operatorData);
+          newOperators.push(savedOperator);
+        }
+        setOperators(prev => [...prev, ...newOperators]);
+        showToast(`${newOperators.length} operators uploaded successfully!`, 'success');
+      } catch (err) {
+        console.error('Error uploading operators:', err);
+        showToast('Failed to upload operators. Check file format.', 'error');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    reader.readAsText(file);
+  }, [showToast]);
+
+  // Pagination logic
+  const totalPages = useMemo(() => Math.ceil(operators.length / itemsPerPage), [operators.length, itemsPerPage]);
+  const paginatedOperators = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return operators.slice(startIndex, endIndex);
+  }, [operators, currentPage, itemsPerPage]);
+
+  const handlePageChange = useCallback((page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
   return (
-    <div className="p-6">
-      <div className="text-center">
-        <h2 className="text-3xl font-bold text-textPrimary mb-2">Operator Builder</h2>
-        <p className="text-textSecondary mb-4">
-            Craft powerful operators to influence and engage your audience with precision.
+    <div className="p-6 bg-background min-h-screen">
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="text-center mb-8"
+      >
+        <h2 className="text-4xl font-bold text-textPrimary mb-2">Operator Builder</h2>
+        <p className="text-textSecondary text-lg mb-4">
+          Craft powerful operators to influence and engage your audience with precision.
         </p>
         <img 
           src="/assets/operator-builder-conceptual-diagram.png" 
           alt="Operator Builder conceptual diagram: Audience Persona -> Operator Builder -> Operator Type" 
-          className="mx-auto mb-6 max-w-lg w-full h-auto rounded-lg shadow-md"
+          className="mx-auto mb-6 max-w-lg w-full h-auto rounded-2xl shadow-lg"
         />
-      </div>
-      <div className="flex justify-between items-center mb-6">
-        {/* Subtitle was here, moved above image for better flow */}
-        {!showForm && (<Button variant="primary" onClick={() => { setShowForm(true); setEditingOperator(undefined); setError(null); }} disabled={personas.length === 0}>Create New Operator</Button>)}
+      </motion.div>
+      <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
+        {!showForm && (
+          <motion.div 
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.3 }}
+            className="flex gap-2"
+          >
+            <Button variant="primary" onClick={() => { setShowForm(true); setEditingOperator(undefined); setError(null); }} disabled={personas.length === 0}>
+              Create New Operator
+            </Button>
+            <Button variant="secondary" onClick={handleDownloadOperators} disabled={operators.length === 0}>
+              Download Operators
+            </Button>
+            <Button variant="ghost" onClick={() => document.getElementById('uploadOperators')?.click()} disabled={personas.length === 0}>
+              Upload Operators
+            </Button>
+            <input
+              type="file"
+              id="uploadOperators"
+              accept=".json"
+              className="hidden"
+              onChange={handleUploadOperators}
+            />
+          </motion.div>
+        )}
+        {operators.length > 0 && (
+          <div className="text-textSecondary text-sm">
+            Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, operators.length)} of {operators.length} operators
+          </div>
+        )}
       </div>
 
       {personas.length === 0 && (
@@ -236,40 +361,96 @@ export const OperatorBuilderView: React.FC<OperatorBuilderViewProps> = ({ operat
       {error && !showForm && <Card className="mb-4 bg-red-100 border-l-4 border-danger text-danger p-4"><p>{error}</p></Card>}
       
       {showForm ? (
-        <Card title={editingOperator ? "Edit Operator" : "Create New Operator"}>
-          <OperatorForm 
-            initialOperator={editingOperator} 
-            personas={personas} 
-            onSubmitForm={handleFormSubmit} 
-            onCancel={() => { setShowForm(false); setEditingOperator(undefined); setError(null);}} 
-            isLoading={isLoading} 
-            onSuggestOperatorDetails={handleSuggestOperatorDetails} 
-          />
-        </Card>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <Card title={editingOperator ? "Edit Operator" : "Create New Operator"} className="shadow-md rounded-2xl bg-surface border-border">
+            <OperatorForm 
+              initialOperator={editingOperator} 
+              personas={personas} 
+              onSubmitForm={handleFormSubmit} 
+              onCancel={() => { setShowForm(false); setEditingOperator(undefined); setError(null);}} 
+              isLoading={isLoading} 
+              onSuggestOperatorDetails={handleSuggestOperatorDetails} 
+            />
+          </Card>
+        </motion.div>
       ) : (
         <>
           {operators.length === 0 && !isLoading && personas.length > 0 && ( 
-            <Card className="text-center">
+            <Card className="text-center shadow-md rounded-2xl bg-surface border-border">
               <p className="text-textSecondary text-lg">No operators created yet.</p>
               <p className="text-textSecondary">Click "Create New Operator" to design one.</p>
             </Card>
           )}
           {isLoading && operators.length === 0 && <LoadingSpinner text="Loading operators..." />}
-          <div className="space-y-4">
-            {operators.map((op) => {
-              const persona = personas.find(p => p.id === op.targetAudienceId);
-              return (
-                <Card key={op.id} title={`${op.name} (${op.type})`}>
-                  <p className="text-sm text-textSecondary mb-1"><strong>Target Audience:</strong> {persona?.name || 'N/A'}</p>
-                  <p className="text-sm text-textSecondary mb-1"><strong>CS:</strong> {op.conditionedStimulus}</p>
-                  <p className="text-sm text-textSecondary mb-1"><strong>US:</strong> {op.unconditionedStimulus}</p>
-                  <p className="text-sm text-textSecondary mb-1"><strong>Desired CR:</strong> {op.desiredConditionedResponse}</p>
-                  <p className="text-sm text-textSecondary mb-3"><strong>Reinforcement:</strong> {op.reinforcementLoop}</p>
-                  <div className="mt-4 pt-4 border-t border-gray-200"><Button size="sm" variant="ghost" onClick={() => handleEdit(op)}>Edit</Button></div>
-                </Card>
-              );
-            })}
-          </div>
+          <AnimatePresence>
+            <div className="space-y-6">
+              {paginatedOperators.map((op, index) => {
+                const persona = personas.find(p => p.id === op.targetAudienceId);
+                return (
+                  <motion.div
+                    key={op.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.4, delay: index * 0.1 }}
+                    className="bg-surface rounded-2xl shadow-md border border-border hover:shadow-lg transition-shadow duration-300"
+                  >
+                    <Card title={`${op.name} (${op.type})`}>
+                      <p className="text-sm text-textSecondary mb-1"><strong>Target Audience:</strong> {persona?.name || 'N/A'}</p>
+                      <p className="text-sm text-textSecondary mb-1"><strong>CS:</strong> {op.conditionedStimulus}</p>
+                      <p className="text-sm text-textSecondary mb-1"><strong>US:</strong> {op.unconditionedStimulus}</p>
+                      <p className="text-sm text-textSecondary mb-1"><strong>Desired CR:</strong> {op.desiredConditionedResponse}</p>
+                      <p className="text-sm text-textSecondary mb-3"><strong>Reinforcement:</strong> {op.reinforcementLoop}</p>
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <Button size="sm" variant="ghost" onClick={() => handleEdit(op)}>Edit</Button>
+                      </div>
+                    </Card>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </AnimatePresence>
+          {operators.length > 0 && (
+            <div className="flex flex-col items-center mt-6 space-y-2">
+              <div className="flex space-x-2">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                  <Button
+                    key={page}
+                    variant={page === currentPage ? 'primary' : 'ghost'}
+                    size="sm"
+                    onClick={() => handlePageChange(page)}
+                    className={`w-10 h-10 ${page === currentPage ? 'bg-primary text-white' : 'text-textSecondary hover:bg-surface'}`}
+                  >
+                    {page}
+                  </Button>
+                ))}
+              </div>
+              <div className="flex space-x-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="text-textSecondary hover:bg-surface"
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="text-textSecondary hover:bg-surface"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

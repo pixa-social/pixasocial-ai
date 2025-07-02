@@ -77,8 +77,6 @@ export const MainAppLayout: React.FC<MainAppLayoutProps> = ({
       case ViewName.ContentPlanner:
         return <ContentPlannerView 
                   contentDrafts={campaignData.contentDrafts} 
-                  personas={campaignData.personas} 
-                  operators={campaignData.operators} 
                   onAddContentDraft={handleAddContentDraft}
                   onAddScheduledPost={handleAddScheduledPost}
                   onAddContentLibraryAsset={handleAddContentLibraryAsset} 

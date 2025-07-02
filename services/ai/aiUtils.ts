@@ -1,132 +1,107 @@
-import { AiProviderConfig, AiProviderType } from "../../types";
-import { AI_PROVIDERS_CONFIG_TEMPLATE, LOCAL_STORAGE_AI_CONFIG_KEY } from "../../constants";
-import { loadAiProviderConfigsFromSupabase, getActiveAiProviderTypeFromSupabase } from './aiConfigService';
+import { AiProviderType, AiProviderConfig } from "../../types";
+import { AI_PROVIDERS_CONFIG_TEMPLATE, LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY, LOCAL_STORAGE_AI_CONFIG_KEY } from "../../constants";
 
-// Get stored AI provider configs, now from Supabase if possible
-export const getStoredAiProviderConfigs = async (): Promise<AiProviderConfig[]> => {
-  try {
-    return await loadAiProviderConfigsFromSupabase();
-  } catch (error) {
-    console.error("Error fetching configs from Supabase, falling back to local storage:", error);
-    const storedConfigs = localStorage.getItem(LOCAL_STORAGE_AI_CONFIG_KEY);
-    if (storedConfigs) {
-      try {
-        return JSON.parse(storedConfigs);
-      } catch (e) {
-        console.error("Error parsing stored AI configs:", e);
-        return AI_PROVIDERS_CONFIG_TEMPLATE;
-      }
-    }
-    return AI_PROVIDERS_CONFIG_TEMPLATE;
-  }
+// Cached configs to avoid repeated localStorage access
+let cachedAiConfigs: AiProviderConfig[] | null = null;
+let cachedActiveProvider: AiProviderType | null = null;
+
+// Load configs from local storage or use default template
+const loadAiConfigs = (): AiProviderConfig[] => {
+  if (cachedAiConfigs) return cachedAiConfigs;
+  
+  const localConfigs = localStorage.getItem(LOCAL_STORAGE_AI_CONFIG_KEY);
+  cachedAiConfigs = localConfigs ? JSON.parse(localConfigs) : AI_PROVIDERS_CONFIG_TEMPLATE;
+  return cachedAiConfigs;
 };
 
-// Synchronous fallback for getting AI provider configs when async is not possible
-export const getStoredAiProviderConfigsSync = (): AiProviderConfig[] => {
-  const storedConfigs = localStorage.getItem(LOCAL_STORAGE_AI_CONFIG_KEY);
-  if (storedConfigs) {
-    try {
-      return JSON.parse(storedConfigs);
-    } catch (e) {
-      console.error("Error parsing stored AI configs synchronously:", e);
-      return AI_PROVIDERS_CONFIG_TEMPLATE;
-    }
+// Get active provider type synchronously from local storage if available
+export const getActiveAiProviderType = (): AiProviderType => {
+  if (cachedActiveProvider) return cachedActiveProvider;
+  
+  const localActiveProvider = localStorage.getItem(LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY) as AiProviderType | null;
+  if (localActiveProvider) {
+    cachedActiveProvider = localActiveProvider;
+    return localActiveProvider;
   }
-  return AI_PROVIDERS_CONFIG_TEMPLATE;
-};
-
-// Get active AI provider type, considering Supabase
-export const getActiveAiProviderType = async (): Promise<AiProviderType> => {
-  try {
-    return await getActiveAiProviderTypeFromSupabase();
-  } catch (error) {
-    console.error("Error fetching active provider from Supabase, falling back to local storage:", error);
-    const storedActiveProvider = localStorage.getItem(LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY) as AiProviderType | null;
-    if (storedActiveProvider) {
-      return storedActiveProvider;
-    }
-    return AiProviderType.Gemini; // Default
+  
+  // If not in local storage, determine from configs
+  const configs = loadAiConfigs();
+  const enabledConfigs = configs.filter(c => c.isEnabled);
+  if (enabledConfigs.length > 0) {
+    const geminiConfig = enabledConfigs.find(c => c.id === AiProviderType.Gemini);
+    cachedActiveProvider = geminiConfig ? AiProviderType.Gemini : enabledConfigs[0].id;
+  } else {
+    cachedActiveProvider = AiProviderType.Gemini; // Default fallback
   }
-};
-
-// Synchronous fallback for contexts where async is not possible
-export const getActiveAiProviderTypeSync = (): AiProviderType => {
-  const storedActiveProvider = localStorage.getItem(LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY) as AiProviderType | null;
-  if (storedActiveProvider) {
-    return storedActiveProvider;
-  }
-  return AiProviderType.Gemini; // Default
+  
+  localStorage.setItem(LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY, cachedActiveProvider);
+  return cachedActiveProvider;
 };
 
 // Get provider config by type
-export const getProviderConfig = (providerType: AiProviderType, configs?: AiProviderConfig[]): AiProviderConfig | undefined => {
-  const configSet = configs || AI_PROVIDERS_CONFIG_TEMPLATE;
-  return configSet.find(p => p.id === providerType);
+export const getProviderConfig = (providerType: AiProviderType): AiProviderConfig | undefined => {
+  const configs = loadAiConfigs();
+  return configs.find(config => config.id === providerType);
 };
 
-// Get API key for a specific provider
-export const getApiKeyForProvider = async (providerType: AiProviderType): Promise<string | null> => {
-  const configs = await getStoredAiProviderConfigs();
-  const providerConfig = getProviderConfig(providerType, configs);
-  return providerConfig?.apiKey || null;
-};
-
-// Get model for a specific provider and feature type
-export const getModelForProvider = (providerType: AiProviderType, featureType: 'chat' | 'text' | 'image'): string | null => {
+// Get API key for a provider
+export const getApiKeyForProvider = (providerType: AiProviderType): string | null => {
   const config = getProviderConfig(providerType);
-  if (!config || !config.isEnabled) {
-    console.warn(`${providerType} provider is not configured or not enabled.`);
-    return null;
+  return config && config.isEnabled ? config.apiKey || null : null;
+};
+
+// Get appropriate model for a provider based on task type
+export const getModelForProvider = (providerType: AiProviderType, taskType: 'text' | 'chat' | 'image' | 'json' = 'text'): string | null => {
+  const config = getProviderConfig(providerType);
+  if (!config || !config.isEnabled) return null;
+  
+  const models = config.models;
+  if (!models) return null;
+  
+  // For OpenAI-compatible, 'chat' is used for text generation with OpenAI SDK
+  if (taskType === 'chat' && models.chat && models.chat.length > 0) {
+    return models.chat[0];
   }
   
-  switch (featureType) {
-    case 'chat':
-      return config.models?.chat || null;
-    case 'text':
-      return config.models?.text || null;
-    case 'image':
-      return config.models?.image || null;
-    default:
-      console.warn(`Unknown feature type ${featureType} for provider ${providerType}.`);
-      return null;
+  // For image generation
+  if (taskType === 'image' && models.image && models.image.length > 0) {
+    return models.image[0];
   }
+  
+  // Default to text models (also used for JSON tasks)
+  return models.text && models.text.length > 0 ? models.text[0] : null;
 };
 
-// Handle non-implemented providers
+// Handle non-implemented providers with a user-friendly message
 export const handleNonImplementedProvider = (providerType: AiProviderType, feature: string): { error: string } => {
-  console.warn(`Provider ${providerType} is not fully implemented for ${feature}.`);
-  return { error: `The ${feature} feature is not yet implemented for ${providerType}. Please select a different provider in Admin Panel.` };
+  const config = getProviderConfig(providerType);
+  const providerName = config?.name || providerType;
+  return {
+    error: `The ${feature} feature is not yet implemented for ${providerName}. Please select a different provider in the Admin Panel.`,
+  };
 };
 
-// Parse JSON from text response, handling code blocks and incomplete JSON
-export const parseJsonFromText = (text: string): any => {
+// Parse JSON from text response, handling potential errors
+export const parseJsonFromText = <T,>(text: string): { data: T | null; error?: string } => {
   try {
-    // First, check if it's already valid JSON
-    return JSON.parse(text);
+    // Attempt to extract JSON from code blocks if present
+    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    const jsonText = jsonMatch ? jsonMatch[1] : text;
+    const parsed = JSON.parse(jsonText);
+    return { data: parsed as T };
   } catch (e) {
-    // If not, try to extract JSON from code blocks or partial JSON
-    const jsonRegex = /```(?:json)?\s*([\s\S]*?)\s*```|```(?:javascript)?\s*([\s\S]*?)\s*```|{[\s\S]*}/g;
-    const matches = Array.from(text.matchAll(jsonRegex));
-    
-    for (const match of matches) {
-      const potentialJson = match[1] || match[2] || match[0];
-      if (potentialJson) {
-        try {
-          // Clean up any trailing commas or incomplete brackets
-          const cleanedJson = potentialJson
-            .replace(/,\s*}/g, '}')
-            .replace(/,\s*]/g, ']')
-            .replace(/}\s*$/gm, '}')
-            .trim();
-          return JSON.parse(cleanedJson);
-        } catch (error) {
-          console.error("Failed to parse extracted JSON:", error);
-        }
-      }
-    }
-    
-    // If no valid JSON found, return null or throw
-    console.warn("No valid JSON found in text response");
-    return null;
+    console.error("Failed to parse JSON from AI response:", e);
+    return { data: null, error: `Failed to parse JSON from response: ${text.substring(0, 100)}...` };
   }
+};
+
+// Reset cached values (useful for logout or config changes)
+export const resetAiConfigCache = (): void => {
+  cachedAiConfigs = null;
+  cachedActiveProvider = null;
+};
+
+// Get stored AI provider configs synchronously
+export const getStoredAiProviderConfigsSync = (): AiProviderConfig[] => {
+  return loadAiConfigs();
 };

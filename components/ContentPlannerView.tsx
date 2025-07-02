@@ -3,7 +3,9 @@ import { ContentDraft, Persona, Operator, PlatformContentMap, PlatformContentDet
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { LoadingSpinner } from './ui/LoadingSpinner';
-import { generateJson, generateImages } from '../services/aiService'; 
+import { generateJson, generateImages } from '../services/aiService';
+import { fetchPersonas } from '../services/personaService';
+import { fetchOperators } from '../services/operatorService';
 import { 
     CONTENT_PLATFORMS, MEDIA_TYPE_OPTIONS, TONE_OF_VOICE_OPTIONS, MAX_FILE_UPLOAD_SIZE_BYTES, MAX_FILE_UPLOAD_SIZE_MB, ACCEPTED_IMAGE_TYPES,
     DEFAULT_FONT_FAMILY, DEFAULT_FONT_COLOR, FONT_CATEGORY_MAP, MEME_TEXT_COLOR_OPTIONS // Added font constants
@@ -19,8 +21,6 @@ import { ContentPlannerSkeleton } from './skeletons/ContentPlannerSkeleton';
 
 interface ContentPlannerViewProps {
   contentDrafts: ContentDraft[];
-  personas: Persona[];
-  operators: Operator[];
   onAddContentDraft: (draft: ContentDraft) => void;
   onAddScheduledPost: (post: ScheduledPost) => void;
   onAddContentLibraryAsset: (asset: ContentLibraryAsset) => void;
@@ -46,9 +46,11 @@ const getPlatformIconDisplay = (icon: string | React.ReactNode | undefined) => {
 };
 
 export const ContentPlannerView: React.FC<ContentPlannerViewProps> = ({ 
-    contentDrafts, personas, operators, onAddContentDraft, onAddScheduledPost, onAddContentLibraryAsset, onNavigate 
+    contentDrafts, onAddContentDraft, onAddScheduledPost, onAddContentLibraryAsset, onNavigate 
 }) => {
   const { showToast } = useToast();
+  const [personas, setPersonas] = useState<Persona[]>([]);
+  const [operators, setOperators] = useState<Operator[]>([]);
   const [selectedPersonaId, setSelectedPersonaId] = useState<string>('');
   const [selectedOperatorId, setSelectedOperatorId] = useState<string>('');
   const [keyMessage, setKeyMessage] = useState<string>(''); 
@@ -89,9 +91,26 @@ export const ContentPlannerView: React.FC<ContentPlannerViewProps> = ({
   });
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsInitialLoading(false), 750); 
-    return () => clearTimeout(timer);
-  }, []);
+    const loadPrerequisites = async () => {
+      setIsInitialLoading(true);
+      try {
+        const [fetchedPersonas, fetchedOperators] = await Promise.all([
+          fetchPersonas(),
+          fetchOperators(),
+        ]);
+        setPersonas(fetchedPersonas);
+        setOperators(fetchedOperators);
+      } catch (error) {
+        console.error("Failed to load prerequisites:", error);
+        showToast("Error loading personas and operators. Please try again.", "error");
+        setError("Could not load required data. Please refresh the page.");
+      } finally {
+        setIsInitialLoading(false);
+      }
+    };
+
+    loadPrerequisites();
+  }, [showToast]);
 
 
   const personaOptions = useMemo(() => personas.map(p => ({ value: p.id, label: p.name })), [personas]);
