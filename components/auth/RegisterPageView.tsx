@@ -11,7 +11,7 @@ import { z } from 'zod';
 
 interface RegisterPageViewProps {
   setAuthView: (view: AuthViewType) => void;
-  onRegisterSuccess: () => void;
+  onRegisterSuccess: (email: string, password: string, name: string) => Promise<void>;
 }
 
 const registerSchema = z.object({
@@ -35,33 +35,17 @@ export const RegisterPageView: React.FC<RegisterPageViewProps> = ({ setAuthView,
     resolver: zodResolver(registerSchema)
   });
 
-  const handleRegister = (data: RegisterFormData) => {
+  const handleRegister = async (data: RegisterFormData) => {
     setServerError(null);
     setIsLoading(true);
-
-    setTimeout(() => {
-      const storedUsers = localStorage.getItem(LOCAL_STORAGE_USERS_KEY);
-      const users: User[] = storedUsers ? JSON.parse(storedUsers) : [];
-
-      if (users.find(user => user.email === data.email)) {
-        setServerError("An account with this email already exists.");
-        setIsLoading(false);
-        return;
-      }
-
-      const newUser: User = { 
-        id: Date.now().toString(), 
-        name: data.name, 
-        email: data.email, 
-        passwordHash: data.password // In a real app, hash this on the backend
-      };
-      users.push(newUser);
-      localStorage.setItem(LOCAL_STORAGE_USERS_KEY, JSON.stringify(users));
-      
+    try {
+      // The actual registration logic is in App.tsx, which calls Supabase
+      await onRegisterSuccess(data.email, data.password, data.name);
+    } catch (error: any) {
+      setServerError(error.message || "An unexpected error occurred.");
+    } finally {
       setIsLoading(false);
-      onRegisterSuccess(); 
-
-    }, 1000);
+    }
   };
 
   return (

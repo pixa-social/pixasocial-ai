@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Card } from '../ui/Card';
-import { AuthViewType, User } from '../../types';
-import { LOCAL_STORAGE_USERS_KEY, LOCAL_STORAGE_AUTH_TOKEN_KEY, APP_TITLE } from '../../constants';
-import { LockClosedIcon, UserCircleIcon } from '../ui/Icons'; // Assuming you have these icons
+import { AuthViewType } from '../../types';
+import { APP_TITLE } from '../../constants';
+import { supabase } from '../../services/supabaseClient';
 
 interface LoginPageViewProps {
   setAuthView: (view: AuthViewType) => void;
@@ -17,29 +17,31 @@ export const LoginPageView: React.FC<LoginPageViewProps> = ({ setAuthView, onLog
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
 
-    // Simulate API call
-    setTimeout(() => {
-      const storedUsers = localStorage.getItem(LOCAL_STORAGE_USERS_KEY);
-      const users: User[] = storedUsers ? JSON.parse(storedUsers) : [];
-      
-      const foundUser = users.find(user => user.email === email);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-      // IMPORTANT: This is a MOCK password check.
-      // In a real app, never store or compare plaintext passwords.
-      // Hashing would be done on the backend. Here, we assume passwordHash is the "password" for simplicity.
-      if (foundUser && foundUser.passwordHash === password) {
-        localStorage.setItem(LOCAL_STORAGE_AUTH_TOKEN_KEY, email); // Store email as mock token
+      if (error) {
+        throw error;
+      }
+
+      if (data.session) {
         onLoginSuccess(email);
       } else {
-        setError('Invalid email or password.');
+        setError('Login failed. No session returned.');
       }
+    } catch (err: any) {
+      setError(err.message || 'Invalid email or password.');
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -55,7 +57,6 @@ export const LoginPageView: React.FC<LoginPageViewProps> = ({ setAuthView, onLog
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
-            // leftIcon={<UserCircleIcon className="h-5 w-5 text-gray-400" />}
           />
           <Input
             label="Password"
@@ -66,7 +67,6 @@ export const LoginPageView: React.FC<LoginPageViewProps> = ({ setAuthView, onLog
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
-            // leftIcon={<LockClosedIcon className="h-5 w-5 text-gray-400" />}
           />
 
           {error && <p className="text-sm text-danger text-center">{error}</p>}
@@ -81,9 +81,9 @@ export const LoginPageView: React.FC<LoginPageViewProps> = ({ setAuthView, onLog
             Sign up here
           </button>
         </p>
-         <p className="mt-4 text-xs text-gray-500 text-center">
-            Note: This is a prototype. Login is simulated.
-          </p>
+        <p className="mt-4 text-xs text-gray-500 text-center">
+          Note: This is a prototype. Login is now integrated with Supabase Auth.
+        </p>
       </Card>
     </div>
   );
