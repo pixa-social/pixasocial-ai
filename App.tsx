@@ -11,7 +11,7 @@ import {
   LOCAL_STORAGE_AUTH_TOKEN_KEY,
   AI_PROVIDERS_CONFIG_TEMPLATE
 } from './constants';
-import { getStoredAiProviderConfigs, getActiveAiProviderType } from './services/ai/aiUtils'; // Updated import
+import { getStoredAiProviderConfigs, getStoredAiProviderConfigsSync, getActiveAiProviderType } from './services/ai/aiUtils';
 import { ToastProvider, useToast } from './components/ui/ToastProvider';
 
 // Reviewed for aliased import error "@/ui/Icons" - no such alias found in provided files.
@@ -88,7 +88,7 @@ const AppContent: React.FC = () => {
   const loadUserAndData = useCallback(() => {
 
     if (!localStorage.getItem(LOCAL_STORAGE_AI_CONFIG_KEY)) {
-      localStorage.setItem(LOCAL_STORAGE_AI_CONFIG_KEY, JSON.stringify(getStoredAiProviderConfigs()));
+      localStorage.setItem(LOCAL_STORAGE_AI_CONFIG_KEY, JSON.stringify(getStoredAiProviderConfigsSync()));
     }
     if (!localStorage.getItem(LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY)) {
        localStorage.setItem(LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY, getActiveAiProviderType());
@@ -340,7 +340,7 @@ const AppContent: React.FC = () => {
       }
 
       // Merge AI Provider Configs carefully
-      const currentStoredAiConfigs = getStoredAiProviderConfigs();
+      const currentStoredAiConfigs = getStoredAiProviderConfigsSync();
       const importedAiConfigs = importedData.aiProviderConfigs || []; 
       
       const mergedAiConfigs = currentStoredAiConfigs.map(currentConfig => {
@@ -402,7 +402,7 @@ const AppContent: React.FC = () => {
   const fullCampaignDataForLayout: CampaignData = {
     ...campaignData,
     chatMessages: [], 
-    aiProviderConfigs: getStoredAiProviderConfigs().map(config => { // Ensure AI configs are current for export in settings
+    aiProviderConfigs: getStoredAiProviderConfigsSync().map(config => { // Use synchronous version to avoid async issues in render
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { apiKey, ...rest } = config;
         return rest;
