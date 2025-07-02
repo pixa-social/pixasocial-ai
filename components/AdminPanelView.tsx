@@ -30,7 +30,7 @@ export const AdminPanelView: React.FC = () => {
       setShowApiKeys(initialShowState);
     } catch (error) {
       console.error('Error loading configs:', error);
-      showToast('Failed to load configurations from Supabase. Using default or local data.', 'error');
+      showToast('Failed to load configurations from Pixasocial. Using default or local data.', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -70,10 +70,10 @@ export const AdminPanelView: React.FC = () => {
     try {
       const result = await saveAiProviderConfigsToSupabase(providerConfigs, activeProvider);
       if (result.success) {
-        showToast('Configurations saved successfully to Supabase!', 'success');
+        showToast('Configurations saved successfully to Pixasocial!', 'success');
         await loadConfigs(); // Reload to ensure UI reflects server state
       } else {
-        showToast(result.error || 'Failed to save configurations to Supabase.', 'error');
+        showToast(result.error || 'Failed to save configurations to Pixasocial.', 'error');
       }
     } catch (error) {
       console.error("Error saving AI configurations:", error);
@@ -93,7 +93,7 @@ export const AdminPanelView: React.FC = () => {
           <div>
             <h3 className="text-lg font-semibold text-yellow-700">API Key Security Warning</h3>
             <p className="text-yellow-600 text-sm">
-              API keys entered here are encrypted and stored securely in Supabase, associated with your user account.
+              API keys entered here are encrypted and stored securely in Pixasocial, associated with your user account.
               For Google Gemini, relying on the pre-configured environment variable is recommended if available.
             </p>
           </div>
@@ -102,7 +102,7 @@ export const AdminPanelView: React.FC = () => {
 
       {isLoading && (
         <Card className="mb-6">
-          <p className="text-textSecondary">Loading configurations from Supabase...</p>
+          <p className="text-textSecondary">Loading configurations from Pixasocial...</p>
         </Card>
       )}
 
@@ -181,7 +181,7 @@ export const AdminPanelView: React.FC = () => {
           
           <div className="mt-8 flex flex-col items-center">
             <Button variant="primary" size="lg" onClick={handleSaveConfigs} className="w-full md:w-auto">
-              Save All AI Configurations to Supabase
+              Save All AI Configurations to Pixasocial
             </Button>
           </div>
         </>
