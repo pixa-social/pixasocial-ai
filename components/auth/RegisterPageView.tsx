@@ -109,9 +109,6 @@ export const RegisterPageView: React.FC<RegisterPageViewProps> = ({ setAuthView,
             Sign in here
           </button>
         </p>
-         <p className="mt-4 text-xs text-gray-500 text-center">
-            Note: This is a prototype. Registration is simulated.
-          </p>
       </Card>
     </div>
   );

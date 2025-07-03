@@ -1,8 +1,9 @@
 import React from 'react';
 import { Button } from '../ui/Button';
+import { Footer } from '@/components/auth/Footer';
 import { APP_TITLE } from '../../constants';
 import { AuthViewType } from '../../types';
-import { Card } from '../ui/Card'; // Card might be useful for the "Why" section
+import { Card } from '../ui/Card';
 
 interface HomePageViewProps {
   setAuthView: (view: AuthViewType) => void;

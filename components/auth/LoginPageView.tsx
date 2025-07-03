@@ -81,9 +81,6 @@ export const LoginPageView: React.FC<LoginPageViewProps> = ({ setAuthView, onLog
             Sign up here
           </button>
         </p>
-        <p className="mt-4 text-xs text-gray-500 text-center">
-          Note: This is a prototype. Login is now integrated with Supabase Auth.
-        </p>
       </Card>
     </div>
   );
