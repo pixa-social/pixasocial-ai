@@ -72,14 +72,30 @@ export const generateJsonInternal = async <T,>(
 
   try {
       const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
-      if (systemInstruction) messages.push({ role: "system", content: systemInstruction });
-      messages.push({ role: "user", content: `${prompt}\n\nReturn your response as a valid JSON object.` });
+      let finalPrompt = prompt;
 
-      const response = await ai.chat.completions.create({ 
+      // Only use the official response_format for OpenAI.
+      // For others (like OpenRouter), we rely on stronger prompt engineering as it's more compatible.
+      const useJsonFormatParam = providerType === AiProviderType.OpenAI;
+      
+      if (!useJsonFormatParam) {
+          finalPrompt = `${prompt}\n\nIMPORTANT: Your entire response must be a single, valid JSON object. Do not include any text, explanations, or markdown formatting (like \`\`\`json) outside of the JSON object.`;
+      }
+
+      if (systemInstruction) messages.push({ role: "system", content: systemInstruction });
+      messages.push({ role: "user", content: finalPrompt });
+      
+      const completionConfig: OpenAI.Chat.Completions.ChatCompletionCreateParams = { 
           model: modelName, 
           messages: messages,
-          response_format: { type: "json_object" } 
-      });
+      };
+
+      if (useJsonFormatParam) {
+          completionConfig.response_format = { type: "json_object" };
+      }
+
+      const response = await ai.chat.completions.create(completionConfig);
+      
       const responseText = response.choices?.[0]?.message?.content;
       if (!responseText) return {data: null, error: `${providerType} returned no content for JSON.`};
       
