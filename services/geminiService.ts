@@ -79,19 +79,34 @@ export const generateJsonInternal = async <T,>(
   if (!ai) return { data: null, error: "Gemini API client not initialized." };
 
   try {
+    // Rely on prompt engineering for JSON output as a more robust method than responseMimeType
+    const jsonPrompt = `${prompt}\n\nIMPORTANT: Your entire response must be a single, valid JSON object. Do not include any text, explanations, or markdown formatting (like \`\`\`json) outside of the JSON object.`;
+
     const params: GenerateContentParameters = {
       model: modelName,
-      contents: prompt,
-      config: { responseMimeType: "application/json" },
+      contents: jsonPrompt,
     };
-    if (systemInstruction) params.config = { ...params.config, systemInstruction };
+    if (systemInstruction) {
+        params.config = { systemInstruction };
+    }
+    
     const response: GenerateContentResponse = await ai.models.generateContent(params);
     const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks as GroundingChunk[] || [];
     const parsed = parseJsonFromText<T>(response.text);
     return { ...parsed, groundingChunks };
   } catch (error) {
     console.error("Gemini API error (generateJsonInternal):", error);
-    return { data: null, error: (error as Error).message };
+    let errorMessage = (error as Error).message;
+    // Try to parse the error for a cleaner message
+    try {
+        const errJson = JSON.parse(errorMessage);
+        if (errJson.error && errJson.error.message) {
+            errorMessage = `Gemini API Error (${errJson.error.status || errJson.error.code}): ${errJson.error.message}`;
+        }
+    } catch(e) {
+        // Not a JSON error, use as is.
+    }
+    return { data: null, error: errorMessage };
   }
 };
 

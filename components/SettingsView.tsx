@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
@@ -14,11 +16,13 @@ import { useToast } from './ui/ToastProvider';
 import { useForm } from 'react-hook-form'; 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { supabase } from '../services/supabaseClient';
 
 interface SettingsViewProps {
   currentUser: User;
   onUpdateUser: (updatedUserData: Partial<User>) => void;
+  connectedAccounts: ConnectedAccount[];
+  onAddConnectedAccount: (platform: SocialPlatformType, accountId: string, displayName: string, profileImageUrl?: string) => void;
+  onDeleteConnectedAccount: (accountId: number, platformName: string) => void;
 }
 
 interface ConnectModalProps {
@@ -95,11 +99,10 @@ const ConnectModalComponent: React.FC<ConnectModalProps> = ({ platform, onClose,
 const ConnectModal = React.memo(ConnectModalComponent);
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ 
-  currentUser, onUpdateUser,
+  currentUser, onUpdateUser, connectedAccounts, onAddConnectedAccount, onDeleteConnectedAccount
 }) => {
   const { showToast } = useToast();
   const [platformToConnect, setPlatformToConnect] = useState<typeof SOCIAL_PLATFORMS_TO_CONNECT[0] | null>(null);
-  const [connectedAccounts, setConnectedAccounts] = useState<ConnectedAccount[]>([]);
   
   const { register: registerProfile, handleSubmit: handleSubmitProfile, formState: { errors: profileErrors }, reset: resetProfileForm } = useForm<UserProfileFormData>({
     resolver: zodResolver(userProfileSchema),
@@ -114,19 +117,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   useEffect(() => {
     resetProfileForm({ walletAddress: currentUser.walletAddress || '' });
-    const fetchAccounts = async () => {
-        const { data, error } = await supabase
-            .from('connected_accounts')
-            .select('*')
-            .eq('user_id', currentUser.id);
-        if (error) {
-            showToast(`Error fetching connected accounts: ${error.message}`, 'error');
-        } else {
-            setConnectedAccounts(data || []);
-        }
-    }
-    fetchAccounts();
-  }, [currentUser, resetProfileForm, showToast]);
+  }, [currentUser, resetProfileForm]);
 
   const handleSaveUserProfile = useCallback((data: UserProfileFormData) => {
     onUpdateUser({ walletAddress: data.walletAddress });
@@ -157,32 +148,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     onUpdateUser({ teamMembers: updatedTeam });
     showToast(`${emailToRemove} has been removed from your team.`, 'info');
   }, [currentUser.teamMembers, onUpdateUser, showToast]);
-
-  const handleConnectAccount = useCallback(async (platform: SocialPlatformType, accountId: string, displayName: string, profileImageUrl?: string) => {
-    const newAccount = {
-      platform, accountId, displayName,
-      profileImageUrl: profileImageUrl || undefined,
-      user_id: currentUser.id,
-      connectedAt: new Date().toISOString(),
-    };
-    const { data, error } = await supabase.from('connected_accounts').insert(newAccount).select().single();
-    if(error) {
-        showToast(`Failed to connect account: ${error.message}`, 'error');
-    } else {
-        setConnectedAccounts(prev => [...prev, data]);
-        showToast(`Account ${displayName} connected.`, "success");
-    }
-  }, [currentUser.id, showToast]);
-
-  const handleDisconnectAccount = useCallback(async (accountId: number, platformName: string) => {
-    const { error } = await supabase.from('connected_accounts').delete().eq('id', accountId);
-    if(error) {
-        showToast(`Failed to disconnect account: ${error.message}`, 'error');
-    } else {
-        setConnectedAccounts(prev => prev.filter(acc => acc.id !== accountId));
-        showToast(`Account for ${platformName} disconnected.`, "info");
-    }
-  }, [showToast]);
 
   const getConnectedAccount = useCallback((platformType: SocialPlatformType): ConnectedAccount | undefined => {
     return connectedAccounts.find(acc => acc.platform === platformType);
@@ -302,7 +267,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                                 <p className="text-xs text-textSecondary">Connected: {new Date(connectedAccount.connectedAt).toLocaleDateString()}</p>
                                 </div>
                             </div>
-                            <Button variant="danger" size="sm" onClick={() => handleDisconnectAccount(connectedAccount.id, platform.name)} leftIcon={<TrashIcon className="w-4 h-4"/>} className="w-full mt-2" title={`Disconnect ${platform.name}`}>
+                            <Button variant="danger" size="sm" onClick={() => onDeleteConnectedAccount(connectedAccount.id, platform.name)} leftIcon={<TrashIcon className="w-4 h-4"/>} className="w-full mt-2" title={`Disconnect ${platform.name}`}>
                                 Disconnect
                             </Button>
                             </div>
@@ -322,7 +287,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
 
       {platformToConnect && (
-        <ConnectModal platform={platformToConnect} onClose={() => setPlatformToConnect(null)} onConnect={handleConnectAccount} showToast={showToast}/>
+        <ConnectModal platform={platformToConnect} onClose={() => setPlatformToConnect(null)} onConnect={onAddConnectedAccount} showToast={showToast}/>
       )}
     </div>
   );

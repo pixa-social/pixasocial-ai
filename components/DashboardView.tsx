@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
@@ -19,33 +21,29 @@ const getContentPreview = (content: string, length: number = 50): string => {
 interface DashboardViewProps {
   currentUser: User;
   onNavigate: (view: ViewName) => void;
+  connectedAccounts: ConnectedAccount[];
 }
 
-export const DashboardView: React.FC<DashboardViewProps> = ({ currentUser, onNavigate }) => {
+export const DashboardView: React.FC<DashboardViewProps> = ({ currentUser, onNavigate, connectedAccounts }) => {
   const [isLoading, setIsLoading] = useState(true);
   
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [operators, setOperators] = useState<Operator[]>([]);
   const [contentDrafts, setContentDrafts] = useState<ContentDraft[]>([]);
   const [scheduledPostRows, setScheduledPostRows] = useState<ScheduledPostDbRow[]>([]);
-  const [connectedAccounts, setConnectedAccounts] = useState<ConnectedAccount[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       const { data: personaData } = await supabase.from('personas').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
       const { data: operatorData } = await supabase.from('operators').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
-      
-      const draftsFromStorage = JSON.parse(localStorage.getItem(`pixasocial_drafts_${currentUser.id}`) || '[]');
-      
+      const { data: draftData } = await supabase.from('content_drafts').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
       const { data: scheduleData } = await supabase.from('scheduled_posts').select('*').eq('user_id', currentUser.id).order('scheduled_at', { ascending: true });
-      const { data: accountData } = await supabase.from('connected_accounts').select('*').eq('user_id', currentUser.id);
-
+      
       setPersonas(personaData || []);
       setOperators(operatorData || []);
-      setContentDrafts(draftsFromStorage || []);
+      setContentDrafts(draftData || []);
       setScheduledPostRows(scheduleData || []);
-      setConnectedAccounts(accountData || []);
       setIsLoading(false);
     };
 
@@ -88,7 +86,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ currentUser, onNav
 
   const latestPersona = (personas?.length ?? 0) > 0 ? personas[0] : null;
   const latestOperator = (operators?.length ?? 0) > 0 ? operators[0] : null;
-  const latestDraft = (contentDrafts?.length ?? 0) > 0 ? contentDrafts.sort((a,b) => parseInt(b.id) - parseInt(a.id))[0] : null;
+  const latestDraft = (contentDrafts?.length ?? 0) > 0 ? contentDrafts.sort((a,b) => new Date(b.created_at!).getTime() - new Date(a.created_at!).getTime())[0] : null;
 
   const quickActionButtons = [
     { label: "Create Persona", view: ViewName.AudienceModeling, icon: <PlusCircleIcon className="w-5 h-5 mr-2" /> },

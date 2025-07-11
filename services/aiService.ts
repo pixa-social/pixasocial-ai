@@ -1,9 +1,11 @@
 
+
 import { AIParsedJsonResponse, GroundingChunk, AiProviderType, UserProfile } from "../types";
-import { getActiveAiProviderType, handleNonImplementedProvider, getApiKeyForProvider, getModelForProvider } from './ai/aiUtils';
+import { handleNonImplementedProvider, getExecutionConfig } from './ai/aiUtils';
 import * as GeminiService from './ai/geminiAIService';
 import * as OpenAICompatibleService from './ai/openAICompatibleAIService';
 import { supabase } from './supabaseClient';
+import { supabase as sb } from './supabaseClient';
 
 const checkAndIncrementUsage = async (user: UserProfile): Promise<{allowed: boolean, error?: string}> => {
     if (user.ai_usage_count_monthly >= user.role.max_ai_uses_monthly) {
@@ -40,26 +42,30 @@ export const generateText = async (
   const usageCheck = await checkAndIncrementUsage(user);
   if (!usageCheck.allowed) return { text: null, error: usageCheck.error, groundingChunks: [] };
 
-  const activeProviderType = getActiveAiProviderType();
-  const apiKey = await getApiKeyForProvider(activeProviderType);
-  if (!apiKey) return { text: null, error: `API Key for ${activeProviderType} is not configured.` };
+  const execConfig = await getExecutionConfig('text', user);
 
-  const modelName = await getModelForProvider(activeProviderType, 'text', user);
-  if (!modelName) return { text: null, error: `Text model for ${activeProviderType} is not configured.` };
+  if (!execConfig) {
+    return { text: null, error: "Could not determine a valid AI model configuration. Check Admin Panel settings.", groundingChunks: [] };
+  }
+  
+  const { provider, model, apiKey } = execConfig;
 
+  if (!apiKey) {
+    return { text: null, error: `API Key for ${provider} is not configured.`, groundingChunks: [] };
+  }
 
-  switch (activeProviderType) {
+  switch (provider) {
     case AiProviderType.Gemini:
-      return GeminiService.generateTextInternal(prompt, apiKey, modelName, systemInstruction);
+      return GeminiService.generateTextInternal(prompt, apiKey, model, systemInstruction);
     case AiProviderType.OpenAI:
     case AiProviderType.Deepseek:
     case AiProviderType.Groq:
     case AiProviderType.Openrouter:
     case AiProviderType.MistralAI:
-      const result = await OpenAICompatibleService.generateTextInternal(activeProviderType, apiKey, modelName, prompt, systemInstruction);
+      const result = await OpenAICompatibleService.generateTextInternal(provider, apiKey, model, prompt, systemInstruction);
       return { ...result, groundingChunks: [] };
     default:
-      const res = await handleNonImplementedProvider(activeProviderType, "Text generation");
+      const res = await handleNonImplementedProvider(provider, "Text generation");
       return { text: null, error: res.error, groundingChunks: [] };
   }
 };
@@ -72,18 +78,21 @@ export const generateTextWithGoogleSearch = async (
   const usageCheck = await checkAndIncrementUsage(user);
   if (!usageCheck.allowed) return { text: null, error: usageCheck.error, groundingChunks: [] };
   
-  const activeProviderType = getActiveAiProviderType();
-  const apiKey = await getApiKeyForProvider(activeProviderType);
-  if (!apiKey) return { text: null, error: `API Key for ${activeProviderType} is not configured.` };
+  const execConfig = await getExecutionConfig('text', user);
 
-  const modelName = await getModelForProvider(activeProviderType, 'text', user);
-  if (!modelName) return { text: null, error: `Text model for ${activeProviderType} is not configured.` };
+  if (!execConfig) {
+    return { text: null, error: "Could not determine a valid AI model configuration. Check Admin Panel settings.", groundingChunks: [] };
+  }
 
-  if (activeProviderType === AiProviderType.Gemini) {
-    return GeminiService.generateTextWithGoogleSearchInternal(prompt, apiKey, modelName, systemInstruction);
+  const { provider, model, apiKey } = execConfig;
+
+  if (!apiKey) return { text: null, error: `API Key for ${provider} is not configured.`, groundingChunks: [] };
+
+  if (provider === AiProviderType.Gemini) {
+    return GeminiService.generateTextWithGoogleSearchInternal(prompt, apiKey, model, systemInstruction);
   } else {
-    console.warn(`Google Search grounding is a Gemini-specific feature. ${activeProviderType} does not support it.`);
-    return { text: null, error: `Google Search grounding is only available for Gemini. Current provider: ${activeProviderType}`, groundingChunks: [] };
+    console.warn(`Google Search grounding is a Gemini-specific feature. ${provider} does not support it.`);
+    return { text: null, error: `Google Search grounding is only available for Gemini. Current provider: ${provider}`, groundingChunks: [] };
   }
 };
 
@@ -95,25 +104,28 @@ export const generateJson = async <T,>(
   const usageCheck = await checkAndIncrementUsage(user);
   if (!usageCheck.allowed) return { data: null, error: usageCheck.error, groundingChunks: [] };
   
-  const activeProviderType = getActiveAiProviderType();
-  const apiKey = await getApiKeyForProvider(activeProviderType);
-  if (!apiKey) return { data: null, error: `API Key for ${activeProviderType} is not configured.` };
+  const execConfig = await getExecutionConfig('text', user);
 
-  const modelName = await getModelForProvider(activeProviderType, 'text', user);
-  if (!modelName) return { data: null, error: `Text model for ${activeProviderType} is not configured.` };
+  if (!execConfig) {
+    return { data: null, error: "Could not determine a valid AI model configuration for JSON generation. Check Admin Panel settings.", groundingChunks: [] };
+  }
 
-  switch (activeProviderType) {
+  const { provider, model, apiKey } = execConfig;
+
+  if (!apiKey) return { data: null, error: `API Key for ${provider} is not configured.`, groundingChunks: [] };
+
+  switch (provider) {
     case AiProviderType.Gemini:
-      return GeminiService.generateJsonInternal<T>(prompt, apiKey, modelName, systemInstruction);
+      return GeminiService.generateJsonInternal<T>(prompt, apiKey, model, systemInstruction);
     case AiProviderType.OpenAI:
     case AiProviderType.Deepseek:
     case AiProviderType.Groq:
     case AiProviderType.Openrouter:
     case AiProviderType.MistralAI:
-      const result = await OpenAICompatibleService.generateJsonInternal<T>(activeProviderType, apiKey, modelName, prompt, systemInstruction);
+      const result = await OpenAICompatibleService.generateJsonInternal<T>(provider, apiKey, model, prompt, systemInstruction);
       return { ...result, groundingChunks: [] };
     default:
-      const res = await handleNonImplementedProvider(activeProviderType, "JSON generation");
+      const res = await handleNonImplementedProvider(provider, "JSON generation");
       return { data: null, error: res.error, groundingChunks: [] };
   }
 };
@@ -126,21 +138,23 @@ export const generateImages = async (
   const usageCheck = await checkAndIncrementUsage(user);
   if (!usageCheck.allowed) return { images: null, error: usageCheck.error };
 
-  const activeProviderType = getActiveAiProviderType();
-  const apiKey = await getApiKeyForProvider(activeProviderType);
-  if (!apiKey) return { images: null, error: `API Key for ${activeProviderType} is not configured.` };
+  const execConfig = await getExecutionConfig('image', user);
 
-  const modelName = await getModelForProvider(activeProviderType, 'image', user);
-  if (!modelName) return { images: null, error: `Image model for ${activeProviderType} is not configured.` };
+  if (!execConfig) {
+    return { images: null, error: "Could not determine a valid AI model configuration for Image generation. Check Admin Panel settings." };
+  }
+  
+  const { provider, model, apiKey } = execConfig;
 
-
-  switch (activeProviderType) {
+  if (!apiKey) return { images: null, error: `API Key for ${provider} is not configured.` };
+  
+  switch (provider) {
     case AiProviderType.Gemini:
-      return GeminiService.generateImagesInternal(prompt, apiKey, modelName, numberOfImages);
+      return GeminiService.generateImagesInternal(prompt, apiKey, model, numberOfImages);
     case AiProviderType.OpenAI:
-      return OpenAICompatibleService.generateOpenAIImagesInternal(prompt, apiKey, modelName, numberOfImages);
+      return OpenAICompatibleService.generateOpenAIImagesInternal(prompt, apiKey, model, numberOfImages);
     default:
-      const res = await handleNonImplementedProvider(activeProviderType, "Image generation");
+      const res = await handleNonImplementedProvider(provider, "Image generation");
       return { images: null, error: res.error };
   }
 };
@@ -159,24 +173,28 @@ export const generateTextStream = async (
     return;
   }
   
-  const activeProviderType = getActiveAiProviderType();
-  const apiKey = await getApiKeyForProvider(activeProviderType);
-  if (!apiKey) { onError(`API Key for ${activeProviderType} is not configured.`); return; }
-  
-  const modelName = await getModelForProvider(activeProviderType, 'chat', user);
-  if (!modelName) { onError(`Chat model for ${activeProviderType} is not configured.`); return; }
+  const execConfig = await getExecutionConfig('chat', user);
 
-  switch (activeProviderType) {
+  if (!execConfig) {
+    onError("Could not determine a valid AI model configuration for streaming chat. Check Admin Panel settings.");
+    return;
+  }
+  
+  const { provider, model, apiKey } = execConfig;
+
+  if (!apiKey) { onError(`API Key for ${provider} is not configured.`); return; }
+  
+  switch (provider) {
     case AiProviderType.Gemini:
-      return GeminiService.generateTextStreamInternal(prompt, apiKey, modelName, onStreamChunk, onStreamComplete, onError, systemInstruction);
+      return GeminiService.generateTextStreamInternal(prompt, apiKey, model, onStreamChunk, onStreamComplete, onError, systemInstruction);
     case AiProviderType.OpenAI:
     case AiProviderType.Deepseek:
     case AiProviderType.Groq:
     case AiProviderType.Openrouter:
     case AiProviderType.MistralAI:
-      return OpenAICompatibleService.generateTextStreamInternal(activeProviderType, apiKey, modelName, prompt, onStreamChunk, onStreamComplete, onError, systemInstruction);
+      return OpenAICompatibleService.generateTextStreamInternal(provider, apiKey, model, prompt, onStreamChunk, onStreamComplete, onError, systemInstruction);
     default:
-      const res = await handleNonImplementedProvider(activeProviderType, "Streaming text generation");
+      const res = await handleNonImplementedProvider(provider, "Streaming text generation");
       onError(res.error);
   }
 };

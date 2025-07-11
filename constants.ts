@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { ViewName, NavItem, AuditStep, Persona, MediaType, AiProviderType, AiProviderConfig, RSTTraitLevel, RSTProfile, SocialPlatformType } from './types';
 import type { Operator } from './types';
@@ -7,7 +8,8 @@ import {
     PinterestIcon, TikTokIcon, YouTubeIcon, LinkIcon,
     PhotoIcon,
     DocumentDuplicateIcon,
-    ChatBubbleLeftEllipsisIcon 
+    ChatBubbleLeftEllipsisIcon,
+    PaperAirplaneIcon
 } from './components/ui/Icons';
 
 export const APP_TITLE = "PixaSocial Ai";
@@ -21,13 +23,13 @@ export const NAVIGATION_ITEMS: NavItem[] = [
       { label: ViewName.OperatorBuilder, viewName: ViewName.OperatorBuilder },
       { label: ViewName.ContentPlanner, viewName: ViewName.ContentPlanner },
       { label: ViewName.Calendar, viewName: ViewName.Calendar },
-      { label: ViewName.ContentLibrary, viewName: ViewName.ContentLibrary, icon: React.createElement(PhotoIcon) },
+      { label: ViewName.SocialPoster, viewName: ViewName.SocialPoster, icon: React.createElement(PaperAirplaneIcon, { className: 'w-4 h-4' }) },
+      { label: ViewName.ContentLibrary, viewName: ViewName.ContentLibrary, icon: React.createElement(PhotoIcon, { className: 'w-4 h-4' }) },
       { label: ViewName.FeedbackSimulator, viewName: ViewName.FeedbackSimulator },
       { label: ViewName.AuditTool, viewName: ViewName.AuditTool },
     ],
   },
-  { label: ViewName.TeamChat, viewName: ViewName.TeamChat, icon: React.createElement(ChatBubbleLeftEllipsisIcon) }, 
-  { label: ViewName.Methodology, viewName: ViewName.Methodology },
+  { label: ViewName.TeamChat, viewName: ViewName.TeamChat, icon: React.createElement(ChatBubbleLeftEllipsisIcon, { className: 'w-5 h-5' }) }, 
   { label: ViewName.AdminPanel, viewName: ViewName.AdminPanel, isAdminOnly: true },
   { label: ViewName.Settings, viewName: ViewName.Settings }, 
 ];
@@ -166,6 +168,8 @@ export const TONE_OF_VOICE_OPTIONS: Array<{ value: string; label: string }> = [
 // Local Storage Keys - Deprecated for most data, but kept for reference or minor client-side state if needed.
 export const LOCAL_STORAGE_AI_CONFIG_KEY = 'pixasocial_ai_provider_configs';
 export const LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY = 'pixasocial_active_ai_provider';
+export const LOCAL_STORAGE_GLOBAL_DEFAULT_TEXT_MODEL_KEY = 'pixasocial_global_default_text_model';
+export const LOCAL_STORAGE_GLOBAL_DEFAULT_IMAGE_MODEL_KEY = 'pixasocial_global_default_image_model';
 
 
 export const AI_PROVIDERS_CONFIG_TEMPLATE: AiProviderConfig[] = [
@@ -224,8 +228,26 @@ export const AI_PROVIDERS_CONFIG_TEMPLATE: AiProviderConfig[] = [
     api_key: null,
     is_enabled: false,
     models: {
-      text: ['google/gemma-3-27b-it:free', 'mistralai/mistral-7b-instruct', 'google/gemini-pro', 'openai/gpt-4o'],
-      chat: ['google/gemma-3-27b-it:free', 'mistralai/mistral-7b-instruct', 'google/gemini-pro', 'openai/gpt-4o']
+      text: [
+        'google/gemma-3-27b-it:free', 
+        'mistralai/mistral-7b-instruct', 
+        'google/gemini-pro', 
+        'openai/gpt-4o',
+        'nvidia/llama-3.3-nemotron-super-49b-v1:free',
+        'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
+        'qwen/qwen3-235b-a22b:free',
+        'google/gemini-2.0-flash-exp:free'
+      ],
+      chat: [
+        'google/gemma-3-27b-it:free', 
+        'mistralai/mistral-7b-instruct', 
+        'google/gemini-pro', 
+        'openai/gpt-4o',
+        'nvidia/llama-3.3-nemotron-super-49b-v1:free',
+        'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
+        'qwen/qwen3-235b-a22b:free',
+        'google/gemini-2.0-flash-exp:free'
+      ]
     },
     notes: 'Acts as a router to many models. Use your OpenRouter API key.',
     base_url: 'https://openrouter.ai/api/v1'

@@ -53,7 +53,7 @@ export const generateTextInternal = async (
       messages.push({ role: "user", content: prompt });
 
       const response = await ai.chat.completions.create({ model: modelName, messages: messages });
-      return { text: response.choices[0]?.message?.content || null };
+      return { text: response.choices?.[0]?.message?.content || null };
   } catch (error) {
       console.error(`${providerType} API error (generateTextInternal):`, error);
       return { text: null, error: (error as Error).message };
@@ -80,7 +80,7 @@ export const generateJsonInternal = async <T,>(
           messages: messages,
           response_format: { type: "json_object" } 
       });
-      const responseText = response.choices[0]?.message?.content;
+      const responseText = response.choices?.[0]?.message?.content;
       if (!responseText) return {data: null, error: `${providerType} returned no content for JSON.`};
       
       return parseJsonFromText<T>(responseText);
@@ -142,7 +142,7 @@ export const generateTextStreamInternal = async (
       const stream = await ai.chat.completions.create({ model: modelName, messages: messages, stream: true });
       let fullTextResponse = "";
       for await (const chunk of stream) {
-          const chunkText = chunk.choices[0]?.delta?.content || "";
+          const chunkText = chunk.choices?.[0]?.delta?.content || "";
           if (chunkText) {
               onStreamChunk(chunkText);
               fullTextResponse += chunkText;

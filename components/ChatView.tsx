@@ -151,17 +151,23 @@ export const ChatView: React.FC<ChatViewProps> = ({
     if ((!text || !text.trim()) && !attachment) return;
     if (!currentUser.email) return;
 
-    const newMessageData: ChatMessage = { 
+    const messageToSend: any = { 
       id: Date.now().toString() + Math.random().toString(36).slice(2, 9),
       channel_id: activeChannelId,
       user_id: currentUser.id,
       sender_name: currentUser.name || currentUser.email.split('@')[0],
       created_at: new Date().toISOString(),
-      text: text ? text.trim() : undefined,
-      attachment: attachment ? attachment : undefined
     };
+
+    if (text && text.trim()) {
+      messageToSend.text = text.trim();
+    }
+
+    if (attachment) {
+      messageToSend.attachment = attachment;
+    }
     
-    gun.get('pixasocial/chat/messages').get(activeChannelId).get(newMessageData.id).put(newMessageData, (ack) => {
+    gun.get('pixasocial/chat/messages').get(activeChannelId).get(messageToSend.id).put(messageToSend, (ack) => {
         if ((ack as any).err) { 
             showToast(`Error sending message: ${(ack as any).err}`, 'error');
             console.error('GunDB send error:', (ack as any).err);

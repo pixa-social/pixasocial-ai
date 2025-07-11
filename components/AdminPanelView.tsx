@@ -1,11 +1,16 @@
 
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Select, SelectOption } from './ui/Select';
 import { AiProviderConfig, AiProviderType, RoleType, RoleName, AdminUserView } from '../types';
-import { LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY } from '../constants';
+import { 
+    LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY, 
+    LOCAL_STORAGE_GLOBAL_DEFAULT_TEXT_MODEL_KEY, 
+    LOCAL_STORAGE_GLOBAL_DEFAULT_IMAGE_MODEL_KEY 
+} from '../constants';
 import { EyeIcon, EyeSlashIcon, ExclamationTriangleIcon, WrenchScrewdriverIcon, ServerStackIcon, UsersIcon } from './ui/Icons';
 import { useToast } from './ui/ToastProvider';
 import { getStoredAiProviderConfigs, getActiveAiProviderType } from '../services/ai/aiUtils';
@@ -21,6 +26,8 @@ const AiProviderConfigTab: React.FC = () => {
     const [activeProvider, setActiveProvider] = useState<AiProviderType>(AiProviderType.Gemini);
     const [showApiKeys, setShowApiKeys] = useState<Record<string, boolean>>({});
     const [isLoading, setIsLoading] = useState(true);
+    const [globalDefaultTextModel, setGlobalDefaultTextModel] = useState<string>('');
+    const [globalDefaultImageModel, setGlobalDefaultImageModel] = useState<string>('');
 
     const loadConfigs = useCallback(async () => {
         setIsLoading(true);
@@ -28,6 +35,8 @@ const AiProviderConfigTab: React.FC = () => {
         setProviderConfigs(configsToUse);
         const currentActiveProvider = getActiveAiProviderType();
         setActiveProvider(currentActiveProvider);
+        setGlobalDefaultTextModel(localStorage.getItem(LOCAL_STORAGE_GLOBAL_DEFAULT_TEXT_MODEL_KEY) || '');
+        setGlobalDefaultImageModel(localStorage.getItem(LOCAL_STORAGE_GLOBAL_DEFAULT_IMAGE_MODEL_KEY) || '');
         const initialShowState: Record<string, boolean> = {};
         configsToUse.forEach(p => initialShowState[p.id] = false);
         setShowApiKeys(initialShowState);
@@ -81,18 +90,52 @@ const AiProviderConfigTab: React.FC = () => {
             } else {
                 localStorage.setItem(LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY, activeProvider);
             }
+
+            if (globalDefaultTextModel) {
+                localStorage.setItem(LOCAL_STORAGE_GLOBAL_DEFAULT_TEXT_MODEL_KEY, globalDefaultTextModel);
+            } else {
+                localStorage.removeItem(LOCAL_STORAGE_GLOBAL_DEFAULT_TEXT_MODEL_KEY);
+            }
+            if (globalDefaultImageModel) {
+                localStorage.setItem(LOCAL_STORAGE_GLOBAL_DEFAULT_IMAGE_MODEL_KEY, globalDefaultImageModel);
+            } else {
+                localStorage.removeItem(LOCAL_STORAGE_GLOBAL_DEFAULT_IMAGE_MODEL_KEY);
+            }
+
             showToast('Global AI configurations saved successfully!', 'success');
             loadConfigs(); 
         } catch (error) {
             showToast(`Failed to save configurations: ${(error as Error).message}`, 'error');
         }
     };
+
+    const allTextModelOptions = useMemo(() => {
+        const options: SelectOption[] = [{ value: '', label: 'Active Provider Default' }];
+        providerConfigs.forEach(provider => {
+            const labelSuffix = provider.is_enabled ? '' : ' (Disabled)';
+            provider.models?.text?.forEach(model => {
+                options.push({ value: model, label: `${provider.name}: ${model}${labelSuffix}`});
+            });
+        });
+        return options;
+    }, [providerConfigs]);
+
+    const allImageModelOptions = useMemo(() => {
+        const options: SelectOption[] = [{ value: '', label: 'Active Provider Default' }];
+        providerConfigs.forEach(provider => {
+            const labelSuffix = provider.is_enabled ? '' : ' (Disabled)';
+            provider.models?.image?.forEach(model => {
+                options.push({ value: model, label: `${provider.name}: ${model}${labelSuffix}`});
+            });
+        });
+        return options;
+    }, [providerConfigs]);
     
     if (isLoading) return <LoadingSpinner text="Loading AI provider configurations..." className="mt-8" />;
 
     return (
         <div className="mt-4">
-            <Card className="mb-6 bg-yellow-50 border-l-4 border-yellow-400 p-4">
+            <Card className="mb-6 bg-yellow-500/10 border-l-4 border-yellow-400 p-4">
                 <div className="flex items-start">
                     <ExclamationTriangleIcon className="h-6 w-6 text-yellow-600 mr-3 shrink-0 mt-1" />
                     <div>
@@ -110,7 +153,24 @@ const AiProviderConfigTab: React.FC = () => {
                     onChange={(e) => setActiveProvider(e.target.value as AiProviderType)}
                     containerClassName="max-w-md"
                 />
-                 <p className="text-xs text-textSecondary mt-1 italic">This sets the default provider for all users unless a specific model is assigned to them below.</p>
+                 <p className="text-xs text-textSecondary mt-1 italic">Sets the default provider if no global model or user-specific model is assigned.</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    <Select
+                        label="Default Text Model (Overrides Active Provider)"
+                        options={allTextModelOptions}
+                        value={globalDefaultTextModel}
+                        onChange={(e) => setGlobalDefaultTextModel(e.target.value)}
+                        containerClassName="mb-0"
+                    />
+                    <Select
+                        label="Default Image Model (Overrides Active Provider)"
+                        options={allImageModelOptions}
+                        value={globalDefaultImageModel}
+                        onChange={(e) => setGlobalDefaultImageModel(e.target.value)}
+                        containerClassName="mb-0"
+                    />
+                </div>
+                 <p className="text-xs text-textSecondary mt-1 italic">This sets a specific default model for all users, overriding the general 'Active Provider' setting. User-specific assignments still take highest priority.</p>
             </Card>
 
             <div className="space-y-6">
@@ -202,7 +262,7 @@ const UserManagementTab: React.FC = () => {
     };
     
     const textModelOptions = useMemo(() => {
-        const options: SelectOption[] = [{ value: '', label: 'Provider Default' }];
+        const options: SelectOption[] = [{ value: '', label: 'Global Default' }];
         aiModels.forEach(provider => {
             provider.models?.text?.forEach(model => {
                 options.push({ value: model, label: `${provider.name}: ${model}`});
@@ -212,7 +272,7 @@ const UserManagementTab: React.FC = () => {
     }, [aiModels]);
 
     const imageModelOptions = useMemo(() => {
-        const options: SelectOption[] = [{ value: '', label: 'Provider Default' }];
+        const options: SelectOption[] = [{ value: '', label: 'Global Default' }];
         aiModels.forEach(provider => {
             provider.models?.image?.forEach(model => {
                 options.push({ value: model, label: `${provider.name}: ${model}`});
@@ -225,10 +285,10 @@ const UserManagementTab: React.FC = () => {
     if (isLoading) return <LoadingSpinner text="Loading users and roles..." className="mt-8" />;
 
     return (
-        <Card title="Manage Users & Permissions" className="mt-4">
+        <Card title="Manage Users & Permissions" className="mt-4 bg-card text-textPrimary">
             <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+                <table className="min-w-full divide-y divide-lightBorder">
+                    <thead className="bg-gray-700/50">
                         <tr>
                             <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-textSecondary uppercase tracking-wider">User</th>
                             <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-textSecondary uppercase tracking-wider">Role</th>
@@ -236,7 +296,7 @@ const UserManagementTab: React.FC = () => {
                             <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-textSecondary uppercase tracking-wider">Assigned Image Model</th>
                         </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="bg-card divide-y divide-lightBorder">
                         {users.map(user => (
                             <tr key={user.id}>
                                 <td className="px-4 py-4 whitespace-nowrap">

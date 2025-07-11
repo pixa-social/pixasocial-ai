@@ -1,3 +1,6 @@
+
+
+
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { ContentDraft, Persona, Operator, PlatformContentMap, PlatformContentDetail, MediaType, ScheduledPost, ImageSourceType, ContentLibraryAsset, ViewName, UserProfile } from '../types';
 import { Card } from './ui/Card';
@@ -11,7 +14,7 @@ import {
 import { useToast } from './ui/ToastProvider';
 import { CalendarDaysIcon } from './ui/Icons';
 import { ScheduleModal } from './content-planner/ScheduleModal';
-import { ContentPlannerConfig } from './content-planner/ContentPlannerConfig';
+import ContentPlannerConfig from './content-planner/ContentPlannerConfig';
 import { PrerequisiteMessageCard } from './ui/PrerequisiteMessageCard'; 
 import { useNavigateToView } from '../hooks/useNavigateToView'; 
 import { ContentPlannerSkeleton } from './skeletons/ContentPlannerSkeleton';
@@ -22,7 +25,7 @@ interface ContentPlannerViewProps {
   contentDrafts: ContentDraft[];
   personas: Persona[];
   operators: Operator[];
-  onAddContentDraft: (draft: ContentDraft) => void;
+  onAddContentDraft: (draft: Omit<ContentDraft, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>;
   onAddScheduledPost: (post: ScheduledPost) => void;
   onAddContentLibraryAsset: (asset: ContentLibraryAsset) => void;
   onNavigate?: (view: ViewName) => void; 
@@ -68,11 +71,11 @@ export const ContentPlannerView: React.FC<ContentPlannerViewProps> = ({
   }, {} as Record<string, boolean>);
   const [selectedPlatformsForGeneration, setSelectedPlatformsForGeneration] = useState<Record<string, boolean>>(initialSelectedPlatforms);
 
-  const initialPlatformSpecificMediaTypes = CONTENT_PLATFORMS.reduce((acc, p) => {
+  const initialPlatformMediaOverrides = CONTENT_PLATFORMS.reduce((acc, p) => {
     acc[p.key] = 'global';
     return acc;
   }, {} as Record<string, MediaType | 'global'>);
-  const [platformSpecificMediaTypes, setPlatformSpecificMediaTypes] = useState<Record<string, MediaType | 'global'>>(initialPlatformSpecificMediaTypes);
+  const [platformMediaOverrides, setPlatformMediaOverrides] = useState<Record<string, MediaType | 'global'>>(initialPlatformMediaOverrides);
 
   const [platformContents, setPlatformContents] = useState<PlatformContentMap>({});
   const [isLoading, setIsLoading] = useState(false); 
@@ -144,14 +147,14 @@ export const ContentPlannerView: React.FC<ContentPlannerViewProps> = ({
     
     let globalMediaInstructionAggregator = ''; 
     let fontInstructions = '';
-    if (defaultFontFamily === 'AI Suggested' && (globalMediaType === 'image' || platformsToProcess.some(p => (platformSpecificMediaTypes[p.key] || globalMediaType) === 'image'))) {
+    if (defaultFontFamily === 'AI Suggested' && (globalMediaType === 'image' || platformsToProcess.some(p => (platformMediaOverrides[p.key] || globalMediaType) === 'image'))) {
         fontInstructions = `Also suggest a 'fontCategory' (e.g., "playful-script", "bold-impactful", "horror-themed") and a 'fontColorSuggestion' (e.g., "white", "black", "yellow") for any meme text.`;
     }
 
     const platformGuidelineInstructions = platformsToProcess.map(p_config => {
         let currentPlatformMediaType = globalMediaType; 
-        if (platformSpecificMediaTypes[p_config.key] && platformSpecificMediaTypes[p_config.key] !== 'global') {
-            currentPlatformMediaType = platformSpecificMediaTypes[p_config.key] as MediaType;
+        if (platformMediaOverrides[p_config.key] && platformMediaOverrides[p_config.key] !== 'global') {
+            currentPlatformMediaType = platformMediaOverrides[p_config.key] as MediaType;
         }
         if (forSpecificPlatformKey && platformContents[p_config.key]) {
             currentPlatformMediaType = platformContents[p_config.key].mediaType;
@@ -187,7 +190,7 @@ export const ContentPlannerView: React.FC<ContentPlannerViewProps> = ({
     
     let socialExample = '';
     if (firstSocialPlatform) {
-        const mediaTypeForExample = platformSpecificMediaTypes[firstSocialPlatform.key] || globalMediaType;
+        const mediaTypeForExample = platformMediaOverrides[firstSocialPlatform.key] || globalMediaType;
         socialExample = `"${firstSocialPlatform.key}": { "content": "Post text for ${firstSocialPlatform.key}", "hashtags": ["#tag${firstSocialPlatform.key}"]`;
         if (mediaTypeForExample === 'image') {
             socialExample += ', "imagePrompt": "...", "memeText": "...", "fontCategory": "modern-clean", "fontColorSuggestion": "white"';
@@ -242,8 +245,8 @@ Return valid JSON for all requested platforms and all required fields. Adhere st
             const suggestion = result.data?.[p_config.key];
             
             let finalPlatformMediaType = globalMediaType;
-            if (platformSpecificMediaTypes[p_config.key] && platformSpecificMediaTypes[p_config.key] !== 'global') {
-                finalPlatformMediaType = platformSpecificMediaTypes[p_config.key] as MediaType;
+            if (platformMediaOverrides[p_config.key] && platformMediaOverrides[p_config.key] !== 'global') {
+                finalPlatformMediaType = platformMediaOverrides[p_config.key] as MediaType;
             }
             if (forSpecificPlatformKey && platformContents[p_config.key]) { 
                 finalPlatformMediaType = platformContents[p_config.key].mediaType;
@@ -305,7 +308,7 @@ Return valid JSON for all requested platforms and all required fields. Adhere st
     }
   }, [
     currentUser, selectedPersonaId, selectedOperatorId, keyMessage, customPrompt, personas, operators, 
-    globalMediaType, platformSpecificMediaTypes, platformContents, selectedTone, selectedPlatformsForGeneration, 
+    globalMediaType, platformMediaOverrides, platformContents, selectedTone, selectedPlatformsForGeneration, 
     defaultFontFamily, defaultFontColor,
     showToast
 ]);
@@ -473,8 +476,8 @@ Return valid JSON for all requested platforms and all required fields. Adhere st
   const handleImageSourceTypeChange = useCallback((platformKey: string, newSourceType: ImageSourceType) => {
     const platformConfig = CONTENT_PLATFORMS.find(p => p.key === platformKey);
     let mediaTypeForPlatform = globalMediaType; 
-    if (platformSpecificMediaTypes[platformKey] && platformSpecificMediaTypes[platformKey] !== 'global') {
-        mediaTypeForPlatform = platformSpecificMediaTypes[platformKey] as MediaType;
+    if (platformMediaOverrides[platformKey] && platformMediaOverrides[platformKey] !== 'global') {
+        mediaTypeForPlatform = platformMediaOverrides[platformKey] as MediaType;
     }
     if (platformConfig?.isPoster) mediaTypeForPlatform = 'image';
 
@@ -495,7 +498,7 @@ Return valid JSON for all requested platforms and all required fields. Adhere st
     if (newSourceType !== 'upload' && imageUploadRefs.current[platformKey]?.current) {
         imageUploadRefs.current[platformKey]!.current!.value = '';
     }
-}, [globalMediaType, platformSpecificMediaTypes, defaultFontFamily, defaultFontColor]);
+}, [globalMediaType, platformMediaOverrides, defaultFontFamily, defaultFontColor]);
 
 const handleCustomImageUpload = useCallback((platformKey: string, event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -574,35 +577,31 @@ const handlePushToLibrary = useCallback((platformKey: string) => {
 }, [platformContents, onAddContentLibraryAsset, showToast]);
 
 
-  const handleSaveDraft = useCallback(() => {
+  const handleSaveDraft = useCallback(async () => {
     if (!selectedPersonaId || !selectedOperatorId || Object.keys(platformContents).length === 0) {
       setError("Cannot save empty draft or draft without persona/operator and generated content.");
       showToast("Cannot save empty draft or draft without persona/operator and generated content.", "error");
       return;
     }
-    const newDraft: ContentDraft = {
-      id: Date.now().toString(),
+    const draftData: Omit<ContentDraft, 'id' | 'user_id' | 'created_at' | 'updated_at'> = {
       persona_id: selectedPersonaId,
       operator_id: selectedOperatorId,
-      key_message: keyMessage, 
+      key_message: keyMessage,
       custom_prompt: customPrompt,
       platform_contents: platformContents,
-      platformSpecificMediaTypes_INTERNAL_DO_NOT_USE: platformSpecificMediaTypes,
-      user_id: '',
-      created_at: new Date().toISOString()
+      platform_media_overrides: platformMediaOverrides,
     };
-    onAddContentDraft(newDraft);
+    await onAddContentDraft(draftData);
     setSelectedPersonaId(null); setSelectedOperatorId(null); setKeyMessage(''); setCustomPrompt('');
     setPlatformContents({}); setGlobalMediaType('none'); setSelectedTone('');
     setDefaultFontFamily(DEFAULT_FONT_FAMILY);
     setDefaultFontColor(DEFAULT_FONT_COLOR);
     setSelectedPlatformsForGeneration(initialSelectedPlatforms); 
-    setPlatformSpecificMediaTypes(initialPlatformSpecificMediaTypes);
-    showToast("Draft saved successfully!", "success");
+    setPlatformMediaOverrides(initialPlatformMediaOverrides);
   }, [
     platformContents, selectedPersonaId, selectedOperatorId, keyMessage, customPrompt, 
-    platformSpecificMediaTypes, onAddContentDraft, showToast, 
-    initialSelectedPlatforms, initialPlatformSpecificMediaTypes
+    platformMediaOverrides, onAddContentDraft, showToast, 
+    initialSelectedPlatforms, initialPlatformMediaOverrides
   ]);
 
   const handlePlatformFieldChange = useCallback((platformKey: string, field: keyof PlatformContentDetail, value: string | string[] | undefined) => {
@@ -611,8 +610,8 @@ const handlePushToLibrary = useCallback((platformKey: string) => {
         let currentPlatformMediaType = globalMediaType;
         if(prev[platformKey]?.mediaType) { 
             currentPlatformMediaType = prev[platformKey].mediaType;
-        } else if (platformSpecificMediaTypes[platformKey] && platformSpecificMediaTypes[platformKey] !== 'global') {
-            currentPlatformMediaType = platformSpecificMediaTypes[platformKey] as MediaType;
+        } else if (platformMediaOverrides[platformKey] && platformMediaOverrides[platformKey] !== 'global') {
+            currentPlatformMediaType = platformMediaOverrides[platformKey] as MediaType;
         }
         if (platformConfig?.isPoster) currentPlatformMediaType = 'image';
         
@@ -624,7 +623,7 @@ const handlePushToLibrary = useCallback((platformKey: string) => {
         };
         return { ...prev, [platformKey]: { ...currentPlatform, [field]: value } };
     });
-  }, [globalMediaType, platformSpecificMediaTypes, defaultFontFamily, defaultFontColor]);
+  }, [globalMediaType, platformMediaOverrides, defaultFontFamily, defaultFontColor]);
   
    const handlePlatformHashtagsChange = useCallback((platformKey: string, newHashtagsString: string) => {
     setPlatformContents(prev => {
@@ -632,8 +631,8 @@ const handlePushToLibrary = useCallback((platformKey: string) => {
         let currentPlatformMediaType = globalMediaType;
         if(prev[platformKey]?.mediaType) {
             currentPlatformMediaType = prev[platformKey].mediaType;
-        } else if (platformSpecificMediaTypes[platformKey] && platformSpecificMediaTypes[platformKey] !== 'global') {
-            currentPlatformMediaType = platformSpecificMediaTypes[platformKey] as MediaType;
+        } else if (platformMediaOverrides[platformKey] && platformMediaOverrides[platformKey] !== 'global') {
+            currentPlatformMediaType = platformMediaOverrides[platformKey] as MediaType;
         }
         if (platformConfig?.isPoster) currentPlatformMediaType = 'image';
 
@@ -646,7 +645,7 @@ const handlePushToLibrary = useCallback((platformKey: string) => {
             hashtags: newHashtagsString.split(',').map(h => h.trim()).filter(h => h.startsWith('#')) 
         } };
     });
-  }, [globalMediaType, platformSpecificMediaTypes, defaultFontFamily, defaultFontColor]);
+  }, [globalMediaType, platformMediaOverrides, defaultFontFamily, defaultFontColor]);
 
   const handleOpenScheduleModal = useCallback((draft: ContentDraft, platformKey: string, platformDetail: PlatformContentDetail) => {
     setSchedulingPostInfo({ draft, platformKey, platformDetail });
@@ -716,12 +715,12 @@ const handlePushToLibrary = useCallback((platformKey: string) => {
                 platformMediaTypesInDraft.push(draftToLoad.platform_contents[p_config.key]!.mediaType);
             }
         }
-        specificOverrides[p_config.key] = draftToLoad.platformSpecificMediaTypes_INTERNAL_DO_NOT_USE?.[p_config.key] || 'global';
+        specificOverrides[p_config.key] = draftToLoad.platform_media_overrides?.[p_config.key] || 'global';
     });
     
     const firstRelevantType = platformMediaTypesInDraft.length > 0 ? platformMediaTypesInDraft[0] : 'none';
     setGlobalMediaType(firstRelevantType); 
-    setPlatformSpecificMediaTypes(specificOverrides);
+    setPlatformMediaOverrides(specificOverrides);
     setSelectedPlatformsForGeneration(platformsSelectedForGen);
 
     showToast("Draft loaded into planner. You can now edit and re-generate.", "info");
@@ -774,8 +773,8 @@ const handlePushToLibrary = useCallback((platformKey: string) => {
           onKeyMessageChange={setKeyMessage} 
           globalMediaType={globalMediaType}
           onGlobalMediaTypeChange={setGlobalMediaType}
-          platformSpecificMediaTypes={platformSpecificMediaTypes} 
-          onPlatformSpecificMediaTypeChange={setPlatformSpecificMediaTypes} 
+          platformMediaOverrides={platformMediaOverrides} 
+          onPlatformMediaOverridesChange={setPlatformMediaOverrides} 
           selectedTone={selectedTone}
           onSelectedToneChange={setSelectedTone}
           customPrompt={customPrompt}
@@ -802,8 +801,8 @@ const handlePushToLibrary = useCallback((platformKey: string) => {
                  if (!platformIsLoading && !currentPlatformData && !isRegeneratingPlatform[platform.key] && !isProcessingMedia[platform.key]) return null;
                  
                  let effectiveMediaType = globalMediaType;
-                 if (platformSpecificMediaTypes[platform.key] && platformSpecificMediaTypes[platform.key] !== 'global') {
-                     effectiveMediaType = platformSpecificMediaTypes[platform.key] as MediaType;
+                 if (platformMediaOverrides[platform.key] && platformMediaOverrides[platform.key] !== 'global') {
+                     effectiveMediaType = platformMediaOverrides[platform.key] as MediaType;
                  }
                  if (platform.isPoster) effectiveMediaType = 'image';
 
@@ -836,7 +835,7 @@ const handlePushToLibrary = useCallback((platformKey: string) => {
       <Card title="Saved Content Drafts" className="mt-8">
         {contentDrafts.length === 0 ? (<p className="text-textSecondary">No content drafts saved yet.</p>) : (
           <div className="space-y-6">
-            {contentDrafts.slice().sort((a,b) => parseInt(b.id) - parseInt(a.id)).map(draft => { 
+            {contentDrafts.slice().sort((a,b) => new Date(b.created_at!).getTime() - new Date(a.created_at!).getTime()).map(draft => { 
               const persona = personas.find(p => p.id === draft.persona_id);
               const operator = operators.find(o => o.id === draft.operator_id);
               return (

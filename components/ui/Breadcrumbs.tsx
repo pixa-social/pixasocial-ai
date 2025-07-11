@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { ViewName, NavItem } from '../../types';
 import { NAVIGATION_ITEMS } from '../../constants';
@@ -39,39 +38,25 @@ const findBreadcrumbPath = (
 export const Breadcrumbs: React.FC<BreadcrumbsProps> = React.memo(({ currentView, onNavigate }) => {
   const path = findBreadcrumbPath(NAVIGATION_ITEMS, currentView);
 
-  if (!path || path.length === 0) {
-    // Fallback for views not in NAVIGATION_ITEMS or if Dashboard itself
-    if (currentView === ViewName.Dashboard) {
-        return (
-            <nav aria-label="Breadcrumb" className="mb-6 px-4 py-2.5 bg-gray-100 border-b border-lightBorder shadow-sm">
-                <ol className="flex items-center space-x-1.5 text-sm text-textSecondary">
-                    <li>
-                        <span className="font-medium text-textPrimary" aria-current="page">
-                            {ViewName.Dashboard}
-                        </span>
-                    </li>
-                </ol>
-            </nav>
-        );
-    }
+  // If we are on the dashboard, don't show any breadcrumbs as it's the root.
+  // This simplifies the UI.
+  if (currentView === ViewName.Dashboard || !path) {
     return null; 
   }
 
-  // Always add Dashboard as the first, non-clickable (unless current) or clickable home link
+  // Always add Dashboard as the first, clickable home link.
   const breadcrumbItems: BreadcrumbItem[] = [
-    { label: ViewName.Dashboard, viewName: ViewName.Dashboard, isCurrent: currentView === ViewName.Dashboard },
-    ...path.filter(p => p.viewName !== ViewName.Dashboard) // Remove dashboard if it's already in path to avoid duplication
+    { label: ViewName.Dashboard, viewName: ViewName.Dashboard, isCurrent: false },
+    ...path,
   ];
   
-  // Special case: if the found path is just Dashboard, we've already handled it.
-  // If the path starts with dashboard (because it was the parent in NAV_ITEMS), ensure it's marked correctly.
-  if (breadcrumbItems.length > 1 && breadcrumbItems[0].label === ViewName.Dashboard && breadcrumbItems[1].label === ViewName.Dashboard) {
-    breadcrumbItems.shift(); // remove duplicate dashboard if it's the first element from the found path
+  // Clean up potential duplicate 'Dashboard' entries if it's the first item in the path.
+  if (breadcrumbItems.length > 1 && breadcrumbItems[1].label === ViewName.Dashboard) {
+    breadcrumbItems.shift(); 
   }
 
-
   return (
-    <nav aria-label="Breadcrumb" className="mb-6 px-4 py-2.5 bg-gray-100 border-b border-lightBorder shadow-sm">
+    <nav aria-label="Breadcrumb" className="mb-6 px-4 py-2.5 bg-card border-b border-lightBorder shadow-sm">
       <ol className="flex items-center space-x-1.5 text-sm text-textSecondary">
         {breadcrumbItems.map((item, index) => (
           <li key={index} className="flex items-center">

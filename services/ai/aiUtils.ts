@@ -1,5 +1,13 @@
 
-import { LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY, AI_PROVIDERS_CONFIG_TEMPLATE } from '../../constants';
+
+import { 
+    LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY, 
+    AI_PROVIDERS_CONFIG_TEMPLATE, 
+    GEMINI_TEXT_MODEL_NAME, 
+    GEMINI_IMAGE_MODEL_NAME,
+    LOCAL_STORAGE_GLOBAL_DEFAULT_TEXT_MODEL_KEY,
+    LOCAL_STORAGE_GLOBAL_DEFAULT_IMAGE_MODEL_KEY
+} from '../../constants';
 import { AIParsedJsonResponse, AiProviderType, AiProviderConfig, UserProfile } from "../../types";
 import { supabase } from '../supabaseClient';
 
@@ -24,10 +32,21 @@ export const getStoredAiProviderConfigs = async (forceRefetch = false): Promise<
   
   const fetchedConfigs = data as AiProviderConfig[];
   
-  // Merge with template to ensure all providers are present
+  // Merge with template to ensure all providers are present and model lists are up-to-date.
   const configsWithDefaults = AI_PROVIDERS_CONFIG_TEMPLATE.map(templateConfig => {
     const storedConfig = fetchedConfigs.find(sc => sc.id === templateConfig.id);
-    return storedConfig ? { ...templateConfig, ...storedConfig } : templateConfig;
+    if (storedConfig) {
+      // The template is the source of truth for name, notes, base_url and available models.
+      // The stored config is the source of truth for user settings (API key, enabled status).
+      return {
+        ...storedConfig, // Start with all user settings from the database
+        name: templateConfig.name, // Overwrite with latest from template
+        notes: templateConfig.notes, // Overwrite with latest from template
+        base_url: templateConfig.base_url, // Overwrite with latest from template
+        models: templateConfig.models, // CRITICAL: Always use the model list from the code
+      };
+    }
+    return templateConfig; // No stored config, so use the template as-is.
   });
 
   globalAiConfigCache = configsWithDefaults;
@@ -75,37 +94,83 @@ export const handleNonImplementedProvider = async (providerType: AiProviderType,
   return { error: errorMsg };
 };
 
-export const getModelForProvider = async (
-  providerType: AiProviderType, 
-  modelType: 'text' | 'image' | 'chat',
-  user: UserProfile
-): Promise<string | null> => {
-    // Check for user-specific override first
-    if (modelType === 'text' && user.assigned_ai_model_text) {
-        return user.assigned_ai_model_text;
+export const getExecutionConfig = async (
+    modelType: 'text' | 'image' | 'chat',
+    user: UserProfile
+  ): Promise<{ provider: AiProviderType; model: string; apiKey: string | null; baseUrl?: string } | null> => {
+  
+    const allConfigs = await getStoredAiProviderConfigs();
+  
+    const findProviderForModel = (modelName: string): AiProviderConfig | undefined => {
+      return allConfigs.find(p => 
+        p.is_enabled && (
+          p.models.text?.includes(modelName) ||
+          p.models.image?.includes(modelName) ||
+          p.models.chat?.includes(modelName)
+        )
+      );
+    };
+  
+    let targetModel: string | undefined;
+    let targetProvider: AiProviderConfig | undefined;
+  
+    // 1. Check for user-specific assigned model
+    if (modelType === 'text' || modelType === 'chat') {
+      targetModel = user.assigned_ai_model_text;
+    } else if (modelType === 'image') {
+      targetModel = user.assigned_ai_model_image;
     }
-    if (modelType === 'image' && user.assigned_ai_model_image) {
-        return user.assigned_ai_model_image;
+  
+    if (targetModel) {
+      targetProvider = findProviderForModel(targetModel);
     }
-
-    // Fallback to global config
-    const config = await getProviderConfig(providerType);
-    if (!config || !config.is_enabled) {
-        console.warn(`Provider ${providerType} is not configured or not enabled.`);
-        return null;
+  
+    // 2. If no user model, check for global default model
+    if (!targetProvider) {
+      const globalDefaultModelKey = modelType === 'image' ? LOCAL_STORAGE_GLOBAL_DEFAULT_IMAGE_MODEL_KEY : LOCAL_STORAGE_GLOBAL_DEFAULT_TEXT_MODEL_KEY;
+      targetModel = localStorage.getItem(globalDefaultModelKey) || undefined;
+      if (targetModel) {
+        targetProvider = findProviderForModel(targetModel);
+      }
+    }
+  
+    // 3. If still no provider, fall back to active provider
+    if (!targetProvider) {
+      const activeProviderType = getActiveAiProviderType();
+      targetProvider = allConfigs.find(p => p.id === activeProviderType && p.is_enabled);
+      targetModel = undefined; // Reset targetModel so we can pick a default from the active provider
+    }
+  
+    // 4. If no valid provider could be determined, fail
+    if (!targetProvider) {
+      console.error("Could not determine a valid, enabled AI provider.");
+      return null;
+    }
+  
+    // 5. Determine the final model name
+    let finalModel = targetModel;
+    if (!finalModel) {
+      if (targetProvider.id === AiProviderType.Gemini) {
+        finalModel = modelType === 'image' ? GEMINI_IMAGE_MODEL_NAME : GEMINI_TEXT_MODEL_NAME;
+      } else {
+        const providerModels = targetProvider.models;
+        if (modelType === 'image') {
+          finalModel = providerModels.image?.[0];
+        } else { // text or chat
+          finalModel = (modelType === 'chat' ? providerModels.chat?.[0] : providerModels.text?.[0]) || providerModels.text?.[0] || providerModels.chat?.[0];
+        }
+      }
     }
     
-    const models = config.models[modelType];
-    if (models && models.length > 0) {
-        return models[0]; // Default to the first model in the list
+    if (!finalModel) {
+        console.error(`No suitable model of type '${modelType}' found for provider '${targetProvider.name}'.`);
+        return null;
     }
-    // Fallback logic for chat/text models
-    if (modelType === 'chat' && config.models.text && config.models.text.length > 0) {
-        return config.models.text[0];
-    }
-    if (modelType === 'text' && config.models.chat && config.models.chat.length > 0) {
-        return config.models.chat[0];
-    }
-    console.warn(`No suitable ${modelType} model found for provider ${providerType} in configuration.`);
-    return null;
-}
+  
+    return {
+      provider: targetProvider.id,
+      model: finalModel,
+      apiKey: targetProvider.api_key,
+      baseUrl: targetProvider.base_url
+    };
+};

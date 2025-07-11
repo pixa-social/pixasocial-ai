@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Calendar as BigCalendar, dateFnsLocalizer, Views, EventProps, ToolbarProps, View, DayPropGetter, SlotPropGetter, Event } from 'react-big-calendar';
 import { format, getDay, isValid } from 'date-fns';
@@ -68,7 +69,9 @@ const EventDetailModalComponent: React.FC<EventDetailModalProps> = ({
   
   const statusOptions: Array<{value: ScheduledPostStatus, label: string}> = useMemo(() => [
       {value: 'Scheduled', label: 'Scheduled'},
+      {value: 'Publishing', label: 'Publishing'},
       {value: 'Published', label: 'Published'},
+      {value: 'Failed', label: 'Failed'},
       {value: 'Missed', label: 'Missed'},
       {value: 'Cancelled', label: 'Cancelled'},
   ], []);
@@ -141,7 +144,7 @@ const EventDetailModalComponent: React.FC<EventDetailModalProps> = ({
                     isVisible={!!combinedContentForCopy()}
                 />
             </div>
-            <div className="bg-gray-50 p-3 rounded-md border border-lightBorder max-h-48 overflow-y-auto text-sm">
+            <div className="bg-background p-3 rounded-md border border-lightBorder max-h-48 overflow-y-auto text-sm">
                 {platformDetail.subject && <p className="font-semibold text-textPrimary mb-1">Subject: {platformDetail.subject}</p>}
                 <pre className="whitespace-pre-wrap text-textPrimary">{platformDetail.content}</pre>
                 {platformDetail.processedImageUrl && (
@@ -258,7 +261,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     }, [toolbar]);
 
     return (
-      <div className="mb-4 p-3 flex flex-col md:flex-row justify-between items-center bg-gray-50 rounded-t-lg border-b border-lightBorder">
+      <div className="mb-4 p-3 flex flex-col md:flex-row justify-between items-center bg-card rounded-t-lg border-b border-lightBorder">
         <div className="flex items-center space-x-1 sm:space-x-2 mb-2 md:mb-0">
           <Button onClick={() => toolbar.onNavigate('PREV')} size="sm" variant="secondary" aria-label="Previous Period" title="Previous Period" leftIcon={<ChevronLeftIcon className="h-4 h-4"/>} />
           <Button onClick={() => toolbar.onNavigate('TODAY')} size="sm" variant="primary" title="Go to Today">Today</Button>
@@ -274,7 +277,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 id="jump-to-date-input"
                 ref={jumpDateInputRef}
                 onChange={handleJumpToDate} 
-                className="px-2 py-1 border border-mediumBorder rounded-md shadow-sm text-sm focus:ring-primary focus:border-primary"
+                className="px-2 py-1 border border-mediumBorder rounded-md shadow-sm text-sm focus:ring-primary focus:border-primary bg-card text-textPrimary"
                 aria-label="Jump to date"
                 title="Select a date to jump to"
             />
@@ -308,9 +311,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     let borderColor = 'border-blue-700';
 
     switch(event.resource.status) {
-        case 'Published': bgColor = 'bg-green-500 hover:bg-green-600'; borderColor = 'border-green-700'; break;
-        case 'Missed': bgColor = 'bg-red-500 hover:bg-red-600'; borderColor = 'border-red-700'; break;
+        case 'Published': bgColor = 'bg-success hover:bg-emerald-600'; borderColor = 'border-emerald-700'; break;
+        case 'Failed':
+        case 'Missed': bgColor = 'bg-danger hover:bg-rose-600'; borderColor = 'border-rose-700'; break;
+        case 'Publishing': bgColor = 'bg-warning hover:bg-amber-600'; borderColor = 'border-amber-700'; break;
         case 'Cancelled': bgColor = 'bg-gray-400 hover:bg-gray-500'; textColor = 'text-gray-800'; borderColor = 'border-gray-600'; break;
+        default: bgColor = 'bg-primary hover:bg-sky-400'; borderColor = 'border-sky-700';
     }
     
     const platformIcon = platformInfo?.icon;
@@ -340,7 +346,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const dayPropGetter = useCallback((date: Date) => {
     const isToday = format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
     return {
-      className: `${isToday ? 'bg-blue-50 rbc-today' : 'hover:bg-gray-50'} transition-colors duration-150`,
+      className: `${isToday ? 'bg-primary/5 rbc-today' : 'hover:bg-card/50'} transition-colors duration-150`,
       style: {
         minHeight: '100px',
       },
@@ -349,7 +355,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   const slotPropGetter = useCallback((date: Date) => {
     return {
-      className: 'hover:bg-gray-50 transition-colors duration-150',
+      className: 'hover:bg-card/50 transition-colors duration-150',
     };
   }, []);
 
@@ -386,13 +392,25 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         />
       </div>
        <style>{`
-        .rbc-calendar { font-family: inherit; }
+        .rbc-calendar { font-family: inherit; color: var(--text-color, #f9fafb); }
         .rbc-toolbar button { text-transform: capitalize; }
         .rbc-event { padding: 0; border-radius: 4px; border: none; background-color: transparent; } 
         .rbc-agenda-date-cell, .rbc-agenda-time-cell { font-weight: 500; }
-        .rbc-header { padding: 8px 5px; text-align: center; font-weight: 600; border-bottom: 1px solid #e5e7eb; background-color: #f9fafb; }
-        .rbc-today { background-color: #eff6ff !important; } 
-        .rbc-day-bg:hover, .rbc-time-slot:hover { background-color: #f9fafb !important; }
+        .rbc-header { padding: 8px 5px; text-align: center; font-weight: 600; border-bottom: 1px solid #374151; background-color: transparent; }
+        .rbc-off-range-bg { background: #1f2937; }
+        .rbc-today { background-color: rgba(56, 189, 248, 0.1) !important; } 
+        .rbc-day-bg:hover, .rbc-time-slot:hover { background-color: rgba(56, 189, 248, 0.05) !important; }
+        .rbc-time-view, .rbc-month-view { border: 1px solid #374151; }
+        .rbc-time-header, .rbc-month-row { border-bottom: 1px solid #374151; }
+        .rbc-day-bg, .rbc-month-row, .rbc-day-slot .rbc-time-slot { border-left: 1px solid #374151; }
+        .rbc-rtl .rbc-day-bg, .rbc-rtl .rbc-month-row, .rbc-rtl .rbc-day-slot .rbc-time-slot { border-right: 1px solid #374151; border-left: none;}
+        .rbc-agenda-view table { border: 1px solid #374151; }
+        .rbc-agenda-view table tr { border-bottom: 1px solid #374151; }
+        .rbc-agenda-view table tr:last-child { border-bottom: none; }
+        .rbc-agenda-view table th, .rbc-agenda-view table td { padding: 0.5rem; border-right: 1px solid #374151; }
+        .rbc-agenda-view table th:last-child, .rbc-agenda-view table td:last-child { border-right: none; }
+        .rbc-agenda-empty { color: #9ca3af; }
+        .rbc-time-gutter, .rbc-header { background-color: #1f2937; }
         .text-xxs { font-size: 0.65rem; line-height: 0.85rem; }
        `}</style>
       {selectedEventFullDetails.event && (

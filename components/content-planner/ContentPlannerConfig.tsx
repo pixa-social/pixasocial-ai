@@ -21,8 +21,8 @@ interface ContentPlannerConfigProps {
   onKeyMessageChange: (message: string) => void;
   globalMediaType: MediaType;
   onGlobalMediaTypeChange: (type: MediaType) => void;
-  platformSpecificMediaTypes: Record<string, MediaType | 'global'>;
-  onPlatformSpecificMediaTypeChange: (newOverrides: Record<string, MediaType | 'global'>) => void;
+  platformMediaOverrides: Record<string, MediaType | 'global'>;
+  onPlatformMediaOverridesChange: (newOverrides: Record<string, MediaType | 'global'>) => void;
   selectedTone: string;
   onSelectedToneChange: (tone: string) => void;
   customPrompt: string;
@@ -58,7 +58,7 @@ const ContentPlannerConfigComponent: React.FC<ContentPlannerConfigProps> = ({
   selectedOperatorId, onSelectedOperatorIdChange,
   keyMessage, onKeyMessageChange,
   globalMediaType, onGlobalMediaTypeChange,
-  platformSpecificMediaTypes, onPlatformSpecificMediaTypeChange,
+  platformMediaOverrides, onPlatformMediaOverridesChange,
   selectedTone, onSelectedToneChange,
   customPrompt, onCustomPromptChange,
   selectedPlatformsForGeneration, onSelectedPlatformChange,
@@ -70,11 +70,11 @@ const ContentPlannerConfigComponent: React.FC<ContentPlannerConfigProps> = ({
   const operatorOptions = useMemo(() => operators.map(o => ({ value: o.id, label: `${o.name} (${o.type})` })), [operators]);
 
   const handlePlatformMediaTypeOverride = useCallback((platformKey: string, value: MediaType | 'global') => {
-    onPlatformSpecificMediaTypeChange({
-        ...platformSpecificMediaTypes,
+    onPlatformMediaOverridesChange({
+        ...platformMediaOverrides,
         [platformKey]: value,
     });
-  }, [platformSpecificMediaTypes, onPlatformSpecificMediaTypeChange]);
+  }, [platformMediaOverrides, onPlatformMediaOverridesChange]);
   
   const showFontColorOptions = globalMediaType === 'image';
 
@@ -122,7 +122,7 @@ const ContentPlannerConfigComponent: React.FC<ContentPlannerConfigProps> = ({
         <label className="block text-sm font-medium text-textSecondary mb-2">Select Platforms for Generation & Media Overrides:</label>
         <div className="space-y-3 max-h-60 overflow-y-auto pr-2"> {/* Increased max-h */}
           {CONTENT_PLATFORMS.map(platform => (
-            <div key={platform.key} className="p-2 border border-lightBorder rounded-md bg-gray-50">
+            <div key={platform.key} className="p-2 border border-lightBorder rounded-md bg-background">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center">
                         <input
@@ -143,7 +143,7 @@ const ContentPlannerConfigComponent: React.FC<ContentPlannerConfigProps> = ({
                          <Select 
                             label="" /* No label for compact view */
                             options={platformMediaTypeOptions} 
-                            value={platformSpecificMediaTypes[platform.key] || 'global'} 
+                            value={platformMediaOverrides[platform.key] || 'global'} 
                             onChange={e => handlePlatformMediaTypeOverride(platform.key, e.target.value as MediaType | 'global')} 
                             className="text-xs py-1"
                             containerClassName="mb-0"
@@ -170,4 +170,4 @@ const ContentPlannerConfigComponent: React.FC<ContentPlannerConfigProps> = ({
   );
 };
 
-export const ContentPlannerConfig = React.memo(ContentPlannerConfigComponent);
+export default React.memo(ContentPlannerConfigComponent);

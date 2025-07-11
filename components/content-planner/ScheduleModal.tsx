@@ -37,7 +37,7 @@ const ScheduleModalComponent: React.FC<ScheduleModalProps> = ({ draft, platformK
         <div className="mb-4">
           <h4 className="font-semibold text-textPrimary">Content Preview:</h4>
           {platformDetail.subject && <p className="text-sm font-medium text-textPrimary">Subject: {platformDetail.subject}</p>}
-          <pre className="text-sm whitespace-pre-wrap bg-gray-100 p-2 rounded max-h-32 overflow-y-auto text-textPrimary">{platformDetail.content}</pre>
+          <pre className="text-sm whitespace-pre-wrap bg-background p-2 rounded max-h-32 overflow-y-auto text-textPrimary">{platformDetail.content}</pre>
            {platformDetail.processedImageUrl && (
             <img src={platformDetail.processedImageUrl} alt="Processed media" className="mt-2 max-w-xs w-full h-auto max-h-24 rounded border border-mediumBorder object-contain"/>
           )}
