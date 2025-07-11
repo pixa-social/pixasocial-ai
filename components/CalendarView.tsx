@@ -11,7 +11,7 @@ import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Textarea } from './ui/Textarea';
 import { Select } from './ui/Select';
-import { CONTENT_PLATFORMS } from '../../constants';
+import { CONTENT_PLATFORMS } from '../constants';
 import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon } from './ui/Icons';
 import { CopyButton } from './ui/CopyButton';
 import { PrerequisiteMessageCard } from './ui/PrerequisiteMessageCard'; 
