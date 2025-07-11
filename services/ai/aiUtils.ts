@@ -1,107 +1,111 @@
-import { AiProviderType, AiProviderConfig } from "../../types";
-import { AI_PROVIDERS_CONFIG_TEMPLATE, LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY, LOCAL_STORAGE_AI_CONFIG_KEY } from "../../constants";
 
-// Cached configs to avoid repeated localStorage access
-let cachedAiConfigs: AiProviderConfig[] | null = null;
-let cachedActiveProvider: AiProviderType | null = null;
+import { LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY, AI_PROVIDERS_CONFIG_TEMPLATE } from '../../constants';
+import { AIParsedJsonResponse, AiProviderType, AiProviderConfig, UserProfile } from "../../types";
+import { supabase } from '../supabaseClient';
 
-// Load configs from local storage or use default template
-const loadAiConfigs = (): AiProviderConfig[] => {
-  if (cachedAiConfigs) return cachedAiConfigs;
+// --- Helper functions to manage AI provider configurations ---
+
+let globalAiConfigCache: AiProviderConfig[] | null = null;
+let lastCacheFetchTime = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+export const getStoredAiProviderConfigs = async (forceRefetch = false): Promise<AiProviderConfig[]> => {
+  const now = Date.now();
+  if (!forceRefetch && globalAiConfigCache && (now - lastCacheFetchTime < CACHE_DURATION)) {
+    return globalAiConfigCache;
+  }
+
+  const { data, error } = await supabase.from('ai_provider_global_configs').select('*');
+  if (error) {
+    console.error("Error fetching global AI configs, returning template:", error);
+    // Return template but don't cache it
+    return AI_PROVIDERS_CONFIG_TEMPLATE;
+  }
   
-  const localConfigs = localStorage.getItem(LOCAL_STORAGE_AI_CONFIG_KEY);
-  cachedAiConfigs = localConfigs ? JSON.parse(localConfigs) : AI_PROVIDERS_CONFIG_TEMPLATE;
-  return cachedAiConfigs;
+  const fetchedConfigs = data as AiProviderConfig[];
+  
+  // Merge with template to ensure all providers are present
+  const configsWithDefaults = AI_PROVIDERS_CONFIG_TEMPLATE.map(templateConfig => {
+    const storedConfig = fetchedConfigs.find(sc => sc.id === templateConfig.id);
+    return storedConfig ? { ...templateConfig, ...storedConfig } : templateConfig;
+  });
+
+  globalAiConfigCache = configsWithDefaults;
+  lastCacheFetchTime = now;
+  return configsWithDefaults;
 };
 
-// Get active provider type synchronously from local storage if available
 export const getActiveAiProviderType = (): AiProviderType => {
-  if (cachedActiveProvider) return cachedActiveProvider;
-  
-  const localActiveProvider = localStorage.getItem(LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY) as AiProviderType | null;
-  if (localActiveProvider) {
-    cachedActiveProvider = localActiveProvider;
-    return localActiveProvider;
+  // This remains client-side preference, but we could move it to user profiles later
+  return (localStorage.getItem(LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY) as AiProviderType) || AiProviderType.Gemini;
+};
+
+export const getProviderConfig = async (providerType: AiProviderType): Promise<AiProviderConfig | undefined> => {
+    const configs = await getStoredAiProviderConfigs();
+    return configs.find(c => c.id === providerType);
+};
+
+export const getApiKeyForProvider = async (providerType: AiProviderType): Promise<string | null> => {
+  const config = await getProviderConfig(providerType);
+  if (!config || !config.is_enabled) return null;
+  return config.api_key || null;
+};
+
+export const parseJsonFromText = <T,>(text: string): AIParsedJsonResponse<T> => {
+  let jsonStr = text.trim();
+  const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
+  const match = jsonStr.match(fenceRegex);
+  if (match && match[2]) {
+    jsonStr = match[2].trim();
   }
-  
-  // If not in local storage, determine from configs
-  const configs = loadAiConfigs();
-  const enabledConfigs = configs.filter(c => c.isEnabled);
-  if (enabledConfigs.length > 0) {
-    const geminiConfig = enabledConfigs.find(c => c.id === AiProviderType.Gemini);
-    cachedActiveProvider = geminiConfig ? AiProviderType.Gemini : enabledConfigs[0].id;
-  } else {
-    cachedActiveProvider = AiProviderType.Gemini; // Default fallback
-  }
-  
-  localStorage.setItem(LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY, cachedActiveProvider);
-  return cachedActiveProvider;
-};
 
-// Get provider config by type
-export const getProviderConfig = (providerType: AiProviderType): AiProviderConfig | undefined => {
-  const configs = loadAiConfigs();
-  return configs.find(config => config.id === providerType);
-};
-
-// Get API key for a provider
-export const getApiKeyForProvider = (providerType: AiProviderType): string | null => {
-  const config = getProviderConfig(providerType);
-  return config && config.isEnabled ? config.apiKey || null : null;
-};
-
-// Get appropriate model for a provider based on task type
-export const getModelForProvider = (providerType: AiProviderType, taskType: 'text' | 'chat' | 'image' | 'json' = 'text'): string | null => {
-  const config = getProviderConfig(providerType);
-  if (!config || !config.isEnabled) return null;
-  
-  const models = config.models;
-  if (!models) return null;
-  
-  // For OpenAI-compatible, 'chat' is used for text generation with OpenAI SDK
-  if (taskType === 'chat' && models.chat && models.chat.length > 0) {
-    return models.chat[0];
-  }
-  
-  // For image generation
-  if (taskType === 'image' && models.image && models.image.length > 0) {
-    return models.image[0];
-  }
-  
-  // Default to text models (also used for JSON tasks)
-  return models.text && models.text.length > 0 ? models.text[0] : null;
-};
-
-// Handle non-implemented providers with a user-friendly message
-export const handleNonImplementedProvider = (providerType: AiProviderType, feature: string): { error: string } => {
-  const config = getProviderConfig(providerType);
-  const providerName = config?.name || providerType;
-  return {
-    error: `The ${feature} feature is not yet implemented for ${providerName}. Please select a different provider in the Admin Panel.`,
-  };
-};
-
-// Parse JSON from text response, handling potential errors
-export const parseJsonFromText = <T,>(text: string): { data: T | null; error?: string } => {
   try {
-    // Attempt to extract JSON from code blocks if present
-    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    const jsonText = jsonMatch ? jsonMatch[1] : text;
-    const parsed = JSON.parse(jsonText);
-    return { data: parsed as T };
+    const parsedData = JSON.parse(jsonStr);
+    return { data: parsedData };
   } catch (e) {
-    console.error("Failed to parse JSON from AI response:", e);
-    return { data: null, error: `Failed to parse JSON from response: ${text.substring(0, 100)}...` };
+    console.error("Failed to parse JSON response:", e, "Original text:", text);
+    return { data: null, error: `Failed to parse JSON: ${(e as Error).message}. Original text: ${text.slice(0,100)}...` };
   }
 };
 
-// Reset cached values (useful for logout or config changes)
-export const resetAiConfigCache = (): void => {
-  cachedAiConfigs = null;
-  cachedActiveProvider = null;
+export const handleNonImplementedProvider = async (providerType: AiProviderType, feature: string = "AI"): Promise<{ error: string }> => {
+  const providerConfig = await getProviderConfig(providerType);
+  const errorMsg = `${feature} features for '${providerConfig?.name || providerType}' are not implemented or supported client-side. Select a different provider or update the AI service.`;
+  console.warn(errorMsg);
+  return { error: errorMsg };
 };
 
-// Get stored AI provider configs synchronously
-export const getStoredAiProviderConfigsSync = (): AiProviderConfig[] => {
-  return loadAiConfigs();
-};
+export const getModelForProvider = async (
+  providerType: AiProviderType, 
+  modelType: 'text' | 'image' | 'chat',
+  user: UserProfile
+): Promise<string | null> => {
+    // Check for user-specific override first
+    if (modelType === 'text' && user.assigned_ai_model_text) {
+        return user.assigned_ai_model_text;
+    }
+    if (modelType === 'image' && user.assigned_ai_model_image) {
+        return user.assigned_ai_model_image;
+    }
+
+    // Fallback to global config
+    const config = await getProviderConfig(providerType);
+    if (!config || !config.is_enabled) {
+        console.warn(`Provider ${providerType} is not configured or not enabled.`);
+        return null;
+    }
+    
+    const models = config.models[modelType];
+    if (models && models.length > 0) {
+        return models[0]; // Default to the first model in the list
+    }
+    // Fallback logic for chat/text models
+    if (modelType === 'chat' && config.models.text && config.models.text.length > 0) {
+        return config.models.text[0];
+    }
+    if (modelType === 'text' && config.models.chat && config.models.chat.length > 0) {
+        return config.models.chat[0];
+    }
+    console.warn(`No suitable ${modelType} model found for provider ${providerType} in configuration.`);
+    return null;
+}

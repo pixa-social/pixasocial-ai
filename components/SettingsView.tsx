@@ -2,28 +2,23 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
-import { Tabs, Tab } from './ui/Tabs'; // Added Tabs import
+import { Tabs, Tab } from './ui/Tabs';
 import { 
     ExclamationTriangleIcon, LinkIcon, PlusCircleIcon, TrashIcon, UserCircleIcon, 
     KeyIcon, WalletIcon, UserGroupIcon, EnvelopeIcon, CheckCircleIcon,
-    ArrowDownTrayIcon, ArrowUpTrayIcon, ServerStackIcon, UsersIcon as TeamIcon, WrenchScrewdriverIcon
+    ServerStackIcon, UsersIcon as TeamIcon, WrenchScrewdriverIcon
 } from './ui/Icons';
-import { SOCIAL_PLATFORMS_TO_CONNECT, MAX_TEAM_MEMBERS, LOCAL_STORAGE_AI_CONFIG_KEY } from '../constants';
-import { SocialPlatformType, ConnectedAccount, User, CampaignData, AiProviderConfig } from '../types';
+import { SOCIAL_PLATFORMS_TO_CONNECT, MAX_TEAM_MEMBERS } from '../constants';
+import { SocialPlatformType, ConnectedAccount, User } from '../types';
 import { useToast } from './ui/ToastProvider';
-import { downloadJsonFile } from '../utils/fileUtils';
-import { useForm, Controller } from 'react-hook-form'; 
+import { useForm } from 'react-hook-form'; 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { supabase } from '../services/supabaseClient';
 
 interface SettingsViewProps {
   currentUser: User;
   onUpdateUser: (updatedUserData: Partial<User>) => void;
-  connectedAccounts: ConnectedAccount[];
-  onAddConnectedAccount: (account: ConnectedAccount) => void;
-  onRemoveConnectedAccount: (platform: SocialPlatformType) => void;
-  campaignData: CampaignData;
-  onImportCampaignData: (data: CampaignData) => void;
 }
 
 interface ConnectModalProps {
@@ -59,10 +54,10 @@ const ConnectModalComponent: React.FC<ConnectModalProps> = ({ platform, onClose,
   }, [accountId, displayName, profileImageUrl, platform.id, onConnect, onClose, showToast]);
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
-      <Card title={`Connect to ${platform.name}`} className="w-full max-w-md bg-card shadow-xl">
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-          <p className="text-sm text-blue-700">
+    <div className="fixed inset-0 bg-black bg-opacity-75 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+      <Card title={`Connect to ${platform.name}`} className="w-full max-w-md shadow-xl">
+        <div className="mb-4 p-3 bg-blue-900/50 border border-blue-500/50 rounded-md">
+          <p className="text-sm text-blue-200">
             <strong>This is a simulated connection.</strong> Enter mock details below.
           </p>
         </div>
@@ -101,12 +96,10 @@ const ConnectModal = React.memo(ConnectModalComponent);
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ 
   currentUser, onUpdateUser,
-  connectedAccounts, onAddConnectedAccount, onRemoveConnectedAccount,
-  campaignData, onImportCampaignData
 }) => {
   const { showToast } = useToast();
   const [platformToConnect, setPlatformToConnect] = useState<typeof SOCIAL_PLATFORMS_TO_CONNECT[0] | null>(null);
-  const importFileRef = useRef<HTMLInputElement>(null);
+  const [connectedAccounts, setConnectedAccounts] = useState<ConnectedAccount[]>([]);
   
   const { register: registerProfile, handleSubmit: handleSubmitProfile, formState: { errors: profileErrors }, reset: resetProfileForm } = useForm<UserProfileFormData>({
     resolver: zodResolver(userProfileSchema),
@@ -121,7 +114,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   useEffect(() => {
     resetProfileForm({ walletAddress: currentUser.walletAddress || '' });
-  }, [currentUser.walletAddress, resetProfileForm]);
+    const fetchAccounts = async () => {
+        const { data, error } = await supabase
+            .from('connected_accounts')
+            .select('*')
+            .eq('user_id', currentUser.id);
+        if (error) {
+            showToast(`Error fetching connected accounts: ${error.message}`, 'error');
+        } else {
+            setConnectedAccounts(data || []);
+        }
+    }
+    fetchAccounts();
+  }, [currentUser, resetProfileForm, showToast]);
 
   const handleSaveUserProfile = useCallback((data: UserProfileFormData) => {
     onUpdateUser({ walletAddress: data.walletAddress });
@@ -153,94 +158,59 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     showToast(`${emailToRemove} has been removed from your team.`, 'info');
   }, [currentUser.teamMembers, onUpdateUser, showToast]);
 
-  const handleConnectAccount = useCallback((platform: SocialPlatformType, accountId: string, displayName: string, profileImageUrl?: string) => {
-    const newAccount: ConnectedAccount = {
+  const handleConnectAccount = useCallback(async (platform: SocialPlatformType, accountId: string, displayName: string, profileImageUrl?: string) => {
+    const newAccount = {
       platform, accountId, displayName,
       profileImageUrl: profileImageUrl || undefined,
+      user_id: currentUser.id,
       connectedAt: new Date().toISOString(),
     };
-    onAddConnectedAccount(newAccount);
-  }, [onAddConnectedAccount]);
+    const { data, error } = await supabase.from('connected_accounts').insert(newAccount).select().single();
+    if(error) {
+        showToast(`Failed to connect account: ${error.message}`, 'error');
+    } else {
+        setConnectedAccounts(prev => [...prev, data]);
+        showToast(`Account ${displayName} connected.`, "success");
+    }
+  }, [currentUser.id, showToast]);
 
-  const handleDisconnectAccount = useCallback((platform: SocialPlatformType) => {
-    onRemoveConnectedAccount(platform);
-  }, [onRemoveConnectedAccount]);
+  const handleDisconnectAccount = useCallback(async (accountId: number, platformName: string) => {
+    const { error } = await supabase.from('connected_accounts').delete().eq('id', accountId);
+    if(error) {
+        showToast(`Failed to disconnect account: ${error.message}`, 'error');
+    } else {
+        setConnectedAccounts(prev => prev.filter(acc => acc.id !== accountId));
+        showToast(`Account for ${platformName} disconnected.`, "info");
+    }
+  }, [showToast]);
 
   const getConnectedAccount = useCallback((platformType: SocialPlatformType): ConnectedAccount | undefined => {
     return connectedAccounts.find(acc => acc.platform === platformType);
   }, [connectedAccounts]);
 
-  const handleExportData = useCallback(() => {
-    try {
-      const storedAiConfigsRaw = localStorage.getItem(LOCAL_STORAGE_AI_CONFIG_KEY);
-      let aiProviderConfigsForExport: Partial<AiProviderConfig>[] = [];
-      if (storedAiConfigsRaw) {
-        const storedAiConfigs: AiProviderConfig[] = JSON.parse(storedAiConfigsRaw);
-        aiProviderConfigsForExport = storedAiConfigs.map(config => {
-          const { apiKey, ...rest } = config; // eslint-disable-line @typescript-eslint/no-unused-vars
-          return rest;
-        });
-      }
-      const dataToExport = { ...campaignData, aiProviderConfigs: aiProviderConfigsForExport, chatMessages: [] };
-      const filename = `pixasocial_campaign_data_${new Date().toISOString().split('T')[0]}.json`;
-      downloadJsonFile(dataToExport, filename);
-      showToast("Campaign data exported successfully!", "success");
-    } catch (error) {
-      console.error("Error exporting data:", error);
-      showToast(`Failed to export data: ${(error as Error).message}`, "error");
-    }
-  }, [campaignData, showToast]);
-
-  const handleImportFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const importedContent = e.target?.result;
-          if (typeof importedContent === 'string') {
-            const parsedData = JSON.parse(importedContent) as CampaignData;
-             if (window.confirm("Are you sure you want to import this data? This will replace your current campaign data.")) {
-                onImportCampaignData(parsedData);
-             }
-          } else { throw new Error("Failed to read file content as text."); }
-        } catch (error) {
-          console.error("Error parsing imported JSON:", error);
-          showToast(`Failed to parse JSON: ${(error as Error).message}`, "error");
-        } finally { if (importFileRef.current) { importFileRef.current.value = ""; } }
-      };
-      reader.onerror = () => {
-        showToast("Failed to read the selected file.", "error");
-        if (importFileRef.current) { importFileRef.current.value = ""; }
-      };
-      reader.readAsText(file);
-    }
-  }, [onImportCampaignData, showToast]);
-
   return (
     <div className="p-6 space-y-8">
       <div>
         <h2 className="text-3xl font-bold text-textPrimary mb-6">Settings</h2>
-        <Card className="mb-6 bg-yellow-50 border-l-4 border-yellow-400 p-4">
+        <Card className="mb-6 bg-yellow-500/10 border-l-4 border-yellow-500 p-4">
           <div className="flex items-start">
-            <ExclamationTriangleIcon className="h-6 w-6 text-yellow-600 mr-3 shrink-0 mt-0.5" />
+            <ExclamationTriangleIcon className="h-6 w-6 text-yellow-400 mr-3 shrink-0 mt-0.5" />
             <div>
-              <h3 className="text-lg font-semibold text-yellow-700">Simulation Notice</h3>
-              <p className="text-yellow-600 text-sm">
-                User profile changes, team management, and account connections are <strong>simulated</strong> and use local storage.
-                Data import/export also operates on local browser data.
+              <h3 className="text-lg font-semibold text-yellow-300">Simulation Notice</h3>
+              <p className="text-yellow-400 text-sm">
+                User profile changes, team management, and account connections are now saved to your Supabase backend.
               </p>
             </div>
           </div>
         </Card>
       </div>
 
-      <Tabs tabListClassName="border-gray-300" tabButtonClassName="hover:border-gray-400 text-gray-600" activeTabButtonClassName="border-primary text-primary">
+      <Tabs tabListClassName="border-gray-700" tabButtonClassName="hover:border-gray-500 text-textSecondary" activeTabButtonClassName="border-primary text-primary">
         <Tab label="User Profile" icon={<UserCircleIcon className="w-5 h-5" />}>
-            <Card title="Your Profile" shadow="soft-lg" className="mt-4">
+            <Card title="Your Profile" className="mt-4">
                 <form onSubmit={handleSubmitProfile(handleSaveUserProfile)} className="space-y-4">
                 <Input label="Username (Display Name)" value={currentUser.name || 'N/A'} readOnly disabled containerClassName="opacity-70"/>
-                <Input label="Email Address" value={currentUser.email} readOnly disabled containerClassName="opacity-70"/>
+                <Input label="Email Address" value={currentUser.email || ''} readOnly disabled containerClassName="opacity-70"/>
                 <div>
                     <label className="block text-sm font-medium text-textSecondary mb-1">Password</label>
                     <div className="flex items-center space-x-3">
@@ -261,7 +231,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </Card>
         </Tab>
         <Tab label="Team Management" icon={<TeamIcon className="w-5 h-5" />}>
-            <Card title="Manage Your Team" shadow="soft-lg" className="mt-4">
+            <Card title="Manage Your Team" className="mt-4">
                 <form onSubmit={handleSubmitInvite(handleInviteTeamMember)} className="space-y-4">
                 <Input
                     label="Invite Team Member (Enter Email)"
@@ -289,9 +259,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     <h4 className="text-sm font-medium text-textSecondary mb-2">Current Team Members ({currentUser.teamMembers.length}/{MAX_TEAM_MEMBERS}):</h4>
                     <ul className="space-y-2">
                     {currentUser.teamMembers.map(email => (
-                        <li key={email} className="flex justify-between items-center p-2 bg-gray-100 rounded-md">
+                        <li key={email} className="flex justify-between items-center p-2 bg-white/5 rounded-md">
                         <span className="text-sm text-textPrimary">{email}</span>
-                        <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveTeamMember(email)} className="text-danger hover:bg-red-100 px-2 py-1" title={`Remove ${email} from team`}>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveTeamMember(email)} className="text-danger hover:bg-red-500/10 px-2 py-1" title={`Remove ${email} from team`}>
                             <TrashIcon className="w-4 h-4"/>
                         </Button>
                         </li>
@@ -303,13 +273,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </Card>
         </Tab>
         <Tab label="Social Accounts" icon={<LinkIcon className="w-5 h-5" />}>
-            <Card title="Connected Social Accounts" shadow="soft-lg" className="mt-4">
+            <Card title="Connected Social Accounts" className="mt-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {SOCIAL_PLATFORMS_TO_CONNECT.map((platform) => {
                     const connectedAccount = getConnectedAccount(platform.id);
                     const PlatformIcon = platform.icon || LinkIcon;
                     return (
-                    <Card key={platform.id} className="flex flex-col justify-between" shadow="soft-md">
+                    <Card key={platform.id} className="flex flex-col justify-between">
                         <div>
                         <div className="flex items-center mb-3">
                             <PlatformIcon className={`w-8 h-8 mr-3 ${platform.brandColor || 'text-textSecondary'}`} />
@@ -317,22 +287,22 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         </div>
                         <p className="text-sm text-textSecondary mb-4 min-h-[40px]">{platform.description}</p>
                         {connectedAccount ? (
-                            <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+                            <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-md">
                             <div className="flex items-center mb-2">
                                 {connectedAccount.profileImageUrl ? (
-                                <img src={connectedAccount.profileImageUrl} alt={connectedAccount.displayName} className="w-10 h-10 rounded-full mr-3 border border-gray-300 object-cover" />
+                                <img src={connectedAccount.profileImageUrl} alt={connectedAccount.displayName} className="w-10 h-10 rounded-full mr-3 border border-gray-600 object-cover" />
                                 ) : (
-                                <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-lg font-medium mr-3">
+                                <div className="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center text-gray-300 text-lg font-medium mr-3">
                                     {connectedAccount.displayName.substring(0,1).toUpperCase()}
                                 </div>
                                 )}
                                 <div>
-                                <p className="text-sm font-semibold text-green-700">Connected: {connectedAccount.displayName}</p>
-                                <p className="text-xs text-green-600">Account ID: {connectedAccount.accountId}</p>
-                                <p className="text-xs text-gray-500">Connected: {new Date(connectedAccount.connectedAt).toLocaleDateString()}</p>
+                                <p className="text-sm font-semibold text-green-300">Connected: {connectedAccount.displayName}</p>
+                                <p className="text-xs text-green-400">Account ID: {connectedAccount.accountId}</p>
+                                <p className="text-xs text-textSecondary">Connected: {new Date(connectedAccount.connectedAt).toLocaleDateString()}</p>
                                 </div>
                             </div>
-                            <Button variant="danger" size="sm" onClick={() => handleDisconnectAccount(platform.id)} leftIcon={<TrashIcon className="w-4 h-4"/>} className="w-full mt-2" title={`Disconnect ${platform.name}`}>
+                            <Button variant="danger" size="sm" onClick={() => handleDisconnectAccount(connectedAccount.id, platform.name)} leftIcon={<TrashIcon className="w-4 h-4"/>} className="w-full mt-2" title={`Disconnect ${platform.name}`}>
                                 Disconnect
                             </Button>
                             </div>
@@ -348,31 +318,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </div>
             </Card>
         </Tab>
-        <Tab label="Data Management" icon={<ServerStackIcon className="w-5 h-5" />}>
-            <Card title="Manage Campaign Data" shadow="soft-lg" className="mt-4">
-                <div className="space-y-4">
-                <div>
-                    <h4 className="text-md font-semibold text-textPrimary mb-2">Export Campaign Data</h4>
-                    <p className="text-sm text-textSecondary mb-3">
-                    Download all your personas, operators, content drafts, scheduled posts, content library assets, and AI configurations (API keys excluded for security) as a single JSON file.
-                    </p>
-                    <Button variant="secondary" onClick={handleExportData} leftIcon={<ArrowDownTrayIcon className="w-5 h-5"/>}>
-                    Export All Campaign Data
-                    </Button>
-                </div>
-                <hr className="my-6 border-lightBorder"/>
-                <div>
-                    <h4 className="text-md font-semibold text-textPrimary mb-2">Import Campaign Data</h4>
-                    <p className="text-sm text-textSecondary mb-1">Import campaign data from a previously exported JSON file.</p>
-                    <p className="text-sm text-danger font-medium mb-3">Warning: This will replace all your current campaign data.</p>
-                    <input type="file" accept=".json" onChange={handleImportFileChange} className="hidden" ref={importFileRef} id="import-campaign-data-input"/>
-                    <Button variant="danger" onClick={() => importFileRef.current?.click()} leftIcon={<ArrowUpTrayIcon className="w-5 h-5"/>}>
-                    Import & Replace Data
-                    </Button>
-                </div>
-                </div>
-            </Card>
-        </Tab>
       </Tabs>
 
 
@@ -382,5 +327,3 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     </div>
   );
 };
-// Assuming WrenchScrewdriverIcon is for general settings or admin, not directly used in this tab structure
-// UserCircleIcon, LinkIcon, TeamIcon, ServerStackIcon are used as tab icons.

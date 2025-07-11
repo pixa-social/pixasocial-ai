@@ -1,41 +1,37 @@
+
 import { GoogleGenAI, GenerateContentResponse, GenerateContentParameters, GenerateImagesResponse } from "@google/genai";
-import { GroundingChunk, AIParsedJsonResponse, AiProviderType } from "../../types";
-import { getApiKeyForProvider, getModelForProvider, parseJsonFromText } from './aiUtils';
+import { GroundingChunk, AIParsedJsonResponse } from "../../types";
+import { parseJsonFromText } from './aiUtils';
 
-let googleGenAiClient: GoogleGenAI | null = null;
-let currentGeminiApiKey: string | null = null;
+const clientInstances: Record<string, GoogleGenAI> = {};
 
-const getGoogleGenAiClientInstance = (): GoogleGenAI | null => {
-  const geminiApiKey = getApiKeyForProvider(AiProviderType.Gemini);
-  if (!geminiApiKey) {
-    if (googleGenAiClient) googleGenAiClient = null; // Clear instance if key removed
-    currentGeminiApiKey = null;
-    console.warn("Gemini API key not found. Gemini features will be disabled.");
+const getGoogleGenAiClientInstance = (apiKey: string): GoogleGenAI | null => {
+  if (!apiKey) {
+    console.error("Gemini API key was not provided to get instance.");
     return null;
   }
-  // Re-initialize if API key changes or client not set
-  if (!googleGenAiClient || currentGeminiApiKey !== geminiApiKey) {
-     try {
-        googleGenAiClient = new GoogleGenAI({ apiKey: geminiApiKey });
-        currentGeminiApiKey = geminiApiKey;
-     } catch (e) {
-        console.error("Failed to initialize GoogleGenAI client:", e);
-        googleGenAiClient = null;
-        currentGeminiApiKey = null;
-        return null;
-     }
+  if (clientInstances[apiKey]) {
+    return clientInstances[apiKey];
   }
-  return googleGenAiClient;
+  try {
+    const newClient = new GoogleGenAI({ apiKey });
+    clientInstances[apiKey] = newClient;
+    return newClient;
+  } catch (e) {
+    console.error("Failed to initialize GoogleGenAI client:", e);
+    return null;
+  }
 };
 
 export const generateTextInternal = async (
   prompt: string,
+  apiKey: string,
+  modelName: string,
   systemInstruction?: string
 ): Promise<{ text: string | null; error?: string; groundingChunks?: GroundingChunk[] }> => {
-  const ai = getGoogleGenAiClientInstance();
-  const modelName = getModelForProvider(AiProviderType.Gemini, 'text');
-  if (!ai) return { text: null, error: "Gemini API client not initialized or API key missing/invalid." };
-  if (!modelName) return { text: null, error: "Gemini text model not configured." };
+  const ai = getGoogleGenAiClientInstance(apiKey);
+  if (!ai) return { text: null, error: "Gemini API client not initialized or API key invalid." };
+  
   try {
     const params: GenerateContentParameters = { model: modelName, contents: prompt };
     if (systemInstruction) params.config = { ...params.config, systemInstruction };
@@ -50,12 +46,13 @@ export const generateTextInternal = async (
 
 export const generateTextWithGoogleSearchInternal = async (
   prompt: string,
+  apiKey: string,
+  modelName: string,
   systemInstruction?: string
 ): Promise<{ text: string | null; error?: string; groundingChunks?: GroundingChunk[] }> => {
-  const ai = getGoogleGenAiClientInstance();
-  const modelName = getModelForProvider(AiProviderType.Gemini, 'text');
+  const ai = getGoogleGenAiClientInstance(apiKey);
   if (!ai) return { text: null, error: "Gemini API client not initialized." };
-  if (!modelName) return { text: null, error: "Gemini text model not configured." };
+
   try {
     const params: GenerateContentParameters = {
       model: modelName,
@@ -74,12 +71,13 @@ export const generateTextWithGoogleSearchInternal = async (
 
 export const generateJsonInternal = async <T,>(
   prompt: string,
+  apiKey: string,
+  modelName: string,
   systemInstruction?: string
 ): Promise<AIParsedJsonResponse<T> & { groundingChunks?: GroundingChunk[] }> => {
-  const ai = getGoogleGenAiClientInstance();
-  const modelName = getModelForProvider(AiProviderType.Gemini, 'text');
+  const ai = getGoogleGenAiClientInstance(apiKey);
   if (!ai) return { data: null, error: "Gemini API client not initialized." };
-  if (!modelName) return { data: null, error: "Gemini text model not configured." };
+
   try {
     const params: GenerateContentParameters = {
       model: modelName,
@@ -99,12 +97,13 @@ export const generateJsonInternal = async <T,>(
 
 export const generateImagesInternal = async (
   prompt: string,
+  apiKey: string,
+  modelName: string,
   numberOfImages: number = 1,
 ): Promise<{ images: string[] | null; error?: string }> => {
-   const ai = getGoogleGenAiClientInstance();
-   const modelName = getModelForProvider(AiProviderType.Gemini, 'image');
+   const ai = getGoogleGenAiClientInstance(apiKey);
    if (!ai) return { images: null, error: "Gemini API client not initialized." };
-   if (!modelName) return { images: null, error: "Gemini image model not configured."};
+   
   try {
     const response: GenerateImagesResponse = await ai.models.generateImages({
         model: modelName,
@@ -124,15 +123,16 @@ export const generateImagesInternal = async (
 
 export const generateTextStreamInternal = async (
   prompt: string,
+  apiKey: string,
+  modelName: string,
   onStreamChunk: (chunkText: string) => void,
   onStreamComplete: (fullText: string) => void,
   onError: (error: string) => void,
   systemInstruction?: string
 ): Promise<void> => {
-  const ai = getGoogleGenAiClientInstance();
-  const modelName = getModelForProvider(AiProviderType.Gemini, 'text');
+  const ai = getGoogleGenAiClientInstance(apiKey);
   if (!ai) { onError("Gemini API client not initialized."); return; }
-  if (!modelName) { onError("Gemini text model not configured for streaming."); return; }
+  
   try {
     const params: GenerateContentParameters = { model: modelName, contents: prompt };
     if (systemInstruction) params.config = { ...params.config, systemInstruction };

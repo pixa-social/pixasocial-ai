@@ -1,3 +1,6 @@
+
+import React from 'react';
+
 export enum ViewName {
   Dashboard = 'Dashboard',
   AudienceModeling = 'Audience Modeling',
@@ -15,22 +18,63 @@ export enum ViewName {
 }
 
 // For pages within the authentication flow (before user is logged in)
-export type AuthViewType = 'home' | 'login' | 'register';
+export type AuthViewType = 'home' | 'login' | 'register' | 'features' | 'pricing' | 'documentation' | 'about' | 'contact' | 'privacy' | 'terms';
 
-export interface User {
-  id: string;
-  supabaseId?: string; // Optional: to store Supabase user ID
-  name?: string;
-  email: string;
-  walletAddress?: string;
-  teamMembers?: string[];
+export enum RoleName {
+    Free = 'Free',
+    Essentials = 'Essentials',
+    Admin = 'Admin',
 }
+
+export interface RoleType {
+    id: string; // uuid
+    name: RoleName;
+    max_personas: number;
+    max_ai_uses_monthly: number;
+    price_monthly: number;
+    price_yearly: number;
+    features: string[]; // Stored as TEXT[] in postgres
+    created_at?: string;
+    updated_at?: string;
+}
+
+// Represents the enriched User object with profile and role details
+export interface UserProfile extends User {
+  role: RoleType;
+  ai_usage_count_monthly: number;
+  assigned_ai_model_text?: string;
+  assigned_ai_model_image?: string;
+}
+
+// Represents a Supabase user, with profile data potentially merged in
+export interface User {
+  id: string; // Supabase user ID (UUID)
+  email?: string;
+  name?: string; // from user_metadata or profiles table
+  walletAddress?: string; // from profiles table
+  teamMembers?: string[]; // from profiles table
+  role_name?: RoleName;
+}
+
+// Represents a row from the admin_users_view for the Admin Panel
+export interface AdminUserView {
+  id: string;
+  email?: string;
+  name?: string;
+  role_name: RoleName;
+  ai_usage_count_monthly: number;
+  assigned_ai_model_text?: string;
+  assigned_ai_model_image?: string;
+  updated_at: string;
+}
+
 
 export interface NavItem {
   label: string;
   viewName?: ViewName;
   icon?: React.ReactNode;
   children?: NavItem[];
+  isAdminOnly?: boolean;
 }
 
 export type RSTTraitLevel = 'Not Assessed' | 'Low' | 'Medium' | 'High';
@@ -42,25 +86,31 @@ export interface RSTProfile {
 }
 
 export interface Persona {
-  id: string;
+  id: number; // DB id
+  user_id: string; // Foreign key to Supabase user
   name: string;
-  demographics: string;
-  psychographics: string;
-  initialBeliefs: string;
+  demographics?: string;
+  psychographics?: string;
+  initial_beliefs?: string;
   vulnerabilities?: string[];
-  avatarUrl?: string;
-  rstProfile?: RSTProfile; 
+  avatar_url?: string;
+  rst_profile?: RSTProfile; 
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Operator {
-  id: string;
+  id: number; // DB id
+  user_id: string; // Foreign key to Supabase user
   name: string;
-  targetAudienceId: string;
+  target_audience_id: number; // Foreign key to Persona
   type: 'Hope' | 'Fear' | 'Belonging' | 'Exclusivity' | 'Curiosity' | 'Authority' | 'Novelty' | 'Pride' | 'Nostalgia' | 'Convenience' | 'Custom';
-  conditionedStimulus: string;
-  unconditionedStimulus:string;
-  desiredConditionedResponse: string;
-  reinforcementLoop: string;
+  conditioned_stimulus: string;
+  unconditioned_stimulus:string;
+  desired_conditioned_response: string;
+  reinforcement_loop: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export type MediaType = 'none' | 'image' | 'video';
@@ -74,28 +124,30 @@ export interface PlatformContentDetail {
 
   imageSourceType?: ImageSourceType; 
   imagePrompt?: string; 
-  uploadedImageBase64?: string; 
-  libraryAssetId?: string; 
+  uploadedImageFile?: File; // Transient state for uploads
+  uploadedImageBase64?: string;
+  libraryAssetId?: string; // Changed to string for uuid
   memeText?: string;
   processedImageUrl?: string; 
 
   videoIdea?: string;
 
-  // New fields for font customization
-  fontFamily?: string; // e.g., 'Roboto', 'Impact', or 'system-default'
-  fontColor?: string;  // e.g., '#FFFFFF', '#000000'
-  aiSuggestedFontCategory?: string; // Raw category from AI like "playful-script"
+  fontFamily?: string;
+  fontColor?: string; 
+  aiSuggestedFontCategory?: string;
 }
 
 export type PlatformContentMap = Record<string, PlatformContentDetail>;
 
 export interface ContentDraft {
-  id: string;
-  operatorId: string;
-  personaId: string;
-  customPrompt: string;
-  platformContents: PlatformContentMap;
-  keyMessage?: string; 
+  id: string; // uuid
+  user_id: string; // Foreign key to Supabase user
+  operator_id: number; // Foreign key to Operator
+  persona_id: number; // Foreign key to Persona
+  custom_prompt: string;
+  platform_contents: PlatformContentMap;
+  key_message?: string; 
+  created_at?: string;
   platformSpecificMediaTypes_INTERNAL_DO_NOT_USE?: Record<string, MediaType | 'global'>;
 }
 
@@ -125,6 +177,8 @@ export enum AiProviderType {
   Groq = 'Groq',
   Deepseek = 'Deepseek',
   Qwen = 'Qwen',
+  Openrouter = 'Openrouter',
+  MistralAI = 'MistralAI',
   Placeholder = 'Placeholder (Not Implemented)',
 }
 
@@ -136,15 +190,15 @@ export interface AiProviderModelSet {
 export interface AiProviderConfig {
   id: AiProviderType;
   name: string;
-  apiKey: string | null; 
-  isEnabled: boolean;
-  isGemini?: boolean;
+  api_key: string | null; 
+  is_enabled: boolean;
   models: AiProviderModelSet;
   notes?: string;
-  baseURL?: string;
+  base_url?: string;
+  updated_at?: string;
 }
 
-export type AiProviderConfigForExport = Omit<AiProviderConfig, 'apiKey'> & { apiKey?: null };
+export type AiProviderConfigForExport = Omit<AiProviderConfig, 'api_key'> & { apiKey?: null };
 
 
 export interface GroundingChunk {
@@ -165,16 +219,28 @@ export interface ScheduledPostResource {
   platformKey: string;
   status: ScheduledPostStatus;
   notes?: string;
-  personaId: string;
-  operatorId: string;
+  personaId: number;
+  operatorId: number;
 }
+
 export interface ScheduledPost {
-  id: string;
+  id: string; 
+  db_id: number;
   title: string;
   start: Date; 
   end: Date;   
   allDay?: boolean;
   resource: ScheduledPostResource;
+}
+
+export interface ScheduledPostDbRow {
+    id: number;
+    user_id: string;
+    content_draft_id: string;
+    platform_key: string;
+    status: ScheduledPostStatus;
+    notes?: string;
+    scheduled_at: string; // ISO string
 }
 
 export enum SocialPlatformType {
@@ -188,6 +254,8 @@ export enum SocialPlatformType {
 }
 
 export interface ConnectedAccount {
+  id: number;
+  user_id: string;
   platform: SocialPlatformType;
   accountId: string; 
   displayName: string; 
@@ -196,51 +264,69 @@ export interface ConnectedAccount {
 }
 
 export interface ContentLibraryAsset {
-  id: string;
+  id: string; // uuid
+  user_id: string;
   name: string;
   type: 'image' | 'video'; 
-  dataUrl: string; 
-  fileName: string;
-  fileType: string; 
+  storage_path: string; // e.g., 'public/user-id/filename.png'
+  file_name: string;
+  file_type: string; 
   size: number; 
-  uploadedAt: string;
-  tags?: string[]; 
+  tags?: string[];
+  uploaded_at: string; 
+  publicUrl?: string; // Only for client-side generation, not in DB
 }
 
 export interface ChatMessageAttachment {
   name: string;
   type: string; 
   size: number; 
-  dataUrl?: string; 
+  publicUrl: string; 
 }
 
 export interface ChatMessage {
-  id: string;
-  channelId: string; 
-  senderEmail: string;
-  senderName: string; 
-  timestamp: string; 
+  id: string; // Client-side generated, hence string
+  channel_id: string;
+  user_id: string;
+  sender_name: string; 
+  created_at: string; 
   text?: string;
   attachment?: ChatMessageAttachment;
 }
 
 export interface CustomChannel {
-  id: string;
+  id: string; // Client-side generated, hence string
+  uuid: string;
   name: string; 
-  createdBy: string; 
-  createdAt: string; 
+  created_by: string;
+  created_at: string; 
 }
 
-export interface CampaignData {
-  personas: Persona[];
-  operators: Operator[];
-  contentDrafts: ContentDraft[];
-  scheduledPosts: ScheduledPost[];
-  connectedAccounts: ConnectedAccount[]; 
-  contentLibraryAssets: ContentLibraryAsset[];
-  customChannels: CustomChannel[];
-  chatMessages?: ChatMessage[]; 
-  aiProviderConfigs?: AiProviderConfigForExport[]; 
+export interface DbSchema {
+  profiles: {
+    id: string;
+    name: string;
+    wallet_address: string;
+    team_members: string[];
+    ai_usage_count_monthly: number;
+    assigned_ai_model_text?: string;
+    assigned_ai_model_image?: string;
+    updated_at: string;
+  };
+  user_roles: {
+      id: string;
+      user_id: string;
+      role_id: string;
+      assigned_at: string;
+  };
+  ai_provider_global_configs: AiProviderConfig;
+  personas: Persona;
+  operators: Operator;
+  content_drafts: ContentDraft;
+  content_library_assets: ContentLibraryAsset;
+  scheduled_posts: ScheduledPostDbRow;
+  connected_accounts: ConnectedAccount;
+  role_types: RoleType;
 }
 
 export interface AISuggestionRequest {

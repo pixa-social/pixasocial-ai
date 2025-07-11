@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 interface CardProps {
@@ -5,7 +6,7 @@ interface CardProps {
   className?: string;
   title?: string;
   actions?: React.ReactNode;
-  icon?: React.ReactNode; // Added icon prop
+  icon?: React.ReactNode;
   shadow?: 'none' | 'sm' | 'md' | 'lg' | 'xl' | 'soft-md' | 'soft-lg';
 }
 
@@ -15,13 +16,13 @@ export const Card: React.FC<CardProps> = ({ children, className = '', title, act
     'sm': 'shadow-sm',
     'md': 'shadow-md',
     'lg': 'shadow-lg',
-    'xl': 'shadow-xl', // Ensure 'xl' is available in tailwind.config or is a default
+    'xl': 'shadow-xl',
     'soft-md': 'shadow-soft-md',
     'soft-lg': 'shadow-soft-lg',
   };
   
   return (
-    <div className={`bg-card ${shadowClass[shadow]} rounded-xl p-6 md:p-7 ${className}`}> {/* Updated padding */}
+    <div className={`bg-card border border-lightBorder rounded-xl p-6 md:p-7 ${className}`}>
       {(title || actions || icon) && (
         <div className="flex justify-between items-center mb-4 pb-4 border-b border-lightBorder">
           <div className="flex items-center">

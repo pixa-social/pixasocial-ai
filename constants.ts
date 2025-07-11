@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { ViewName, NavItem, AuditStep, Persona, MediaType, AiProviderType, AiProviderConfig, RSTTraitLevel, RSTProfile, SocialPlatformType } from './types';
 import type { Operator } from './types';
@@ -27,11 +28,11 @@ export const NAVIGATION_ITEMS: NavItem[] = [
   },
   { label: ViewName.TeamChat, viewName: ViewName.TeamChat, icon: React.createElement(ChatBubbleLeftEllipsisIcon) }, 
   { label: ViewName.Methodology, viewName: ViewName.Methodology },
-  { label: ViewName.AdminPanel, viewName: ViewName.AdminPanel },
+  { label: ViewName.AdminPanel, viewName: ViewName.AdminPanel, isAdminOnly: true },
   { label: ViewName.Settings, viewName: ViewName.Settings }, 
 ];
 
-export const GEMINI_TEXT_MODEL_NAME = 'gemini-2.5-flash-preview-04-17';
+export const GEMINI_TEXT_MODEL_NAME = 'gemini-2.5-flash';
 export const GEMINI_IMAGE_MODEL_NAME = 'imagen-3.0-generate-002';
 
 export const DEFAULT_PERSONA_AVATAR = 'https://picsum.photos/seed/persona/100/100';
@@ -162,87 +163,100 @@ export const TONE_OF_VOICE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'Concerned', label: 'Concerned' },
 ];
 
-// Local Storage Keys
+// Local Storage Keys - Deprecated for most data, but kept for reference or minor client-side state if needed.
 export const LOCAL_STORAGE_AI_CONFIG_KEY = 'pixasocial_ai_provider_configs';
 export const LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY = 'pixasocial_active_ai_provider';
-export const LOCAL_STORAGE_CAMPAIGN_DATA_KEY = 'pixasocial_campaign_data';
-export const LOCAL_STORAGE_USERS_KEY = 'pixasocial_users'; 
-export const LOCAL_STORAGE_AUTH_TOKEN_KEY = 'pixasocial_auth_token'; 
 
 
 export const AI_PROVIDERS_CONFIG_TEMPLATE: AiProviderConfig[] = [
   {
     id: AiProviderType.Gemini,
     name: 'Google Gemini',
-    apiKey: null,
-    isEnabled: true,
-    isGemini: true,
+    api_key: null,
+    is_enabled: true,
     models: {
       text: [GEMINI_TEXT_MODEL_NAME],
       image: [GEMINI_IMAGE_MODEL_NAME],
       chat: [GEMINI_TEXT_MODEL_NAME]
     },
-    notes: `Uses pre-configured environment API key if available. Otherwise, enter your key.`
+    notes: `Global key for all users. Managed by Admin.`
   },
   {
     id: AiProviderType.OpenAI,
     name: 'OpenAI (GPT)',
-    apiKey: null,
-    isEnabled: false,
+    api_key: null,
+    is_enabled: false,
     models: {
       text: ['gpt-4-turbo', 'gpt-3.5-turbo'],
-      image: ['dall-e-3', 'dall-e-2'],
+      image: ['dall-e-3'],
       chat: ['gpt-4-turbo', 'gpt-3.5-turbo']
     },
-    notes: 'Requires API key. Uses OpenAI API.',
-    baseURL: 'https://api.openai.com/v1'
+    notes: 'Uses OpenAI API.',
+    base_url: 'https://api.openai.com/v1'
+  },
+  {
+    id: AiProviderType.Groq,
+    name: 'Groq',
+    api_key: null,
+    is_enabled: false,
+    models: {
+      text: ['llama3-8b-8192', 'llama3-70b-8192', 'mixtral-8x7b-32768'],
+      chat: ['llama3-8b-8192', 'llama3-70b-8192', 'mixtral-8x7b-32768']
+    },
+    notes: 'Uses GroqCloud API (OpenAI compatible).',
+    base_url: 'https://api.groq.com/openai/v1'
   },
   {
     id: AiProviderType.Deepseek,
     name: 'Deepseek',
-    apiKey: null,
-    isEnabled: false,
+    api_key: null,
+    is_enabled: false,
     models: {
       text: ['deepseek-chat', 'deepseek-coder'],
       chat: ['deepseek-chat', 'deepseek-coder']
     },
-    notes: 'Requires API key. Uses an OpenAI-compatible API. Image generation not typically supported.',
-    baseURL: 'https://api.deepseek.com/v1'
+    notes: 'Uses Deepseek API (OpenAI compatible).',
+    base_url: 'https://api.deepseek.com/v1'
   },
   {
-    id: AiProviderType.Groq,
-    name: 'GroqCloud',
-    apiKey: null,
-    isEnabled: false,
+    id: AiProviderType.Openrouter,
+    name: 'OpenRouter.ai',
+    api_key: null,
+    is_enabled: false,
     models: {
-      text: ['mixtral-8x7b-32768', 'llama3-70b-8192', 'llama3-8b-8192', 'gemma-7b-it'],
-      chat: ['mixtral-8x7b-32768', 'llama3-70b-8192', 'llama3-8b-8192', 'gemma-7b-it']
+      text: ['google/gemma-3-27b-it:free', 'mistralai/mistral-7b-instruct', 'google/gemini-pro', 'openai/gpt-4o'],
+      chat: ['google/gemma-3-27b-it:free', 'mistralai/mistral-7b-instruct', 'google/gemini-pro', 'openai/gpt-4o']
     },
-    notes: 'Requires API key. For GroqCloud (api.groq.com) fast inference. Uses OpenAI-compatible API. Image generation not supported.',
-    baseURL: 'https://api.groq.com/openai/v1'
+    notes: 'Acts as a router to many models. Use your OpenRouter API key.',
+    base_url: 'https://openrouter.ai/api/v1'
+  },
+  {
+    id: AiProviderType.MistralAI,
+    name: 'Mistral AI',
+    api_key: null,
+    is_enabled: false,
+    models: {
+      text: ['open-mistral-7b', 'open-mixtral-8x7b', 'mistral-large-latest'],
+      chat: ['open-mistral-7b', 'open-mixtral-8x7b', 'mistral-large-latest']
+    },
+    notes: 'Uses the official Mistral AI API (OpenAI compatible).',
+    base_url: 'https://api.mistral.ai/v1'
   },
   {
     id: AiProviderType.Anthropic,
     name: 'Anthropic (Claude)',
-    apiKey: null,
-    isEnabled: false,
-    models: {
-      text: ['claude-3-opus-20240229', 'claude-3-sonnet-20240229', 'claude-3-haiku-20240307'],
-      chat: ['claude-3-opus-20240229', 'claude-3-sonnet-20240229', 'claude-3-haiku-20240307']
-    },
-    notes: 'Requires API key. (Full API integration for Anthropic SDK not yet implemented in app; currently placeholder)'
+    api_key: null,
+    is_enabled: false,
+    models: { text: [], chat: [] },
+    notes: 'Placeholder only. This provider is not implemented as it requires a custom SDK.',
   },
   {
     id: AiProviderType.Qwen,
     name: 'Qwen (Alibaba)',
-    apiKey: null,
-    isEnabled: false,
-    models: {
-        text: ['qwen-turbo', 'qwen-plus', 'qwen-max'],
-        image: ['qwen-vl-plus', 'qwen-vl-max'],
-        chat: ['qwen-turbo', 'qwen-plus', 'qwen-max']
-    },
-    notes: 'Requires API key. (Full API integration not yet implemented in app; currently placeholder)'
+    api_key: null,
+    is_enabled: false,
+    models: { text: [], chat: [] },
+    notes: 'Placeholder only. This provider is not implemented as it requires a custom SDK.',
   },
 ];
 
@@ -256,7 +270,7 @@ export const SOCIAL_PLATFORMS_TO_CONNECT: Array<{ id: SocialPlatformType; name: 
   { id: SocialPlatformType.YouTube, name: 'YouTube', icon: YouTubeIcon, description: "Manage video uploads and scheduling for your YouTube channels.", brandColor: "text-red-500" },
 ];
 
-export const MAX_FILE_UPLOAD_SIZE_MB = 2; 
+export const MAX_FILE_UPLOAD_SIZE_MB = 10; 
 export const CHAT_IMAGE_PREVIEW_MAX_SIZE_BYTES = 100 * 1024; 
 export const MAX_FILE_UPLOAD_SIZE_BYTES = MAX_FILE_UPLOAD_SIZE_MB * 1024 * 1024;
 export const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];

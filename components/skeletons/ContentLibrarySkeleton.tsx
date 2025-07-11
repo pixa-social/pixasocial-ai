@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 export const ContentLibrarySkeleton: React.FC = () => {
@@ -29,7 +30,3 @@ export const ContentLibrarySkeleton: React.FC = () => {
 
       {/* Assets Grid Skeleton */}
       <div className="bg-gray-200 rounded-xl p-6">
-      </div>
-    </div>
-  );
-};

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Navbar } from './Navbar';
 import { ViewName, User, Persona, Operator, ContentDraft, ScheduledPost, ScheduledPostDbRow, ContentLibraryAsset, CustomChannel, UserProfile } from '../types';
@@ -259,7 +258,7 @@ export const MainAppLayout: React.FC<MainAppLayoutProps> = ({
       <main className="flex-grow container mx-auto px-4 pb-8 max-w-7xl">
         {renderView()}
       </main>
-      <footer className="bg-card text-textSecondary text-center p-4 text-sm border-t border-lightBorder">
+      <footer className="bg-gray-900 text-gray-400 text-center p-4 text-sm border-t border-lightBorder">
         &copy; {new Date().getFullYear()} {APP_TITLE}. All rights reserved. For planning and educational purposes.
       </footer>
     </div>

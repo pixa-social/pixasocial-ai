@@ -1,37 +1,31 @@
+
 import OpenAI, { ClientOptions } from "openai";
 import { AiProviderType, AIParsedJsonResponse } from "../../types";
-import { getProviderConfig, getApiKeyForProvider, getModelForProvider, parseJsonFromText } from './aiUtils';
+import { getProviderConfig, parseJsonFromText } from './aiUtils';
 
 const openAICompatibleClients: Record<string, OpenAI> = {};
 
-const getOpenAICompatibleClientInstance = (providerType: AiProviderType): OpenAI | null => {
-    const config = getProviderConfig(providerType);
-    if (!config || !config.isEnabled) {
+const getOpenAICompatibleClientInstance = async (providerType: AiProviderType, apiKey: string): Promise<OpenAI | null> => {
+    const config = await getProviderConfig(providerType);
+    if (!config || !config.is_enabled) {
         console.warn(`${providerType} provider is not configured or not enabled.`);
         return null;
     }
 
-    const apiKey = getApiKeyForProvider(providerType);
-    const baseURL = config.baseURL;
-
-    if (!apiKey) {
-        console.warn(`API key for ${providerType} not found.`);
-        return null;
-    }
-     if (!baseURL && providerType !== AiProviderType.OpenAI) { // OpenAI SDK can use its default baseURL
+    const baseURL = config.base_url;
+    if (!baseURL && providerType !== AiProviderType.OpenAI) {
         console.warn(`Base URL for ${providerType} not configured.`);
         return null;
     }
 
     const clientCacheKey = `${providerType}-${apiKey}-${baseURL || 'default'}`;
-
     if (openAICompatibleClients[clientCacheKey]) {
         return openAICompatibleClients[clientCacheKey];
     }
 
     try {
         const clientOptions: ClientOptions = { apiKey, dangerouslyAllowBrowser: true };
-        if (baseURL) { // Only set baseURL if it's explicitly provided in config
+        if (baseURL) {
             clientOptions.baseURL = baseURL;
         }
         const newClient = new OpenAI(clientOptions);
@@ -45,13 +39,14 @@ const getOpenAICompatibleClientInstance = (providerType: AiProviderType): OpenAI
 
 export const generateTextInternal = async (
   providerType: AiProviderType,
+  apiKey: string,
+  modelName: string,
   prompt: string,
   systemInstruction?: string
 ): Promise<{ text: string | null; error?: string }> => {
-  const ai = getOpenAICompatibleClientInstance(providerType);
-  const modelName = getModelForProvider(providerType, 'chat'); // Use 'chat' model for text gen with OpenAI SDK
+  const ai = await getOpenAICompatibleClientInstance(providerType, apiKey);
   if (!ai) return { text: null, error: `${providerType} API client not initialized or API key/baseURL missing/invalid.` };
-  if (!modelName) return { text: null, error: `${providerType} chat/text model not configured.` };
+  
   try {
       const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
       if (systemInstruction) messages.push({ role: "system", content: systemInstruction });
@@ -67,13 +62,14 @@ export const generateTextInternal = async (
 
 export const generateJsonInternal = async <T,>(
   providerType: AiProviderType,
+  apiKey: string,
+  modelName: string,
   prompt: string,
   systemInstruction?: string
 ): Promise<AIParsedJsonResponse<T>> => {
-  const ai = getOpenAICompatibleClientInstance(providerType);
-  const modelName = getModelForProvider(providerType, 'chat');
+  const ai = await getOpenAICompatibleClientInstance(providerType, apiKey);
   if (!ai) return { data: null, error: `${providerType} API client not initialized.` };
-  if (!modelName) return { data: null, error: `${providerType} chat model not configured for JSON.` };
+
   try {
       const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
       if (systemInstruction) messages.push({ role: "system", content: systemInstruction });
@@ -97,15 +93,15 @@ export const generateJsonInternal = async <T,>(
   }
 };
 
-// Specifically for OpenAI DALL-E, as other OpenAI-compatible providers usually don't have this endpoint.
 export const generateOpenAIImagesInternal = async (
   prompt: string,
+  apiKey: string,
+  modelName: string,
   numberOfImages: number = 1,
 ): Promise<{ images: string[] | null; error?: string }> => {
-  const ai = getOpenAICompatibleClientInstance(AiProviderType.OpenAI); // Specifically OpenAI client
-  const modelName = getModelForProvider(AiProviderType.OpenAI, 'image');
+  const ai = await getOpenAICompatibleClientInstance(AiProviderType.OpenAI, apiKey);
   if (!ai) return { images: null, error: "OpenAI API client not initialized for DALL-E." };
-  if (!modelName) return { images: null, error: "OpenAI image model (e.g., DALL-E) not configured." };
+  
   try {
       const response = await ai.images.generate({
           model: modelName,
@@ -127,16 +123,17 @@ export const generateOpenAIImagesInternal = async (
 
 export const generateTextStreamInternal = async (
   providerType: AiProviderType,
+  apiKey: string,
+  modelName: string,
   prompt: string,
   onStreamChunk: (chunkText: string) => void,
   onStreamComplete: (fullText: string) => void,
   onError: (error: string) => void,
   systemInstruction?: string
 ): Promise<void> => {
-  const ai = getOpenAICompatibleClientInstance(providerType);
-  const modelName = getModelForProvider(providerType, 'chat');
+  const ai = await getOpenAICompatibleClientInstance(providerType, apiKey);
   if (!ai) { onError(`${providerType} API client not initialized.`); return; }
-  if (!modelName) { onError(`${providerType} chat model not configured for streaming.`); return; }
+  
   try {
       const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
       if (systemInstruction) messages.push({ role: "system", content: systemInstruction });

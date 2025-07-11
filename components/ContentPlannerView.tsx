@@ -1,26 +1,27 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { ContentDraft, Persona, Operator, PlatformContentMap, PlatformContentDetail, MediaType, ScheduledPost, ImageSourceType, ContentLibraryAsset, ViewName } from '../types';
+import { ContentDraft, Persona, Operator, PlatformContentMap, PlatformContentDetail, MediaType, ScheduledPost, ImageSourceType, ContentLibraryAsset, ViewName, UserProfile } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { LoadingSpinner } from './ui/LoadingSpinner';
-import { generateJson, generateImages } from '../services/aiService';
-import { fetchPersonas } from '../services/personaService';
-import { fetchOperators } from '../services/operatorService';
+import { generateJson, generateImages } from '../services/aiService'; 
 import { 
     CONTENT_PLATFORMS, MEDIA_TYPE_OPTIONS, TONE_OF_VOICE_OPTIONS, MAX_FILE_UPLOAD_SIZE_BYTES, MAX_FILE_UPLOAD_SIZE_MB, ACCEPTED_IMAGE_TYPES,
-    DEFAULT_FONT_FAMILY, DEFAULT_FONT_COLOR, FONT_CATEGORY_MAP, MEME_TEXT_COLOR_OPTIONS // Added font constants
+    DEFAULT_FONT_FAMILY, DEFAULT_FONT_COLOR, FONT_CATEGORY_MAP, MEME_TEXT_COLOR_OPTIONS
 } from '../constants';
 import { useToast } from './ui/ToastProvider';
 import { CalendarDaysIcon } from './ui/Icons';
 import { ScheduleModal } from './content-planner/ScheduleModal';
 import { ContentPlannerConfig } from './content-planner/ContentPlannerConfig';
-import { PlatformContentCard } from './content-planner/PlatformContentCard';
 import { PrerequisiteMessageCard } from './ui/PrerequisiteMessageCard'; 
 import { useNavigateToView } from '../hooks/useNavigateToView'; 
 import { ContentPlannerSkeleton } from './skeletons/ContentPlannerSkeleton';
+import { PlatformContentCard } from './content-planner/PlatformContentCard';
 
 interface ContentPlannerViewProps {
+  currentUser: UserProfile;
   contentDrafts: ContentDraft[];
+  personas: Persona[];
+  operators: Operator[];
   onAddContentDraft: (draft: ContentDraft) => void;
   onAddScheduledPost: (post: ScheduledPost) => void;
   onAddContentLibraryAsset: (asset: ContentLibraryAsset) => void;
@@ -34,8 +35,8 @@ interface AiPlatformContentSuggestion {
   imagePrompt?: string; 
   memeText?: string;    
   videoIdea?: string;
-  fontCategory?: string; // AI suggested font category
-  fontColorSuggestion?: string; // AI suggested font color name
+  fontCategory?: string;
+  fontColorSuggestion?: string;
 }
 type AiPlatformContentResponse = Record<string, AiPlatformContentSuggestion>;
 
@@ -46,13 +47,11 @@ const getPlatformIconDisplay = (icon: string | React.ReactNode | undefined) => {
 };
 
 export const ContentPlannerView: React.FC<ContentPlannerViewProps> = ({ 
-    contentDrafts, onAddContentDraft, onAddScheduledPost, onAddContentLibraryAsset, onNavigate 
+    currentUser, contentDrafts, personas, operators, onAddContentDraft, onAddScheduledPost, onAddContentLibraryAsset, onNavigate 
 }) => {
   const { showToast } = useToast();
-  const [personas, setPersonas] = useState<Persona[]>([]);
-  const [operators, setOperators] = useState<Operator[]>([]);
-  const [selectedPersonaId, setSelectedPersonaId] = useState<string>('');
-  const [selectedOperatorId, setSelectedOperatorId] = useState<string>('');
+  const [selectedPersonaId, setSelectedPersonaId] = useState<number | null>(null);
+  const [selectedOperatorId, setSelectedOperatorId] = useState<number | null>(null);
   const [keyMessage, setKeyMessage] = useState<string>(''); 
   const [customPrompt, setCustomPrompt] = useState<string>('');
   const [globalMediaType, setGlobalMediaType] = useState<MediaType>('none');
@@ -60,7 +59,6 @@ export const ContentPlannerView: React.FC<ContentPlannerViewProps> = ({
   const navigateTo = useNavigateToView(onNavigate);
   const [isInitialLoading, setIsInitialLoading] = useState(true); 
   
-  // Font and Color State
   const [defaultFontFamily, setDefaultFontFamily] = useState<string>(DEFAULT_FONT_FAMILY);
   const [defaultFontColor, setDefaultFontColor] = useState<string>(DEFAULT_FONT_COLOR);
 
@@ -91,26 +89,9 @@ export const ContentPlannerView: React.FC<ContentPlannerViewProps> = ({
   });
 
   useEffect(() => {
-    const loadPrerequisites = async () => {
-      setIsInitialLoading(true);
-      try {
-        const [fetchedPersonas, fetchedOperators] = await Promise.all([
-          fetchPersonas(),
-          fetchOperators(),
-        ]);
-        setPersonas(fetchedPersonas);
-        setOperators(fetchedOperators);
-      } catch (error) {
-        console.error("Failed to load prerequisites:", error);
-        showToast("Error loading personas and operators. Please try again.", "error");
-        setError("Could not load required data. Please refresh the page.");
-      } finally {
-        setIsInitialLoading(false);
-      }
-    };
-
-    loadPrerequisites();
-  }, [showToast]);
+    const timer = setTimeout(() => setIsInitialLoading(false), 750); 
+    return () => clearTimeout(timer);
+  }, []);
 
 
   const personaOptions = useMemo(() => personas.map(p => ({ value: p.id, label: p.name })), [personas]);
@@ -229,11 +210,11 @@ If asked for fontColorSuggestion, choose from: ${MEME_TEXT_COLOR_OPTIONS.map(c =
 Return valid JSON for all requested platforms and all required fields. Adhere strictly to the JSON format. Avoid gibberish.`;
 
     const prompt = `
-      Persona: ${persona.name} (Demographics: ${persona.demographics}, Psychographics: ${persona.psychographics}, Beliefs: ${persona.initialBeliefs}, Vulnerabilities: ${persona.vulnerabilities?.join(', ') || 'N/A'})
+      Persona: ${persona.name} (Demographics: ${persona.demographics}, Psychographics: ${persona.psychographics}, Beliefs: ${persona.initial_beliefs}, Vulnerabilities: ${persona.vulnerabilities?.join(', ') || 'N/A'})
       Operator: ${operator.name} (Type: ${operator.type})
-      Conditioned Stimulus (CS): ${operator.conditionedStimulus}
-      Unconditioned Stimulus (US): ${operator.unconditionedStimulus}
-      Desired Conditioned Response (CR): ${operator.desiredConditionedResponse}
+      Conditioned Stimulus (CS): ${operator.conditioned_stimulus}
+      Unconditioned Stimulus (US): ${operator.unconditioned_stimulus}
+      Desired Conditioned Response (CR): ${operator.desired_conditioned_response}
       
       Key Message/Core Idea for this campaign: ${keyMessage || "Not specified, focus on operator and persona."}
       Desired Tone of Voice: ${selectedTone || "Default/Neutral"}
@@ -247,7 +228,7 @@ Return valid JSON for all requested platforms and all required fields. Adhere st
       Example structure: { ${exampleStructureParts} }
     `;
     
-    const result = await generateJson<AiPlatformContentResponse>(prompt, systemInstruction);
+    const result = await generateJson<AiPlatformContentResponse>(prompt, currentUser, systemInstruction);
     
     if (forSpecificPlatformKey) {
         setIsRegeneratingPlatform(prev => ({ ...prev, [forSpecificPlatformKey]: false }));
@@ -323,9 +304,9 @@ Return valid JSON for all requested platforms and all required fields. Adhere st
         showToast(result.error || "Failed to generate content.", "error");
     }
   }, [
-    selectedPersonaId, selectedOperatorId, keyMessage, customPrompt, personas, operators, 
+    currentUser, selectedPersonaId, selectedOperatorId, keyMessage, customPrompt, personas, operators, 
     globalMediaType, platformSpecificMediaTypes, platformContents, selectedTone, selectedPlatformsForGeneration, 
-    defaultFontFamily, defaultFontColor, // Added font/color dependencies
+    defaultFontFamily, defaultFontColor,
     showToast
 ]);
 
@@ -352,7 +333,7 @@ Return valid JSON for all requested platforms and all required fields. Adhere st
                 setIsProcessingMedia(prev => ({ ...prev, [platformKey]: false }));
                 return;
             }
-            const imageResult = await generateImages(imagePrompt, 1);
+            const imageResult = await generateImages(imagePrompt, currentUser, 1);
             if (imageResult.images && imageResult.images[0]) {
                 sourceImageUrl = `data:image/jpeg;base64,${imageResult.images[0]}`;
             } else {
@@ -376,7 +357,7 @@ Return valid JSON for all requested platforms and all required fields. Adhere st
         }
 
         const image = new Image();
-        image.crossOrigin = "anonymous"; // Important for canvas if image is from different origin (e.g. AI service)
+        image.crossOrigin = "anonymous";
         image.onload = () => {
             const finalCanvas = document.createElement('canvas');
             const finalCtx = finalCanvas.getContext('2d');
@@ -425,14 +406,14 @@ Return valid JSON for all requested platforms and all required fields. Adhere st
 
             if (memeText && memeText.trim() !== "") {
                 const baseFontSize = Math.max(16, Math.min(60, Math.floor(canvasHeight * 0.08)));
-                const currentFontFamily = fontFamily === 'system-default' || !fontFamily ? 'Arial' : fontFamily; // Use selected font or Arial
+                const currentFontFamily = fontFamily === 'system-default' || !fontFamily ? 'Arial' : fontFamily;
                 const currentFontColor = fontColor || DEFAULT_FONT_COLOR;
 
-                finalCtx.font = `bold ${baseFontSize}px "${currentFontFamily}", Arial, sans-serif`; // Add fallback fonts
+                finalCtx.font = `bold ${baseFontSize}px "${currentFontFamily}", Arial, sans-serif`;
                 finalCtx.textAlign = 'center';
                 finalCtx.textBaseline = 'bottom'; 
                 finalCtx.fillStyle = currentFontColor;
-                finalCtx.strokeStyle = currentFontColor === '#FFFFFF' || currentFontColor.toLowerCase() === 'white' ? 'black' : 'white'; // Contrast outline
+                finalCtx.strokeStyle = currentFontColor === '#FFFFFF' || currentFontColor.toLowerCase() === 'white' ? 'black' : 'white';
                 finalCtx.lineWidth = Math.max(1, Math.floor(baseFontSize / 10)); 
                 const x = canvasWidth / 2;
                 const maxWidth = canvasWidth * 0.90;
@@ -487,7 +468,7 @@ Return valid JSON for all requested platforms and all required fields. Adhere st
     } finally {
         setIsProcessingMedia(prev => ({ ...prev, [platformKey]: false }));
     }
-  }, [platformContents, showToast]);
+  }, [platformContents, showToast, currentUser]);
 
   const handleImageSourceTypeChange = useCallback((platformKey: string, newSourceType: ImageSourceType) => {
     const platformConfig = CONTENT_PLATFORMS.find(p => p.key === platformKey);
@@ -574,13 +555,19 @@ const handlePushToLibrary = useCallback((platformKey: string) => {
             try { size = atob(base64Data.split(',')[1]).length; } catch (e) { console.error("Error decoding base64 for size", e); }
         }
 
-        const newAsset: ContentLibraryAsset = {
+        const newAsset: Omit<ContentLibraryAsset, 'user_id'> & { user_id?: string } = {
             id: Date.now().toString() + Math.random().toString(36).substring(2,9),
-            name: assetName.trim(), type: 'image', dataUrl: base64Data,
-            fileName: `${assetName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.jpg`,
-            fileType: 'image/jpeg', size: size, uploadedAt: new Date().toISOString(),
+            name: assetName.trim(), 
+            type: 'image', 
+            publicUrl: base64Data,
+            storage_path: '',
+            file_name: `${assetName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.jpg`,
+            file_type: 'image/jpeg', 
+            size: size, 
+            uploaded_at: new Date().toISOString(),
         };
-        onAddContentLibraryAsset(newAsset);
+        onAddContentLibraryAsset(newAsset as ContentLibraryAsset);
+        showToast("Image saved to local library!", "success");
     } else {
         showToast("No processed image available to push to library.", "error");
     }
@@ -588,25 +575,27 @@ const handlePushToLibrary = useCallback((platformKey: string) => {
 
 
   const handleSaveDraft = useCallback(() => {
-    if (Object.keys(platformContents).length === 0 || !selectedPersonaId || !selectedOperatorId) {
+    if (!selectedPersonaId || !selectedOperatorId || Object.keys(platformContents).length === 0) {
       setError("Cannot save empty draft or draft without persona/operator and generated content.");
       showToast("Cannot save empty draft or draft without persona/operator and generated content.", "error");
       return;
     }
     const newDraft: ContentDraft = {
       id: Date.now().toString(),
-      personaId: selectedPersonaId,
-      operatorId: selectedOperatorId,
-      keyMessage: keyMessage, 
-      customPrompt: customPrompt,
-      platformContents: platformContents, // platformContents already has fontFamily/fontColor
-      platformSpecificMediaTypes_INTERNAL_DO_NOT_USE: platformSpecificMediaTypes, 
+      persona_id: selectedPersonaId,
+      operator_id: selectedOperatorId,
+      key_message: keyMessage, 
+      custom_prompt: customPrompt,
+      platform_contents: platformContents,
+      platformSpecificMediaTypes_INTERNAL_DO_NOT_USE: platformSpecificMediaTypes,
+      user_id: '',
+      created_at: new Date().toISOString()
     };
     onAddContentDraft(newDraft);
-    setSelectedPersonaId(''); setSelectedOperatorId(''); setKeyMessage(''); setCustomPrompt('');
+    setSelectedPersonaId(null); setSelectedOperatorId(null); setKeyMessage(''); setCustomPrompt('');
     setPlatformContents({}); setGlobalMediaType('none'); setSelectedTone('');
-    setDefaultFontFamily(DEFAULT_FONT_FAMILY); // Reset default font
-    setDefaultFontColor(DEFAULT_FONT_COLOR);  // Reset default color
+    setDefaultFontFamily(DEFAULT_FONT_FAMILY);
+    setDefaultFontColor(DEFAULT_FONT_COLOR);
     setSelectedPlatformsForGeneration(initialSelectedPlatforms); 
     setPlatformSpecificMediaTypes(initialPlatformSpecificMediaTypes);
     showToast("Draft saved successfully!", "success");
@@ -630,7 +619,7 @@ const handlePushToLibrary = useCallback((platformKey: string) => {
         const currentPlatform = prev[platformKey] || { 
             hashtags: [], mediaType: currentPlatformMediaType, content: '', 
             subject: platformKey === 'Email' ? '' : undefined,
-            fontFamily: defaultFontFamily === 'AI Suggested' ? DEFAULT_FONT_FAMILY : defaultFontFamily, // Initialize with defaults
+            fontFamily: defaultFontFamily === 'AI Suggested' ? DEFAULT_FONT_FAMILY : defaultFontFamily,
             fontColor: defaultFontColor
         };
         return { ...prev, [platformKey]: { ...currentPlatform, [field]: value } };
@@ -665,7 +654,7 @@ const handlePushToLibrary = useCallback((platformKey: string) => {
 
   const handleConfirmSchedule = useCallback((draftId: string, platformKey: string, scheduledDateTime: string, notes: string) => {
     const draft = contentDrafts.find(d => d.id === draftId);
-    const platformDetail = draft?.platformContents[platformKey];
+    const platformDetail = draft?.platform_contents[platformKey];
     const platformInfo = CONTENT_PLATFORMS.find(p => p.key === platformKey);
     
     if (!draft || !platformDetail || !platformInfo) {
@@ -679,9 +668,12 @@ const handlePushToLibrary = useCallback((platformKey: string) => {
     const title = `${typeof platformInfo.icon === 'string' ? platformInfo.icon : ''} ${platformInfo.label}: ${platformDetail.subject || titleContent.substring(0, 20)}...`;
 
     const newScheduledPost: ScheduledPost = {
-      id: `sch_${Date.now()}_${draft.id}_${platformKey}`, title: title, start: scheduledDate,
+      id: `sch_${Date.now()}_${draft.id}_${platformKey}`,
+      db_id: Date.now(),
+      title: title,
+      start: scheduledDate,
       end: new Date(scheduledDate.getTime() + 60 * 60 * 1000), allDay: false, 
-      resource: { contentDraftId: draft.id, platformKey: platformKey, status: 'Scheduled', notes: notes, personaId: draft.personaId, operatorId: draft.operatorId }
+      resource: { contentDraftId: draft.id, platformKey: platformKey, status: 'Scheduled', notes: notes, personaId: draft.persona_id, operatorId: draft.operator_id }
     };
     onAddScheduledPost(newScheduledPost);
     showToast(`Post for ${platformInfo.label} scheduled!`, "success");
@@ -693,36 +685,35 @@ const handlePushToLibrary = useCallback((platformKey: string) => {
       showToast("Could not find draft to load.", "error");
       return;
     }
-    setSelectedPersonaId(draftToLoad.personaId);
-    setSelectedOperatorId(draftToLoad.operatorId);
-    setKeyMessage(draftToLoad.keyMessage || '');
-    setCustomPrompt(draftToLoad.customPrompt);
+    setSelectedPersonaId(draftToLoad.persona_id);
+    setSelectedOperatorId(draftToLoad.operator_id);
+    setKeyMessage(draftToLoad.key_message || '');
+    setCustomPrompt(draftToLoad.custom_prompt);
     
-    // Determine global font/color from the first relevant platform in the draft
     let loadedDefaultFontFamily = DEFAULT_FONT_FAMILY;
     let loadedDefaultFontColor = DEFAULT_FONT_COLOR;
     const firstRelevantPlatformKey = CONTENT_PLATFORMS.find(p => 
-        draftToLoad.platformContents[p.key]?.mediaType === 'image' || p.isPoster
+        draftToLoad.platform_contents[p.key]?.mediaType === 'image' || p.isPoster
     )?.key;
 
-    if (firstRelevantPlatformKey && draftToLoad.platformContents[firstRelevantPlatformKey]) {
-        loadedDefaultFontFamily = draftToLoad.platformContents[firstRelevantPlatformKey].fontFamily || DEFAULT_FONT_FAMILY;
-        loadedDefaultFontColor = draftToLoad.platformContents[firstRelevantPlatformKey].fontColor || DEFAULT_FONT_COLOR;
+    if (firstRelevantPlatformKey && draftToLoad.platform_contents[firstRelevantPlatformKey]) {
+        loadedDefaultFontFamily = draftToLoad.platform_contents[firstRelevantPlatformKey].fontFamily || DEFAULT_FONT_FAMILY;
+        loadedDefaultFontColor = draftToLoad.platform_contents[firstRelevantPlatformKey].fontColor || DEFAULT_FONT_COLOR;
     }
     setDefaultFontFamily(loadedDefaultFontFamily);
     setDefaultFontColor(loadedDefaultFontColor);
     
-    setPlatformContents({ ...draftToLoad.platformContents }); 
+    setPlatformContents({ ...draftToLoad.platform_contents }); 
 
     const platformMediaTypesInDraft: MediaType[] = [];
     const specificOverrides: Record<string, MediaType | 'global'> = {};
     const platformsSelectedForGen: Record<string, boolean> = {};
 
     CONTENT_PLATFORMS.forEach(p_config => {
-        platformsSelectedForGen[p_config.key] = !!draftToLoad.platformContents[p_config.key];
-        if (draftToLoad.platformContents[p_config.key]) {
+        platformsSelectedForGen[p_config.key] = !!draftToLoad.platform_contents[p_config.key];
+        if (draftToLoad.platform_contents[p_config.key]) {
             if (!p_config.isPoster && p_config.key !== 'Email') {
-                platformMediaTypesInDraft.push(draftToLoad.platformContents[p_config.key].mediaType);
+                platformMediaTypesInDraft.push(draftToLoad.platform_contents[p_config.key]!.mediaType);
             }
         }
         specificOverrides[p_config.key] = draftToLoad.platformSpecificMediaTypes_INTERNAL_DO_NOT_USE?.[p_config.key] || 'global';
@@ -769,16 +760,16 @@ const handlePushToLibrary = useCallback((platformKey: string) => {
            action={prerequisiteAction}
          />
       )}
-      {error && <Card className="mb-4 bg-red-100 border-l-4 border-danger text-danger p-4" shadow="soft-md"><p>{error}</p></Card>}
+      {error && <Card className="mb-4 bg-red-500/10 border-l-4 border-danger text-danger p-4"><p>{error}</p></Card>}
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <ContentPlannerConfig
           personas={personas}
           operators={operators}
-          selectedPersonaId={selectedPersonaId}
-          onSelectedPersonaIdChange={setSelectedPersonaId}
-          selectedOperatorId={selectedOperatorId}
-          onSelectedOperatorIdChange={setSelectedOperatorId}
+          selectedPersonaId={String(selectedPersonaId || '')}
+          onSelectedPersonaIdChange={(id) => setSelectedPersonaId(Number(id))}
+          selectedOperatorId={String(selectedOperatorId || '')}
+          onSelectedOperatorIdChange={(id) => setSelectedOperatorId(Number(id))}
           keyMessage={keyMessage} 
           onKeyMessageChange={setKeyMessage} 
           globalMediaType={globalMediaType}
@@ -846,14 +837,14 @@ const handlePushToLibrary = useCallback((platformKey: string) => {
         {contentDrafts.length === 0 ? (<p className="text-textSecondary">No content drafts saved yet.</p>) : (
           <div className="space-y-6">
             {contentDrafts.slice().sort((a,b) => parseInt(b.id) - parseInt(a.id)).map(draft => { 
-              const persona = personas.find(p => p.id === draft.personaId);
-              const operator = operators.find(o => o.id === draft.operatorId);
+              const persona = personas.find(p => p.id === draft.persona_id);
+              const operator = operators.find(o => o.id === draft.operator_id);
               return (
-                <Card key={draft.id} className="bg-gray-50 p-4" shadow="soft-md">
+                <Card key={draft.id} className="bg-white/5 p-4" shadow="soft-md">
                   <div className="flex justify-between items-start">
                     <div>
                       <h4 className="font-semibold text-textPrimary text-lg">To: {persona?.name || 'N/A'} | Using: {operator?.name || 'N/A'}</h4>
-                      {draft.keyMessage && <p className="text-xs text-textSecondary mt-0.5">Key Message: "{draft.keyMessage.substring(0,50)}..."</p>}
+                      {draft.key_message && <p className="text-xs text-textSecondary mt-0.5">Key Message: "{draft.key_message.substring(0,50)}..."</p>}
                     </div>
                     <Button
                         variant="outline"
@@ -864,10 +855,10 @@ const handlePushToLibrary = useCallback((platformKey: string) => {
                         Load & Edit Draft
                     </Button>
                   </div>
-                  <p className="text-xs text-textSecondary mt-1">Global Media Type at creation: <span className="font-medium">{MEDIA_TYPE_OPTIONS.find(opt => opt.value === (Object.values(draft.platformContents).find(pc => !CONTENT_PLATFORMS.find(cp => cp.key === Object.keys(draft.platformContents).find(k => draft.platformContents[k] === pc)!)?.isPoster && pc.mediaType !== 'none')?.mediaType || 'none'))?.label || 'Text Only'}</span></p>
-                  <p className="text-xs text-textSecondary mt-1 mb-3">Custom Instructions: {draft.customPrompt || "None"}</p>
+                  <p className="text-xs text-textSecondary mt-1">Global Media Type at creation: <span className="font-medium">{MEDIA_TYPE_OPTIONS.find(opt => opt.value === (Object.values(draft.platform_contents).find(pc => !CONTENT_PLATFORMS.find(cp => cp.key === Object.keys(draft.platform_contents).find(k => draft.platform_contents[k] === pc)!)?.isPoster && pc.mediaType !== 'none')?.mediaType || 'none'))?.label || 'Text Only'}</span></p>
+                  <p className="text-xs text-textSecondary mt-1 mb-3">Custom Instructions: {draft.custom_prompt || "None"}</p>
                   <div className="space-y-4">
-                    {Object.entries(draft.platformContents).map(([platformKey, platformData]) => {
+                    {Object.entries(draft.platform_contents).map(([platformKey, platformData]: [string, PlatformContentDetail]) => {
                       const platformInfo = CONTENT_PLATFORMS.find(p => p.key === platformKey);
                       if (!platformData || (!platformData.content && !platformData.processedImageUrl && !platformData.videoIdea && !platformData.subject && !platformData.imagePrompt)) return null;
                       return (
@@ -879,16 +870,16 @@ const handlePushToLibrary = useCallback((platformKey: string) => {
                             <Button size="sm" variant="primary" onClick={() => handleOpenScheduleModal(draft, platformKey, platformData)} className="ml-2 text-xs py-1 px-2" leftIcon={<CalendarDaysIcon className="w-3.5 h-3.5" />}> Schedule </Button>
                           </div>
                           {platformData.subject && <p className="text-sm font-semibold text-textPrimary mt-1">Subject: {platformData.subject}</p>}
-                          {platformData.content && !platformInfo?.isPoster && <pre className="whitespace-pre-wrap text-sm text-textPrimary mt-1 mb-2 bg-gray-50 p-2 rounded">{platformData.content}</pre>}
-                          {!platformInfo?.isPoster && platformKey !== 'Email' && platformData.hashtags && platformData.hashtags.length > 0 && (<p className="text-xs text-blue-600">Hashtags: {platformData.hashtags.join(', ')}</p>)}
+                          {platformData.content && !platformInfo?.isPoster && <pre className="whitespace-pre-wrap text-sm text-textPrimary mt-1 mb-2 bg-background p-2 rounded">{platformData.content}</pre>}
+                          {!platformInfo?.isPoster && platformKey !== 'Email' && platformData.hashtags && platformData.hashtags.length > 0 && (<p className="text-xs text-primary">Hashtags: {platformData.hashtags.join(', ')}</p>)}
                           
                           {(platformData.mediaType === 'image' || platformInfo?.isPoster) && platformData.processedImageUrl && (
                             <div className="mt-2">
                                 <img src={platformData.processedImageUrl} alt="Processed content" className="max-w-xxs w-full h-auto max-h-32 rounded border border-mediumBorder object-contain"/>
-                                {platformData.imageSourceType === 'upload' && <p className="text-xxs italic text-gray-500 mt-0.5">(User Uploaded Image)</p>}
+                                {platformData.imageSourceType === 'upload' && <p className="text-xxs italic text-textSecondary mt-0.5">(User Uploaded Image)</p>}
                                 {platformData.memeText && <p className="text-sm italic text-textSecondary mt-1">Meme: "{platformData.memeText}"</p>}
                                 {(platformData.fontFamily || platformData.fontColor) && (
-                                    <p className="text-xxs text-gray-500 mt-0.5">
+                                    <p className="text-xxs text-gray-400 mt-0.5">
                                         Font: {platformData.fontFamily || 'Default'}, Color: {platformData.fontColor || 'Default'}
                                     </p>
                                 )}
@@ -898,7 +889,7 @@ const handlePushToLibrary = useCallback((platformKey: string) => {
                            {platformKey !== 'Email' && !platformInfo?.isPoster && platformData.mediaType === 'video' && platformData.videoIdea && (
                             <div className="mt-2">
                                 <h6 className="text-xs font-semibold text-textPrimary">Video Idea:</h6>
-                                <pre className="whitespace-pre-wrap text-xs text-textSecondary bg-gray-100 p-2 rounded">{platformData.videoIdea}</pre>
+                                <pre className="whitespace-pre-wrap text-xs text-textSecondary bg-background p-2 rounded">{platformData.videoIdea}</pre>
                             </div>
                           )}
                         </div>
@@ -916,12 +907,14 @@ const handlePushToLibrary = useCallback((platformKey: string) => {
   );
 };
 
-// Add to support text-xxs if not already globally defined
-const style = document.createElement('style');
-style.innerHTML = `
-  .text-xxs {
-    font-size: 0.65rem; 
-    line-height: 0.8rem;
-  }
-`;
-document.head.appendChild(style);
+if (!document.getElementById('pixasocial-text-xxs-style-dark')) {
+    const style = document.createElement('style');
+    style.id = 'pixasocial-text-xxs-style-dark';
+    style.innerHTML = `
+    .text-xxs {
+        font-size: 0.65rem; 
+        line-height: 0.8rem;
+    }
+    `;
+    document.head.appendChild(style);
+}

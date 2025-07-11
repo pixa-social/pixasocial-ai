@@ -1,5 +1,6 @@
+
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { Calendar as BigCalendar, dateFnsLocalizer, Views, EventProps, ToolbarProps, View, EventInteractionArgs } from 'react-big-calendar';
+import { Calendar as BigCalendar, dateFnsLocalizer, Views, EventProps, ToolbarProps, View, DayPropGetter, SlotPropGetter, Event } from 'react-big-calendar';
 import { format, getDay, isValid } from 'date-fns';
 import { parse } from 'date-fns/parse';
 import { startOfWeek } from 'date-fns/startOfWeek';
@@ -10,7 +11,7 @@ import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Textarea } from './ui/Textarea';
 import { Select } from './ui/Select';
-import { CONTENT_PLATFORMS } from '../constants';
+import { CONTENT_PLATFORMS } from '../../constants';
 import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon } from './ui/Icons';
 import { CopyButton } from './ui/CopyButton';
 import { PrerequisiteMessageCard } from './ui/PrerequisiteMessageCard'; 
@@ -79,10 +80,13 @@ const EventDetailModalComponent: React.FC<EventDetailModalProps> = ({
     return text.trim() || undefined;
   }, [platformDetail]);
 
+  const modalTitleIcon = React.isValidElement(platformInfo?.icon) ? platformInfo.icon : null;
+
   return (
     <div className="fixed inset-0 bg-gray-900 bg-opacity-75 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4 transition-opacity duration-300 ease-in-out">
       <Card 
-        title={`${typeof platformInfo?.icon === 'string' ? platformInfo?.icon : React.isValidElement(platformInfo?.icon) ? platformInfo.icon : ''} Schedule Details: ${platformInfo?.label || event.resource.platformKey}`} 
+        title={`Schedule Details: ${platformInfo?.label || event.resource.platformKey}`}
+        icon={modalTitleIcon}
         className="w-full max-w-lg bg-card shadow-xl rounded-lg transform transition-all duration-300 ease-in-out scale-95 opacity-0 animate-modal-appear"
         shadow="xl"
       >
@@ -192,8 +196,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     end: new Date(post.end),     
   })), [scheduledPosts]);
 
-  const handleSelectEvent = useCallback((event: ScheduledPost) => {
-    setSelectedEvent(event);
+  const handleSelectEvent = useCallback((event: Event) => {
+    setSelectedEvent(event as ScheduledPost);
   }, []);
 
   const closeModal = useCallback(() => {
@@ -227,29 +231,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     }
   }, [selectedEvent, onDeleteScheduledPost, closeModal]);
 
-  const handleEventDrop = useCallback(({ event, start, end, allDay }: EventInteractionArgs<ScheduledPost>) => {
-    if (event) { 
-        const newStart = typeof start === 'string' ? new Date(start) : start;
-        const newEnd = typeof end === 'string' ? new Date(end) : end;
-        
-        const updatedEvent: ScheduledPost = { 
-            ...event,
-            start: newStart,
-            end: newEnd,
-            allDay: allDay || false, 
-        };
-        onUpdateScheduledPost(updatedEvent);
-    }
-  }, [onUpdateScheduledPost]);
-
-
   const selectedEventFullDetails = useMemo(() => {
     if (!selectedEvent) return { event: null };
     const draft = contentDrafts.find(d => d.id === selectedEvent.resource.contentDraftId);
     if (!draft) return { event: selectedEvent };
-    const platformDetail = draft.platformContents[selectedEvent.resource.platformKey];
-    const personaDetails = personas.find(p => p.id === draft.personaId);
-    const operatorDetails = operators.find(o => o.id === draft.operatorId);
+    const platformDetail = draft.platform_contents[selectedEvent.resource.platformKey];
+    const personaDetails = personas.find(p => p.id === draft.persona_id);
+    const operatorDetails = operators.find(o => o.id === draft.operator_id);
     return { event: selectedEvent, contentDraft: draft, platformDetail, persona: personaDetails, operator: operatorDetails };
   }, [selectedEvent, contentDrafts, personas, operators]);
 
@@ -272,9 +260,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     return (
       <div className="mb-4 p-3 flex flex-col md:flex-row justify-between items-center bg-gray-50 rounded-t-lg border-b border-lightBorder">
         <div className="flex items-center space-x-1 sm:space-x-2 mb-2 md:mb-0">
-          <Button onClick={() => toolbar.onNavigate('PREV')} size="sm" variant="secondary" aria-label="Previous Period" title="Previous Period" leftIcon={<ChevronLeftIcon className="h-4 w-4"/>} />
+          <Button onClick={() => toolbar.onNavigate('PREV')} size="sm" variant="secondary" aria-label="Previous Period" title="Previous Period" leftIcon={<ChevronLeftIcon className="h-4 h-4"/>} />
           <Button onClick={() => toolbar.onNavigate('TODAY')} size="sm" variant="primary" title="Go to Today">Today</Button>
-          <Button onClick={() => toolbar.onNavigate('NEXT')} size="sm" variant="secondary" aria-label="Next Period" title="Next Period" rightIcon={<ChevronRightIcon className="h-4 w-4"/>} />
+          <Button onClick={() => toolbar.onNavigate('NEXT')} size="sm" variant="secondary" aria-label="Next Period" title="Next Period" rightIcon={<ChevronRightIcon className="h-4 h-4"/>} />
         </div>
         
         <div className="flex items-center space-x-1 sm:space-x-2 mb-2 md:mb-0 order-first md:order-none">
@@ -330,7 +318,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     if (typeof platformIcon === 'string') {
         iconDisplay = <span className="mr-1.5 text-xs opacity-90">{platformIcon}</span>;
     } else if (React.isValidElement(platformIcon)) {
-        iconDisplay = <span className="mr-1.5">{React.cloneElement(platformIcon, { className: 'w-3 h-3 inline-block' })}</span>;
+        iconDisplay = <span className="mr-1.5">{React.cloneElement(platformIcon as React.ReactElement<any>, { className: 'w-3 h-3 inline-block' })}</span>;
     }
 
     return (
@@ -348,6 +336,22 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   });
 
   const showPrerequisiteMessage = contentDrafts.length === 0 && scheduledPosts.length === 0;
+
+  const dayPropGetter = useCallback((date: Date) => {
+    const isToday = format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+    return {
+      className: `${isToday ? 'bg-blue-50 rbc-today' : 'hover:bg-gray-50'} transition-colors duration-150`,
+      style: {
+        minHeight: '100px',
+      },
+    };
+  }, []);
+
+  const slotPropGetter = useCallback((date: Date) => {
+    return {
+      className: 'hover:bg-gray-50 transition-colors duration-150',
+    };
+  }, []);
 
   if (isLoading) {
     return <CalendarSkeleton />;
@@ -370,7 +374,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           startAccessor="start"
           endAccessor="end"
           onSelectEvent={handleSelectEvent}
-          onEventDrop={handleEventDrop} 
           views={[Views.MONTH, Views.WEEK, Views.DAY, Views.AGENDA]}
           components={{
               toolbar: CustomToolbar,
@@ -378,21 +381,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           }}
           selectable 
           popup 
-          dayPropGetter={(date) => {
-            const isToday = format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
-            return {
-              className: `${isToday ? 'bg-blue-50 rbc-today' : 'hover:bg-gray-50'} transition-colors duration-150`,
-              style: {
-                minHeight: '100px',
-              },
-            };
-          }}
-          slotPropGetter={(date) => {
-            return {
-              className: 'hover:bg-gray-50 transition-colors duration-150',
-              style: {},
-            };
-          }}
+          dayPropGetter={dayPropGetter}
+          slotPropGetter={slotPropGetter}
         />
       </div>
        <style>{`

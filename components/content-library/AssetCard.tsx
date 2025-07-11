@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { ContentLibraryAsset } from '../../types';
 import { Card } from '../ui/Card';
@@ -63,7 +64,7 @@ const AssetCardComponent: React.FC<AssetCardProps> = ({
           onClick={(e) => e.stopPropagation()} // Prevent image click when checkbox clicked
         />
         {asset.type === 'image' ? (
-          <img src={asset.dataUrl} alt={asset.name} className="object-contain max-h-40 w-full" />
+          <img src={asset.publicUrl} alt={asset.name} className="object-contain max-h-40 w-full" />
         ) : (
           <div className="p-4 flex flex-col items-center justify-center text-center">
             <VideoCameraIcon className="w-16 h-16 text-secondary mb-2" />
@@ -75,7 +76,7 @@ const AssetCardComponent: React.FC<AssetCardProps> = ({
         <div>
           <h4 className="font-semibold text-textPrimary truncate" title={asset.name}>{asset.name}</h4>
           <p className="text-xs text-textSecondary capitalize">{asset.type} &bull; {formatBytes(asset.size)}</p>
-          <p className="text-xs text-textSecondary">Uploaded: {new Date(asset.uploadedAt).toLocaleDateString()}</p>
+          <p className="text-xs text-textSecondary">Uploaded: {new Date(asset.uploaded_at).toLocaleDateString()}</p>
           <div className="mt-1.5">
             {editingTagsForAssetId === asset.id ? (
               <div className="space-y-1.5">

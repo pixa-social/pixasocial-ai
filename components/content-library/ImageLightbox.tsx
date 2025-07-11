@@ -1,3 +1,4 @@
+
 import React, { useEffect, useCallback } from 'react';
 import { ContentLibraryAsset } from '../../types';
 import { ChevronLeftIcon, ChevronRightIcon, XMarkIcon } from '../ui/Icons';
@@ -45,7 +46,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({ images, startIndex
         onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside the modal content
       >
         <img 
-          src={currentImage.dataUrl} 
+          src={currentImage.publicUrl} 
           alt={currentImage.name} 
           className="max-w-full max-h-[calc(90vh-80px)] object-contain rounded" 
           id="lightbox-image-name"

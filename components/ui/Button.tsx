@@ -1,7 +1,8 @@
+
 import React from 'react';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'success' | 'outline' | 'link'; // Added 'link'
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'success' | 'outline' | 'link';
   size?: 'xs' | 'sm' | 'md' | 'lg';
   isLoading?: boolean;
   leftIcon?: React.ReactNode;
@@ -18,16 +19,16 @@ export const Button: React.FC<ButtonProps> = ({
   className = '',
   ...props
 }) => {
-  const baseStyles = 'font-semibold rounded-md focus:outline-none focus:ring-2 focus:ring-offset-1 transition-colors duration-150 flex items-center justify-center disabled:opacity-70 disabled:cursor-not-allowed';
+  const baseStyles = 'font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background transition-all duration-200 ease-in-out flex items-center justify-center disabled:opacity-60 disabled:cursor-not-allowed transform hover:-translate-y-px';
   
   const variantStyles = {
-    primary: 'bg-primary text-white hover:bg-blue-600 focus:ring-primary focus:ring-offset-0', // Adjusted hover, offset
-    secondary: 'bg-secondary text-white hover:bg-gray-700 focus:ring-secondary focus:ring-offset-0',
-    danger: 'bg-danger text-white hover:bg-red-600 focus:ring-danger focus:ring-offset-0',
-    ghost: 'bg-transparent text-primary hover:bg-blue-100 focus:ring-primary focus:ring-offset-0',
-    success: 'bg-accent text-white hover:bg-emerald-600 focus:ring-accent focus:ring-offset-0',
-    outline: 'bg-transparent text-primary border border-primary hover:bg-primary hover:text-white focus:ring-primary focus:ring-offset-0',
-    link: 'bg-transparent text-primary hover:text-blue-600 hover:underline focus:ring-primary focus:ring-offset-0', // Added link styles
+    primary: 'bg-primary text-white hover:bg-sky-400 focus:ring-primary',
+    secondary: 'bg-secondary text-textPrimary hover:bg-slate-500 focus:ring-slate-400',
+    danger: 'bg-danger text-white hover:bg-rose-600 focus:ring-danger',
+    ghost: 'bg-transparent text-textSecondary hover:bg-gray-700 hover:text-textPrimary focus:ring-primary',
+    success: 'bg-success text-white hover:bg-emerald-600 focus:ring-success',
+    outline: 'bg-transparent text-primary border border-primary hover:bg-primary hover:text-white focus:ring-primary',
+    link: 'bg-transparent text-primary hover:text-sky-400 hover:underline focus:ring-primary',
   };
 
   const sizeStyles = {

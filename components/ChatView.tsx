@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Gun from 'gun/gun'; 
 import 'gun/lib/radix'; 
@@ -86,8 +87,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
     channelMessagesPath.map().on((data: ChatMessage | null, id: string) => {
       if (data) {
-        if (typeof data === 'object' && data !== null && data.id && data.timestamp) {
-          loadedMsgs[id] = { ...data, timestamp: new Date(data.timestamp).toISOString() }; 
+        if (typeof data === 'object' && data !== null && data.id && data.created_at) {
+          loadedMsgs[id] = { ...data, created_at: new Date(data.created_at).toISOString() }; 
           
           if(initialLoadComplete) { 
              setCurrentChannelMessages(prevMsgs => {
@@ -95,23 +96,23 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 if (existingMsgIndex > -1) {
                     const updated = [...prevMsgs];
                     updated[existingMsgIndex] = data;
-                    return updated.sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+                    return updated.sort((a,b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
                 }
-                return [...prevMsgs, data].sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+                return [...prevMsgs, data].sort((a,b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
              });
           }
         }
       } else if (data === null && loadedMsgs[id]) { 
         delete loadedMsgs[id];
         if(initialLoadComplete) {
-            setCurrentChannelMessages(Object.values(loadedMsgs).sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()));
+            setCurrentChannelMessages(Object.values(loadedMsgs).sort((a,b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()));
         }
       }
     });
 
     loadTimeout = setTimeout(() => {
         initialLoadComplete = true;
-        setCurrentChannelMessages(Object.values(loadedMsgs).sort((a,b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()));
+        setCurrentChannelMessages(Object.values(loadedMsgs).sort((a,b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()));
         setIsLoadingMessages(false);
     }, 750); 
 
@@ -126,7 +127,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
 
   const getDmChannelId = useCallback((memberEmail: string): string => {
-    const emails = [currentUser.email, memberEmail].sort();
+    const emails = [currentUser.email, memberEmail].filter((e): e is string => !!e).sort();
     return `dm_${emails[0]}_${emails[1]}`;
   }, [currentUser.email]);
   
@@ -139,32 +140,28 @@ export const ChatView: React.FC<ChatViewProps> = ({
     if (channelId.startsWith('dm_')) {
         const parts = channelId.split('_');
         const otherUserEmail = parts.find(part => part !== currentUser.email && part !== 'dm');
-        const otherUser = teamMembers.find(email => email === otherUserEmail);
-        return otherUser?.split('@')[0] || otherUserEmail || "Direct Message";
+        const otherUserName = teamMembers.find(email => email === otherUserEmail)?.split('@')[0];
+        return otherUserName || otherUserEmail || "Direct Message";
     }
     return channelId; 
   }, [customChannels, currentUser.email, teamMembers]);
 
 
   const handleSendMessage = useCallback((text: string, attachment?: ChatMessageAttachment) => {
-    if (!text.trim() && !attachment) return;
+    if ((!text || !text.trim()) && !attachment) return;
+    if (!currentUser.email) return;
 
-    const newMessageData: Partial<ChatMessage> = { 
+    const newMessageData: ChatMessage = { 
       id: Date.now().toString() + Math.random().toString(36).slice(2, 9),
-      channelId: activeChannelId,
-      senderEmail: currentUser.email,
-      senderName: currentUser.name || currentUser.email.split('@')[0],
-      timestamp: new Date().toISOString(),
+      channel_id: activeChannelId,
+      user_id: currentUser.id,
+      sender_name: currentUser.name || currentUser.email.split('@')[0],
+      created_at: new Date().toISOString(),
+      text: text ? text.trim() : undefined,
+      attachment: attachment ? attachment : undefined
     };
-
-    if (text.trim()) {
-      newMessageData.text = text.trim();
-    }
-    if (attachment) {
-      newMessageData.attachment = attachment;
-    }
     
-    gun.get('pixasocial/chat/messages').get(activeChannelId).get(newMessageData.id as string).put(newMessageData as ChatMessage, (ack) => {
+    gun.get('pixasocial/chat/messages').get(activeChannelId).get(newMessageData.id).put(newMessageData, (ack) => {
         if ((ack as any).err) { 
             showToast(`Error sending message: ${(ack as any).err}`, 'error');
             console.error('GunDB send error:', (ack as any).err);
@@ -193,17 +190,18 @@ export const ChatView: React.FC<ChatViewProps> = ({
         name: file.name,
         type: file.type,
         size: file.size,
+        publicUrl: '', // Will be populated for images
       };
 
       if (file.type.startsWith('image/') && file.size < CHAT_IMAGE_PREVIEW_MAX_SIZE_BYTES) {
         const reader = new FileReader();
         reader.onloadend = () => {
-          attachmentInfo.dataUrl = reader.result as string;
+          attachmentInfo.publicUrl = reader.result as string;
           handleSendMessage(messageInput, attachmentInfo); 
         };
         reader.onerror = () => {
           showToast('Failed to read image for preview.', 'error');
-          handleSendMessage(messageInput, { name: file.name, type: file.type, size: file.size });
+          handleSendMessage(messageInput, attachmentInfo);
         };
         reader.readAsDataURL(file);
       } else {
@@ -368,7 +366,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 variant="primary" 
                 size="sm" 
                 onClick={() => handleSendMessage(messageInput)}
-                disabled={!messageInput.trim() && !fileInputRef.current?.files?.length}
+                disabled={!messageInput.trim() && (!fileInputRef.current || !fileInputRef.current.files || fileInputRef.current.files.length === 0)}
                 aria-label="Send message"
                 className="p-2"
                 title="Send message"

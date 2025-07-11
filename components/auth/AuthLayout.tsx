@@ -1,25 +1,44 @@
+import React from 'react';
 import { AuthViewType } from '../../types';
 import { HomePageView } from './HomePageView';
 import { LoginPageView } from './LoginPageView';
 import { RegisterPageView } from './RegisterPageView';
-import Header from './Header';
-import { Footer } from './Footer';
+import { FeaturesPageView } from './pages/FeaturesPageView';
+import { PricingPageView } from './pages/PricingPageView';
+import { DocumentationPageView } from './pages/DocumentationPageView';
+import { AboutPageView } from './pages/AboutPageView';
+import { ContactPageView } from './pages/ContactPageView';
+import { PrivacyPolicyPageView } from './pages/PrivacyPolicyPageView';
+import { TermsOfServicePageView } from './pages/TermsOfServicePageView';
+import { AuthHeader } from './AuthHeader';
+import { AuthFooter } from './AuthFooter';
 
 interface AuthLayoutProps {
   authView: AuthViewType;
   setAuthView: (view: AuthViewType) => void;
-  onLoginSuccess: (email: string, password: string) => Promise<void>;
-  onRegisterSuccess: (email: string, password: string, name: string) => Promise<void>;
 }
 
-export const AuthLayout: React.FC<AuthLayoutProps> = ({ authView, setAuthView, onLoginSuccess, onRegisterSuccess }) => {
-
+export const AuthLayout: React.FC<AuthLayoutProps> = ({ authView, setAuthView }) => {
   const renderAuthView = () => {
     switch (authView) {
       case 'login':
-        return <LoginPageView setAuthView={setAuthView} onLoginSuccess={onLoginSuccess} />;
+        return <LoginPageView setAuthView={setAuthView} />;
       case 'register':
-        return <RegisterPageView setAuthView={setAuthView} onRegisterSuccess={onRegisterSuccess} />;
+        return <RegisterPageView setAuthView={setAuthView} />;
+      case 'features':
+        return <FeaturesPageView />;
+      case 'pricing':
+        return <PricingPageView setAuthView={setAuthView} />;
+      case 'documentation':
+        return <DocumentationPageView />;
+      case 'about':
+        return <AboutPageView />;
+      case 'contact':
+        return <ContactPageView />;
+      case 'privacy':
+        return <PrivacyPolicyPageView />;
+      case 'terms':
+        return <TermsOfServicePageView />;
       case 'home':
       default:
         return <HomePageView setAuthView={setAuthView} />;
@@ -27,10 +46,16 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({ authView, setAuthView, o
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-900 via-primary to-gray-900 text-white">
-      <Header authView={authView} setAuthView={setAuthView} />
-      <main>{renderAuthView()}</main>
-      <Footer />
+    <div className="min-h-screen flex flex-col bg-background text-textPrimary">
+      <AuthHeader authView={authView} setAuthView={setAuthView} />
+
+      <main className="flex-grow">
+        <div className="w-full">
+          {renderAuthView()}
+        </div>
+      </main>
+
+      <AuthFooter setAuthView={setAuthView} />
     </div>
   );
 };

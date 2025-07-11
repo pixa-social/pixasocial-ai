@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { ChatMessage, User } from '../../types';
 import { PaperClipIcon } from '../ui/Icons';
@@ -18,7 +19,7 @@ const formatBytes = (bytes: number, decimals = 2) => {
   };
 
 const ChatMessageItemComponent: React.FC<ChatMessageItemProps> = ({ msg, currentUser }) => {
-  const isCurrentUser = msg.senderEmail === currentUser.email;
+  const isCurrentUser = msg.user_id === currentUser.id;
   return (
     <div className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
       <div
@@ -27,7 +28,7 @@ const ChatMessageItemComponent: React.FC<ChatMessageItemProps> = ({ msg, current
         }`}
       >
         {!isCurrentUser && (
-          <p className="text-xs font-semibold mb-0.5 opacity-80">{msg.senderName}</p>
+          <p className="text-xs font-semibold mb-0.5 opacity-80">{msg.sender_name}</p>
         )}
         {msg.text && <p className="text-sm whitespace-pre-wrap">{msg.text}</p>}
         {msg.attachment && (
@@ -41,13 +42,13 @@ const ChatMessageItemComponent: React.FC<ChatMessageItemProps> = ({ msg, current
             <p className={`text-xxs opacity-70 ${isCurrentUser ? 'text-blue-200' : 'text-gray-500'}`}>
               {msg.attachment.type} - {formatBytes(msg.attachment.size)}
             </p>
-            {msg.attachment.dataUrl && msg.attachment.type.startsWith('image/') && (
-              <img src={msg.attachment.dataUrl} alt="Preview" className="mt-1 max-w-[100px] max-h-20 rounded object-contain" />
+            {msg.attachment.publicUrl && msg.attachment.type.startsWith('image/') && (
+              <img src={msg.attachment.publicUrl} alt="Preview" className="mt-1 max-w-[100px] max-h-20 rounded object-contain" />
             )}
           </div>
         )}
         <p className={`text-xxs mt-1.5 ${isCurrentUser ? 'text-right opacity-70' : 'text-left opacity-60'}`}>
-          {format(new Date(msg.timestamp), 'p')}
+          {format(new Date(msg.created_at), 'p')}
         </p>
       </div>
     </div>

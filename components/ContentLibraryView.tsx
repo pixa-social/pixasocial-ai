@@ -1,5 +1,6 @@
+
 import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
-import { ContentLibraryAsset } from '../types';
+import { ContentLibraryAsset } from '../../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
@@ -13,10 +14,12 @@ import { MAX_FILE_UPLOAD_SIZE_BYTES, MAX_FILE_UPLOAD_SIZE_MB, ACCEPTED_MEDIA_TYP
 import { AssetCard } from './content-library/AssetCard'; 
 import { ContentLibrarySkeleton } from './skeletons/ContentLibrarySkeleton';
 import { ImageLightbox } from './content-library/ImageLightbox';
-import { fetchContentLibraryAssets, uploadContentLibraryAsset, deleteContentLibraryAsset, updateContentLibraryAssetTags } from '../services/contentLibraryService';
 
 interface ContentLibraryViewProps {
-  // No props needed since data is fetched from backend
+  assets: ContentLibraryAsset[];
+  onAddAsset: (asset: ContentLibraryAsset) => void;
+  onUpdateAsset: (asset: ContentLibraryAsset) => void; 
+  onRemoveAsset: (assetId: string) => void;
 }
 
 const formatBytes = (bytes: number, decimals = 2) => {
@@ -28,9 +31,8 @@ const formatBytes = (bytes: number, decimals = 2) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 };
 
-export const ContentLibraryView: React.FC<ContentLibraryViewProps> = () => {
+export const ContentLibraryView: React.FC<ContentLibraryViewProps> = ({ assets, onAddAsset, onUpdateAsset, onRemoveAsset }) => {
   const { showToast } = useToast();
-  const [assets, setAssets] = useState<ContentLibraryAsset[]>([]);
   const [assetName, setAssetName] = useState('');
   const [assetTags, setAssetTags] = useState(''); 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -49,21 +51,12 @@ export const ContentLibraryView: React.FC<ContentLibraryViewProps> = () => {
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [currentLightboxImageIndex, setCurrentLightboxImageIndex] = useState(0);
 
+
   useEffect(() => {
-    const loadAssets = async () => {
-      setIsInitialLoading(true);
-      try {
-        const fetchedAssets = await fetchContentLibraryAssets();
-        setAssets(fetchedAssets);
-      } catch (error) {
-        showToast('Failed to load assets from backend.', 'error');
-        console.error('Error loading assets:', error);
-      } finally {
-        setIsInitialLoading(false);
-      }
-    };
-    loadAssets();
-  }, [showToast]);
+    const timer = setTimeout(() => setIsInitialLoading(false), 750);
+    return () => clearTimeout(timer);
+  }, []);
+
 
   const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -94,40 +87,42 @@ export const ContentLibraryView: React.FC<ContentLibraryViewProps> = () => {
     }
     setIsLoading(true);
 
-    try {
-      const tags = assetTags.split(',').map(tag => tag.trim()).filter(tag => tag);
-      const newAsset = await uploadContentLibraryAsset(selectedFile, assetName.trim(), tags);
-      setAssets(prev => [newAsset, ...prev]);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const newAsset: ContentLibraryAsset = {
+        id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
+        user_id: '', // Will be set by parent/service
+        name: assetName.trim(),
+        type: selectedFile.type.startsWith('image/') ? 'image' : 'video',
+        publicUrl: reader.result as string,
+        storage_path: '', // Placeholder for local assets
+        file_name: selectedFile.name,
+        file_type: selectedFile.type,
+        size: selectedFile.size,
+        uploaded_at: new Date().toISOString(),
+        tags: assetTags.split(',').map(tag => tag.trim()).filter(tag => tag),
+      };
+      onAddAsset(newAsset);
       setAssetName('');
       setAssetTags('');
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
-      showToast('Asset uploaded successfully.', 'success');
-    } catch (error) {
-      showToast('Failed to upload asset to backend.', 'error');
-      console.error('Upload error:', error);
-    } finally {
       setIsLoading(false);
-    }
-  }, [selectedFile, assetName, assetTags, showToast]);
+    };
+    reader.onerror = () => {
+      showToast('Failed to read file.', 'error');
+      setIsLoading(false);
+    };
+    reader.readAsDataURL(selectedFile);
+  }, [selectedFile, assetName, assetTags, onAddAsset, showToast]);
 
-  const handleDeleteAsset = useCallback(async (assetId: string) => {
+  const handleDeleteAsset = useCallback((assetId: string) => {
     if (window.confirm('Are you sure you want to delete this asset? This action cannot be undone.')) {
-      setIsLoading(true);
-      try {
-        await deleteContentLibraryAsset(assetId);
-        setAssets(prev => prev.filter(asset => asset.id !== assetId));
-        setSelectedAssetIds(prev => prev.filter(id => id !== assetId));
-        showToast('Asset deleted successfully.', 'success');
-      } catch (error) {
-        showToast('Failed to delete asset from backend.', 'error');
-        console.error('Delete error:', error);
-      } finally {
-        setIsLoading(false);
-      }
+      onRemoveAsset(assetId);
+      setSelectedAssetIds(prev => prev.filter(id => id !== assetId)); 
     }
-  }, [showToast]);
-
+  }, [onRemoveAsset]);
+  
   const handleStartEditTags = useCallback((asset: ContentLibraryAsset) => {
     setEditingTagsForAssetId(asset.id);
     setCurrentEditingTags((asset.tags || []).join(', '));
@@ -138,24 +133,15 @@ export const ContentLibraryView: React.FC<ContentLibraryViewProps> = () => {
     setCurrentEditingTags('');
   }, []);
 
-  const handleSaveTags = useCallback(async (assetId: string) => {
-    setIsLoading(true);
-    try {
+  const handleSaveTags = useCallback((assetId: string) => {
+    const assetToUpdate = assets.find(a => a.id === assetId);
+    if (assetToUpdate) {
       const updatedTags = currentEditingTags.split(',').map(tag => tag.trim()).filter(tag => tag);
-      await updateContentLibraryAssetTags(assetId, updatedTags);
-      setAssets(prev => prev.map(asset => 
-        asset.id === assetId ? { ...asset, tags: updatedTags } : asset
-      ));
+      onUpdateAsset({ ...assetToUpdate, tags: updatedTags });
       setEditingTagsForAssetId(null);
       setCurrentEditingTags('');
-      showToast('Tags updated successfully.', 'success');
-    } catch (error) {
-      showToast('Failed to update tags on backend.', 'error');
-      console.error('Update tags error:', error);
-    } finally {
-      setIsLoading(false);
     }
-  }, [currentEditingTags, showToast]);
+  }, [assets, currentEditingTags, onUpdateAsset]);
 
   const filteredAssets = useMemo(() => {
     return assets.filter(asset => {
@@ -163,7 +149,7 @@ export const ContentLibraryView: React.FC<ContentLibraryViewProps> = () => {
       const nameMatch = filterName === '' || asset.name.toLowerCase().includes(filterName.toLowerCase());
       const tagMatch = filterTag === '' || (asset.tags && asset.tags.some(tag => tag.toLowerCase().includes(filterTag.toLowerCase())));
       return typeMatch && nameMatch && tagMatch;
-    }).sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
+    }).sort((a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime());
   }, [assets, filterType, filterName, filterTag]);
 
   const imageAssetsForLightbox = useMemo(() => filteredAssets.filter(asset => asset.type === 'image'), [filteredAssets]);
@@ -190,32 +176,22 @@ export const ContentLibraryView: React.FC<ContentLibraryViewProps> = () => {
     }
   }, [selectedAssetIds, filteredAssets]);
   
-  const handleDeleteSelected = useCallback(async () => {
+  const handleDeleteSelected = useCallback(() => {
     if (selectedAssetIds.length === 0) {
-      showToast("No assets selected for deletion.", "info");
-      return;
+        showToast("No assets selected for deletion.", "info");
+        return;
     }
     if (window.confirm(`Are you sure you want to delete ${selectedAssetIds.length} selected asset(s)? This action cannot be undone.`)) {
-      setIsLoading(true);
-      try {
-        await Promise.all(selectedAssetIds.map(id => deleteContentLibraryAsset(id)));
-        setAssets(prev => prev.filter(asset => !selectedAssetIds.includes(asset.id)));
+        selectedAssetIds.forEach(id => onRemoveAsset(id));
         setSelectedAssetIds([]);
-        showToast(`${selectedAssetIds.length} assets deleted successfully.`, 'success');
-      } catch (error) {
-        showToast('Failed to delete selected assets from backend.', 'error');
-        console.error('Bulk delete error:', error);
-      } finally {
-        setIsLoading(false);
-      }
     }
-  }, [selectedAssetIds, showToast]);
-
+  }, [selectedAssetIds, onRemoveAsset, showToast]);
+  
   const handleCurrentEditingTagsChange = useCallback((tags: string) => {
     setCurrentEditingTags(tags);
   }, []);
 
-  if (isInitialLoading) {
+  if (isInitialLoading && assets.length === 0) {
     return <ContentLibrarySkeleton />;
   }
 
@@ -268,12 +244,12 @@ export const ContentLibraryView: React.FC<ContentLibraryViewProps> = () => {
           </Button>
         </div>
         <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-          <div className="flex items-start">
+           <div className="flex items-start">
             <ExclamationTriangleIcon className="h-5 w-5 text-yellow-600 mr-2 shrink-0 mt-0.5" />
             <p className="text-xs text-yellow-700">
-              Uploaded media is now stored securely in the cloud with Supabase. Ensure your files comply with storage policies.
+                Uploaded media is stored in your browser's local storage. Large files or many uploads can impact performance and storage limits.
             </p>
-          </div>
+           </div>
         </div>
       </Card>
 
@@ -310,49 +286,50 @@ export const ContentLibraryView: React.FC<ContentLibraryViewProps> = () => {
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 pt-4 border-t border-lightBorder">
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="select-all-assets"
-              className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded mr-2"
-              checked={filteredAssets.length > 0 && selectedAssetIds.length === filteredAssets.length}
-              onChange={handleSelectAll}
-              disabled={filteredAssets.length === 0}
-              aria-label="Select all filtered assets"
-            />
-            <label htmlFor="select-all-assets" className="text-sm text-textSecondary">
-              Select All ({selectedAssetIds.length} / {filteredAssets.length} selected)
-            </label>
-          </div>
-          <div className="flex gap-2">
-            <Button size="sm" variant="ghost" onClick={() => {setFilterType('all'); setFilterName(''); setFilterTag(''); setSelectedAssetIds([]);}} disabled={!filterName && !filterTag && filterType === 'all'}>
-              Clear Filters
-            </Button>
-            {selectedAssetIds.length > 0 && (
-              <Button 
-                size="sm" 
-                variant="danger" 
-                onClick={handleDeleteSelected}
-                leftIcon={<TrashIcon className="w-4 h-4" />}
-              >
-                Delete Selected ({selectedAssetIds.length})
-              </Button>
-            )}
-          </div>
+            <div className="flex items-center">
+                <input
+                    type="checkbox"
+                    id="select-all-assets"
+                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded mr-2"
+                    checked={filteredAssets.length > 0 && selectedAssetIds.length === filteredAssets.length}
+                    onChange={handleSelectAll}
+                    disabled={filteredAssets.length === 0}
+                    aria-label="Select all filtered assets"
+                />
+                <label htmlFor="select-all-assets" className="text-sm text-textSecondary">
+                    Select All ({selectedAssetIds.length} / {filteredAssets.length} selected)
+                </label>
+            </div>
+            <div className="flex gap-2">
+                <Button size="sm" variant="ghost" onClick={() => {setFilterType('all'); setFilterName(''); setFilterTag(''); setSelectedAssetIds([]);}} disabled={!filterName && !filterTag && filterType === 'all'}>
+                    Clear Filters
+                </Button>
+                {selectedAssetIds.length > 0 && (
+                    <Button 
+                        size="sm" 
+                        variant="danger" 
+                        onClick={handleDeleteSelected}
+                        leftIcon={<TrashIcon className="w-4 h-4" />}
+                    >
+                        Delete Selected ({selectedAssetIds.length})
+                    </Button>
+                )}
+            </div>
         </div>
       </Card>
 
+
       <Card title={`Showing ${filteredAssets.length} Assets`} shadow="soft-lg">
-        {(isLoading && assets.length === 0) && <LoadingSpinner text="Loading assets..." />}
+        {(isLoading && assets.length === 0 && !isInitialLoading) && <LoadingSpinner text="Loading assets..." />}
         {!isInitialLoading && assets.length === 0 && (
           <p className="text-textSecondary text-center py-4">
             No media uploaded yet. Use the form above to add assets to your library.
           </p>
         )}
         {!isInitialLoading && assets.length > 0 && filteredAssets.length === 0 && (
-          <p className="text-textSecondary text-center py-4">
-            No assets match your current filters. Try adjusting or clearing filters.
-          </p>
+            <p className="text-textSecondary text-center py-4">
+                No assets match your current filters. Try adjusting or clearing filters.
+            </p>
         )}
         {filteredAssets.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">

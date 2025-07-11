@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { AuditStep } from '../types';
+import { AuditStep, UserProfile } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Textarea } from './ui/Textarea';
@@ -8,27 +8,26 @@ import { generateJson } from '../services/aiService';
 import { AUDIT_TOOL_STEPS_DATA } from '../constants';
 
 interface AuditToolViewProps {
-  // Potentially pass campaign data if audit is related to a specific campaign
+  currentUser: UserProfile;
 }
 
-// Helper to trigger file download
 const downloadFile = (filename: string, content: string, mimeType: string) => {
   const element = document.createElement('a');
   const file = new Blob([content], { type: mimeType });
   element.href = URL.createObjectURL(file);
   element.download = filename;
-  document.body.appendChild(element); // Required for this to work in FireFox
+  document.body.appendChild(element);
   element.click();
   document.body.removeChild(element);
 };
 
-export const AuditToolView: React.FC<AuditToolViewProps> = () => {
+export const AuditToolView: React.FC<AuditToolViewProps> = ({ currentUser }) => {
   const initialSteps: AuditStep[] = AUDIT_TOOL_STEPS_DATA.map(s_item => ({
     id: s_item.id,
     title: s_item.title,
     description: s_item.description,
-    content: '', // Content will be filled by AI
-    isCompleted: false, // Will be true if AI successfully generates content for it
+    content: '',
+    isCompleted: false,
   }));
 
   const [steps, setSteps] = useState<AuditStep[]>(initialSteps);
@@ -44,9 +43,8 @@ export const AuditToolView: React.FC<AuditToolViewProps> = () => {
     }
     setIsLoading(true);
     setError(null);
-    setIsPlanGenerated(false); // Reset plan generated state
+    setIsPlanGenerated(false);
 
-    // Construct the definitions part of the prompt
     const stepDefinitions = AUDIT_TOOL_STEPS_DATA.map(s => `${s.id}: ${s.title} - ${s.description}`).join("\n");
 
     const prompt = `
@@ -74,10 +72,9 @@ export const AuditToolView: React.FC<AuditToolViewProps> = () => {
 
     const systemInstruction = "You are an AI assistant specialized in strategic planning and project management, proficient in the 8D problem-solving methodology. Generate detailed and practical content for each 8D step based on the user's campaign objective.";
     
-    // Type for the expected AI response
     type AiAuditPlanResponse = Record<string, string>;
 
-    const result = await generateJson<AiAuditPlanResponse>(prompt, systemInstruction);
+    const result = await generateJson<AiAuditPlanResponse>(prompt, currentUser, systemInstruction);
 
     if (result.data) {
       const allStepsContentProvided = AUDIT_TOOL_STEPS_DATA.every(s_item => result.data![s_item.id] && typeof result.data![s_item.id] === 'string');
@@ -87,21 +84,20 @@ export const AuditToolView: React.FC<AuditToolViewProps> = () => {
           prevSteps.map(step => ({
             ...step,
             content: result.data![step.id] || "AI did not provide content for this step.",
-            isCompleted: !!result.data![step.id], // Mark as completed if AI provided content
+            isCompleted: !!result.data![step.id],
           }))
         );
         setIsPlanGenerated(true);
       } else {
          setError("AI response was incomplete or not in the expected format. Some 8D steps might be missing content. Please try again.");
-         // Partially update if needed, or reset
-          setSteps(initialSteps); // Reset to avoid partial display
+          setSteps(initialSteps);
       }
     } else {
       setError(result.error || "Failed to generate AI audit plan. The AI might not have returned data or an error occurred.");
-      setSteps(initialSteps); // Reset to initial state on error
+      setSteps(initialSteps);
     }
     setIsLoading(false);
-  }, [campaignObjective, initialSteps]);
+  }, [campaignObjective, initialSteps, currentUser]);
 
 
   const exportAuditPlan = useCallback((format: 'markdown' | 'text') => {
@@ -152,7 +148,7 @@ export const AuditToolView: React.FC<AuditToolViewProps> = () => {
         </Button>
       </Card>
 
-      {error && <Card className="mb-4 bg-red-100 border-l-4 border-danger text-danger p-4"><p>{error}</p></Card>}
+      {error && <Card className="mb-4 bg-red-500/10 border-l-4 border-danger text-danger p-4"><p>{error}</p></Card>}
       
       {isLoading && !isPlanGenerated && <LoadingSpinner text="AI is crafting your 8D Audit Plan..." className="my-8" />}
 
@@ -164,10 +160,10 @@ export const AuditToolView: React.FC<AuditToolViewProps> = () => {
           </div>
           <div className="space-y-6">
             {steps.map(step => (
-              <div key={step.id} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+              <div key={step.id} className="p-4 border border-lightBorder rounded-lg bg-white/5">
                 <h3 className="text-xl font-semibold text-primary">{step.id}: {step.title}</h3>
                 <p className="text-sm text-textSecondary mt-1 italic">{step.description}</p>
-                <div className="mt-3 p-3 bg-white rounded border border-gray-300">
+                <div className="mt-3 p-3 bg-background rounded border border-mediumBorder">
                   <h4 className="text-sm font-semibold text-textPrimary mb-1">AI Generated Content:</h4>
                   <pre className="whitespace-pre-wrap text-sm text-textPrimary font-sans">
                     {step.content || "No content generated for this step."}

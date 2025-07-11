@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from 'react';
 import { ContentDraft, PlatformContentDetail } from '../../types';
 import { Card } from '../ui/Card';
@@ -12,7 +13,7 @@ interface ScheduleModalProps {
   platformKey: string;
   platformDetail: PlatformContentDetail;
   onClose: () => void;
-  onSchedule: (postId: string, platformKey: string, scheduledDateTime: string, notes: string) => void;
+  onSchedule: (draftId: string, platformKey: string, scheduledDateTime: string, notes: string) => void;
   showToast: (message: string, type: 'success' | 'error' | 'info', duration?: number) => void;
 }
 
