@@ -6,8 +6,7 @@ import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { 
-    ArrowUpTrayIcon, PhotoIcon, TrashIcon, VideoCameraIcon, 
-    ExclamationTriangleIcon, TagIcon, PencilSquareIcon, CheckIcon, XMarkIcon
+    ArrowUpTrayIcon, TrashIcon, TagIcon
 } from './ui/Icons'; 
 import { useToast } from './ui/ToastProvider';
 import { MAX_FILE_UPLOAD_SIZE_BYTES, MAX_FILE_UPLOAD_SIZE_MB, ACCEPTED_MEDIA_TYPES } from '../constants';
@@ -17,19 +16,10 @@ import { ImageLightbox } from './content-library/ImageLightbox';
 
 interface ContentLibraryViewProps {
   assets: ContentLibraryAsset[];
-  onAddAsset: (asset: ContentLibraryAsset) => void;
-  onUpdateAsset: (asset: ContentLibraryAsset) => void; 
-  onRemoveAsset: (assetId: string) => void;
+  onAddAsset: (file: File, name: string, tags: string[]) => Promise<void>;
+  onUpdateAsset: (assetId: string, updates: Partial<Pick<ContentLibraryAsset, 'name' | 'tags'>>) => Promise<void>;
+  onRemoveAsset: (assetId: string) => Promise<void>;
 }
-
-const formatBytes = (bytes: number, decimals = 2) => {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const dm = decimals < 0 ? 0 : decimals;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
-};
 
 export const ContentLibraryView: React.FC<ContentLibraryViewProps> = ({ assets, onAddAsset, onUpdateAsset, onRemoveAsset }) => {
   const { showToast } = useToast();
@@ -51,8 +41,8 @@ export const ContentLibraryView: React.FC<ContentLibraryViewProps> = ({ assets, 
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [currentLightboxImageIndex, setCurrentLightboxImageIndex] = useState(0);
 
-
   useEffect(() => {
+    // Simulate initial data load for skeleton display
     const timer = setTimeout(() => setIsInitialLoading(false), 750);
     return () => clearTimeout(timer);
   }, []);
@@ -68,7 +58,7 @@ export const ContentLibraryView: React.FC<ContentLibraryViewProps> = ({ assets, 
         return;
       }
       if (file.size > MAX_FILE_UPLOAD_SIZE_BYTES) {
-        showToast(`File is too large (${formatBytes(file.size)}). Maximum size is ${MAX_FILE_UPLOAD_SIZE_MB}MB.`, 'error');
+        showToast(`File is too large (${(file.size / (1024*1024)).toFixed(2)}MB). Maximum size is ${MAX_FILE_UPLOAD_SIZE_MB}MB.`, 'error');
         setSelectedFile(null);
         if (fileInputRef.current) fileInputRef.current.value = "";
         return;
@@ -86,39 +76,17 @@ export const ContentLibraryView: React.FC<ContentLibraryViewProps> = ({ assets, 
       return;
     }
     setIsLoading(true);
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const newAsset: ContentLibraryAsset = {
-        id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
-        user_id: '', // Will be set by parent/service
-        name: assetName.trim(),
-        type: selectedFile.type.startsWith('image/') ? 'image' : 'video',
-        publicUrl: reader.result as string,
-        storage_path: '', // Placeholder for local assets
-        file_name: selectedFile.name,
-        file_type: selectedFile.type,
-        size: selectedFile.size,
-        uploaded_at: new Date().toISOString(),
-        tags: assetTags.split(',').map(tag => tag.trim()).filter(tag => tag),
-      };
-      onAddAsset(newAsset);
-      setAssetName('');
-      setAssetTags('');
-      setSelectedFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      setIsLoading(false);
-    };
-    reader.onerror = () => {
-      showToast('Failed to read file.', 'error');
-      setIsLoading(false);
-    };
-    reader.readAsDataURL(selectedFile);
+    await onAddAsset(selectedFile, assetName, assetTags.split(',').map(t => t.trim()).filter(Boolean));
+    setAssetName('');
+    setAssetTags('');
+    setSelectedFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    setIsLoading(false);
   }, [selectedFile, assetName, assetTags, onAddAsset, showToast]);
 
-  const handleDeleteAsset = useCallback((assetId: string) => {
-    if (window.confirm('Are you sure you want to delete this asset? This action cannot be undone.')) {
-      onRemoveAsset(assetId);
+  const handleDeleteAsset = useCallback(async (assetId: string) => {
+    if (window.confirm('Are you sure you want to delete this asset? This action is permanent.')) {
+      await onRemoveAsset(assetId);
       setSelectedAssetIds(prev => prev.filter(id => id !== assetId)); 
     }
   }, [onRemoveAsset]);
@@ -133,11 +101,11 @@ export const ContentLibraryView: React.FC<ContentLibraryViewProps> = ({ assets, 
     setCurrentEditingTags('');
   }, []);
 
-  const handleSaveTags = useCallback((assetId: string) => {
+  const handleSaveTags = useCallback(async (assetId: string) => {
     const assetToUpdate = assets.find(a => a.id === assetId);
     if (assetToUpdate) {
       const updatedTags = currentEditingTags.split(',').map(tag => tag.trim()).filter(tag => tag);
-      onUpdateAsset({ ...assetToUpdate, tags: updatedTags });
+      await onUpdateAsset(assetId, { tags: updatedTags });
       setEditingTagsForAssetId(null);
       setCurrentEditingTags('');
     }
@@ -176,13 +144,13 @@ export const ContentLibraryView: React.FC<ContentLibraryViewProps> = ({ assets, 
     }
   }, [selectedAssetIds, filteredAssets]);
   
-  const handleDeleteSelected = useCallback(() => {
+  const handleDeleteSelected = useCallback(async () => {
     if (selectedAssetIds.length === 0) {
         showToast("No assets selected for deletion.", "info");
         return;
     }
-    if (window.confirm(`Are you sure you want to delete ${selectedAssetIds.length} selected asset(s)? This action cannot be undone.`)) {
-        selectedAssetIds.forEach(id => onRemoveAsset(id));
+    if (window.confirm(`Are you sure you want to delete ${selectedAssetIds.length} selected asset(s)? This action is permanent.`)) {
+        await Promise.all(selectedAssetIds.map(id => onRemoveAsset(id)));
         setSelectedAssetIds([]);
     }
   }, [selectedAssetIds, onRemoveAsset, showToast]);
@@ -229,7 +197,7 @@ export const ContentLibraryView: React.FC<ContentLibraryViewProps> = ({ assets, 
             />
             {selectedFile && (
               <p className="text-xs text-textSecondary mt-1">
-                Selected: {selectedFile.name} ({formatBytes(selectedFile.size)})
+                Selected: {selectedFile.name} ({(selectedFile.size / (1024*1024)).toFixed(2)}MB)
               </p>
             )}
           </div>
@@ -242,14 +210,6 @@ export const ContentLibraryView: React.FC<ContentLibraryViewProps> = ({ assets, 
           >
             {isLoading ? 'Uploading...' : 'Upload to Library'}
           </Button>
-        </div>
-        <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-           <div className="flex items-start">
-            <ExclamationTriangleIcon className="h-5 w-5 text-yellow-600 mr-2 shrink-0 mt-0.5" />
-            <p className="text-xs text-yellow-700">
-                Uploaded media is stored in your browser's local storage. Large files or many uploads can impact performance and storage limits.
-            </p>
-           </div>
         </div>
       </Card>
 
@@ -307,7 +267,7 @@ export const ContentLibraryView: React.FC<ContentLibraryViewProps> = ({ assets, 
                 {selectedAssetIds.length > 0 && (
                     <Button 
                         size="sm" 
-                        variant="danger" 
+                        variant="destructive" 
                         onClick={handleDeleteSelected}
                         leftIcon={<TrashIcon className="w-4 h-4" />}
                     >
@@ -320,7 +280,7 @@ export const ContentLibraryView: React.FC<ContentLibraryViewProps> = ({ assets, 
 
 
       <Card title={`Showing ${filteredAssets.length} Assets`} shadow="soft-lg">
-        {(isLoading && assets.length === 0 && !isInitialLoading) && <LoadingSpinner text="Loading assets..." />}
+        {isLoading && assets.length === 0 && !isInitialLoading && <LoadingSpinner text="Loading assets..." />}
         {!isInitialLoading && assets.length === 0 && (
           <p className="text-textSecondary text-center py-4">
             No media uploaded yet. Use the form above to add assets to your library.

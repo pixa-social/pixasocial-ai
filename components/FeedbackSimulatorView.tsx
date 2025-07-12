@@ -1,5 +1,7 @@
+
+
 import React, { useState, useCallback, useMemo } from 'react';
-import { Persona, Operator, FeedbackSimulationResult, ContentDraft, ViewName, UserProfile } from '../types';
+import { Persona, Operator, FeedbackSimulationResult, ContentDraft, ViewName, UserProfile, RSTProfile } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Textarea } from './ui/Textarea';
@@ -40,6 +42,8 @@ export const FeedbackSimulatorView: React.FC<FeedbackSimulatorViewProps> = ({ cu
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const hasNoCredits = currentUser.ai_usage_count_monthly >= currentUser.role.max_ai_uses_monthly;
+
   const personaOptions = useMemo(() => personas.map(p => ({ value: p.id, label: p.name })), [personas]);
   
   const contentDraftOptions = useMemo(() => contentDrafts.map(d => ({
@@ -76,6 +80,8 @@ export const FeedbackSimulatorView: React.FC<FeedbackSimulatorViewProps> = ({ cu
     setIsLoading(true);
     setError(null);
     setSimulationResult(null);
+    
+    const rstProfile = persona.rst_profile as unknown as RSTProfile | null;
 
     const prompt = `
       Persona Profile:
@@ -84,6 +90,7 @@ export const FeedbackSimulatorView: React.FC<FeedbackSimulatorViewProps> = ({ cu
       Psychographics: ${persona.psychographics}
       Initial Beliefs: ${persona.initial_beliefs}
       Vulnerabilities: ${persona.vulnerabilities?.join(', ') || 'Not specified'}
+      RST Profile: BAS: ${rstProfile?.bas || 'N/A'}, BIS: ${rstProfile?.bis || 'N/A'}, FFFS: ${rstProfile?.fffs || 'N/A'}
 
       Content for Feedback Simulation:
       """
@@ -164,12 +171,16 @@ export const FeedbackSimulatorView: React.FC<FeedbackSimulatorViewProps> = ({ cu
             required 
             disabled={showPrerequisiteMessage}
           />
+          {hasNoCredits && (
+             <p className="mt-4 text-sm text-yellow-400 text-center">You have used all your AI credits for this month.</p>
+          )}
           <Button 
             variant="primary" 
             onClick={handleSimulateFeedback} 
             isLoading={isLoading}
-            className="w-full mt-4"
-            disabled={!selectedPersonaId || !contentToSimulate || isLoading || showPrerequisiteMessage}
+            className="w-full mt-2"
+            disabled={!selectedPersonaId || !contentToSimulate || isLoading || showPrerequisiteMessage || hasNoCredits}
+            title={hasNoCredits ? "You have no AI credits remaining." : "Simulate feedback"}
           >
             {isLoading ? 'Simulating...' : 'Simulate Feedback'}
           </Button>

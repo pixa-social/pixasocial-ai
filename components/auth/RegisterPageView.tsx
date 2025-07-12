@@ -36,24 +36,26 @@ export const RegisterPageView: React.FC<RegisterPageViewProps> = ({ setAuthView 
     resolver: zodResolver(registerSchema)
   });
 
-  const handleRegister = async (data: RegisterFormData) => {
+  const handleRegister = async (formData: RegisterFormData) => {
     setServerError(null);
     setIsLoading(true);
 
-    const { data: { user }, error } = await supabase.auth.signUp({
-      email: data.email,
-      password: data.password,
-      options: {
-        data: {
-          name: data.name,
+    const { data, error } = await supabase.auth.signUp(
+      {
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            name: formData.name,
+          }
         }
       }
-    });
+    );
 
     if (error) {
       setServerError(error.message);
       showToast(error.message, "error");
-    } else if (user) {
+    } else if (data.user) {
       showToast("Registration successful! Check your email for confirmation.", "success");
       setAuthView('login');
     }

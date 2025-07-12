@@ -1,4 +1,3 @@
-
 # PixaSocial Ai - Strategic Social Engagement Suite
 
 PixaSocial Ai is a React-based web application designed for planning, simulating, and evaluating social engagement strategies. It leverages behavioral insights, psychological frameworks like Reinforcement Sensitivity Theory (RST), AI-driven assistance, and decentralized real-time communication to support global campaign managers.
@@ -7,6 +6,7 @@ PixaSocial Ai is a React-based web application designed for planning, simulating
 
 *   **Dashboard:** Dynamic overview of your campaign data, upcoming posts, and quick actions.
 *   **Audience Modeling:** Create detailed audience personas using RST (BAS, BIS, FFFS) and AI-assisted suggestions.
+*   **Analytics:** Generate and visualize OCEAN (Big Five) personality scores for your personas with AI-powered analysis and radar charts.
 *   **Operator Builder:** Design campaign mechanics (Hope, Fear, Custom, etc.) based on Pavlovian conditioning principles, tailored to specific personas.
 *   **Content Planner:** Generate multi-platform content (X, Facebook, Instagram, Email, Posters) with AI, including text, image prompts, meme text, and video ideas.
 *   **Calendar:** Schedule and visualize your content plan with an interactive calendar.
@@ -27,6 +27,7 @@ PixaSocial Ai is a React-based web application designed for planning, simulating
 *   **Decentralized Real-time Chat:** GunDB (`gun`)
 *   **Forms:** React Hook Form & Zod
 *   **Calendar:** `react-big-calendar`
+*   **Charts:** `recharts`
 *   **Date Management:** `date-fns`
 
 ## Local Development Setup with Bun

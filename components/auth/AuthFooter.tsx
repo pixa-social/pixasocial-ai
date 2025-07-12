@@ -1,4 +1,5 @@
-import React from 'react';
+
+import React, { useMemo } from 'react';
 import { APP_TITLE } from '../../constants';
 import { AuthViewType } from '../../types';
 
@@ -28,7 +29,7 @@ interface AuthFooterProps {
 }
 
 export const AuthFooter: React.FC<AuthFooterProps> = ({ setAuthView }) => {
-  const currentYear = new Date().getFullYear();
+  const currentYear = useMemo(() => new Date().getFullYear(), []);
 
   const productLinks: NavFooterLinkItem[] = [
     { label: "Features", view: "features" },

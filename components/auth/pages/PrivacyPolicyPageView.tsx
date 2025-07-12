@@ -1,9 +1,11 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Card } from '../../ui/Card';
 import { APP_TITLE } from '../../../constants';
 
 export const PrivacyPolicyPageView: React.FC = () => {
+  const effectiveDate = useMemo(() => new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }), []);
+
   return (
     <div className="bg-background py-16 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto prose prose-invert lg:prose-xl text-textSecondary prose-headings:text-primary prose-a:text-accent prose-strong:text-textPrimary">
@@ -11,7 +13,7 @@ export const PrivacyPolicyPageView: React.FC = () => {
         <p className="lead">
           Your privacy is important to us. It is {APP_TITLE}'s policy to respect your privacy regarding any information we may collect from you across our application.
         </p>
-        <p>This policy is effective as of {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}.</p>
+        <p>This policy is effective as of {effectiveDate}.</p>
 
         <h2>1. Information We Collect</h2>
         <p>

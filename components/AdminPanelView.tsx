@@ -5,19 +5,20 @@ import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Select, SelectOption } from './ui/Select';
-import { AiProviderConfig, AiProviderType, RoleType, RoleName, AdminUserView } from '../types';
+import { AiProviderConfig, AiProviderType, RoleType, RoleName, AdminUserView, Database, Json } from '../types';
 import { 
     LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY, 
     LOCAL_STORAGE_GLOBAL_DEFAULT_TEXT_MODEL_KEY, 
     LOCAL_STORAGE_GLOBAL_DEFAULT_IMAGE_MODEL_KEY 
 } from '../constants';
-import { EyeIcon, EyeSlashIcon, ExclamationTriangleIcon, WrenchScrewdriverIcon, ServerStackIcon, UsersIcon } from './ui/Icons';
+import { EyeIcon, EyeSlashIcon, ExclamationTriangleIcon, WrenchScrewdriverIcon, ServerStackIcon, UsersIcon, ShieldCheckIcon } from './ui/Icons';
 import { useToast } from './ui/ToastProvider';
 import { getStoredAiProviderConfigs, getActiveAiProviderType } from '../services/ai/aiUtils';
 import { Tabs, Tab } from './ui/Tabs';
 import { supabase } from '../services/supabaseClient';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { Textarea } from './ui/Textarea';
+import { SeoSettingsTab } from './admin/SeoSettingsTab';
 
 // --- AI Provider Config Tab ---
 const AiProviderConfigTab: React.FC = () => {
@@ -69,8 +70,14 @@ const AiProviderConfigTab: React.FC = () => {
 
     const handleSaveConfigs = async () => {
         try {
-            const upsertData = providerConfigs.map(({ id, name, api_key, is_enabled, models, notes, base_url }) => ({
-                id, name, api_key, is_enabled, models, notes, base_url, updated_at: new Date().toISOString()
+            const upsertData: Database['public']['Tables']['ai_provider_global_configs']['Insert'][] = providerConfigs.map(({ id, name, api_key, is_enabled, models, notes, base_url }) => ({
+                id, name, 
+                api_key: api_key || null, 
+                is_enabled, 
+                models: models as unknown as Json, 
+                notes: notes || null, 
+                base_url: base_url || null, 
+                updated_at: new Date().toISOString()
             }));
 
             const { error } = await supabase.from('ai_provider_global_configs').upsert(upsertData, { onConflict: 'id' });
@@ -236,9 +243,14 @@ const UserManagementTab: React.FC = () => {
             return;
         }
 
+        const updatePayload: Database['public']['Tables']['user_roles']['Update'] = {
+            role_id: newRole.id,
+            assigned_at: new Date().toISOString()
+        };
+
         const { error } = await supabase
             .from('user_roles')
-            .update({ role_id: newRole.id, assigned_at: new Date().toISOString() })
+            .update(updatePayload)
             .eq('user_id', userId);
         
         if (error) {
@@ -250,8 +262,13 @@ const UserManagementTab: React.FC = () => {
     };
 
     const handleModelChange = async (userId: string, modelType: 'text' | 'image', modelName: string) => {
-        const fieldToUpdate = modelType === 'text' ? 'assigned_ai_model_text' : 'assigned_ai_model_image';
-        const { error } = await supabase.from('profiles').update({ [fieldToUpdate]: modelName }).eq('id', userId);
+        const fieldToUpdate: 'assigned_ai_model_text' | 'assigned_ai_model_image' = modelType === 'text' ? 'assigned_ai_model_text' : 'assigned_ai_model_image';
+        
+        const updatePayload: Database['public']['Tables']['profiles']['Update'] = {
+            [fieldToUpdate]: modelName || null
+        };
+
+        const { error } = await supabase.from('profiles').update(updatePayload).eq('id', userId);
         
         if (error) {
             showToast(`Failed to update model assignment: ${error.message}`, 'error');
@@ -369,7 +386,16 @@ const PricingManagementTab: React.FC = () => {
             return;
         }
 
-        const { error } = await supabase.from('role_types').update({...updates, updated_at: new Date().toISOString()}).eq('id', roleId);
+        const updatePayload: Database['public']['Tables']['role_types']['Update'] = {
+            max_personas: updates.max_personas,
+            max_ai_uses_monthly: updates.max_ai_uses_monthly,
+            price_monthly: updates.price_monthly,
+            price_yearly: updates.price_yearly,
+            features: updates.features,
+            updated_at: new Date().toISOString()
+        };
+
+        const { error } = await supabase.from('role_types').update(updatePayload).eq('id', roleId);
         if (error) {
             showToast(`Failed to save role '${roleToUpdate.name}': ${error.message}`, 'error');
         } else {
@@ -421,6 +447,9 @@ export const AdminPanelView: React.FC = () => {
                 </Tab>
                 <Tab label="Pricing & Subscriptions" icon={<WrenchScrewdriverIcon className="w-5 h-5" />}>
                     <PricingManagementTab />
+                </Tab>
+                 <Tab label="SEO & Analytics" icon={<ShieldCheckIcon className="w-5 h-5" />}>
+                    <SeoSettingsTab />
                 </Tab>
             </Tabs>
         </div>

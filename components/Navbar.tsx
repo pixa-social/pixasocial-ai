@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { NavItem, ViewName, UserProfile, RoleName } from '../types';
 import { APP_TITLE, NAVIGATION_ITEMS } from '../constants';
@@ -25,7 +26,7 @@ const NavLinkComponent: React.FC<{
     : 'bg-primary text-white';
   const inactiveClasses = isDropdownChild 
     ? 'text-textPrimary hover:bg-gray-700 hover:text-white block w-full text-left' 
-    : 'text-textSecondary hover:bg-primary/80 hover:text-white';
+    : 'text-textSecondary hover:bg-gray-700 hover:text-white';
 
   return (
     <button
@@ -78,6 +79,30 @@ const DropdownIconComponent: React.FC<{ isOpen: boolean }> = ({ isOpen }) => (
   </svg>
 );
 const DropdownIcon = React.memo(DropdownIconComponent);
+
+const AiCreditCounter: React.FC<{ currentUser: UserProfile }> = ({ currentUser }) => {
+    const { ai_usage_count_monthly, role } = currentUser;
+    const { max_ai_uses_monthly } = role;
+    const remainingCredits = max_ai_uses_monthly - ai_usage_count_monthly;
+    
+    const creditsClass = remainingCredits > (max_ai_uses_monthly * 0.2)
+      ? 'text-green-400'
+      : remainingCredits > 0 ? 'text-yellow-400' : 'text-danger';
+
+    return (
+        <div 
+            className="flex items-center px-3 py-2 bg-card border border-lightBorder rounded-md"
+            title={`You have ${remainingCredits} out of ${max_ai_uses_monthly} monthly AI credits remaining.`}
+        >
+            <span role="img" aria-label="credits" className="text-yellow-400 mr-2">⚡</span>
+            <span className={`font-mono font-semibold text-sm ${creditsClass}`}>
+                {remainingCredits}
+            </span>
+            <span className="text-xs text-textSecondary mx-1">/</span>
+            <span className="text-xs text-textSecondary">{max_ai_uses_monthly}</span>
+        </div>
+    );
+};
 
 
 export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, isAuthenticated, onLogout, currentUser }) => {
@@ -143,9 +168,9 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, isAuthe
   }, []);
 
   return (
-    <nav className="bg-gray-900 shadow-lg border-b border-lightBorder sticky top-0 z-50">
+    <nav className="bg-background shadow-lg border-b border-lightBorder sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20"> 
+        <div className="flex items-center justify-between h-16"> 
           <div className="flex items-center">
             <span 
               className="font-bold text-xl sm:text-2xl text-white cursor-pointer transition-opacity hover:opacity-80"
@@ -159,7 +184,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, isAuthe
 
           {isAuthenticated && (
             <div className="hidden md:flex items-center">
-              <div className="ml-10 flex items-baseline space-x-1">
+              <div className="ml-10 flex items-center space-x-2">
                 {visibleNavItems.map((item) => (
                   <div key={item.label} className="relative" ref={item.children ? dropdownRef : null}>
                     {item.children ? (
@@ -167,10 +192,10 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, isAuthe
                         <button
                           onClick={() => handleToggleDropdown(item.label)}
                           aria-label={item.label}
-                          className={`px-3 py-2.5 rounded-md text-sm font-medium flex items-center transition-colors duration-150 ease-in-out
+                          className={`px-3 py-2 rounded-md text-sm font-medium flex items-center transition-colors duration-150 ease-in-out
                             ${isViewActive(item, currentView)
                               ? 'bg-primary/20 text-primary' 
-                              : 'text-textSecondary hover:bg-primary/20 hover:text-white'
+                              : 'text-textSecondary hover:bg-gray-700 hover:text-white'
                             }`}
                           aria-expanded={openDropdownLabel === item.label}
                           aria-haspopup="true"
@@ -209,18 +234,21 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, isAuthe
                   </div>
                 ))}
               </div>
-              {onLogout && (
-                <Button 
-                  onClick={onLogout} 
-                  variant="ghost" 
-                  size="sm"
-                  className="ml-6 text-textSecondary hover:bg-primary/20 hover:text-white px-3 py-2" 
-                  leftIcon={<ArrowRightOnRectangleIcon className="h-5 w-5 transform rotate-180" />}
-                  title="Logout"
-                >
-                  Logout
-                </Button>
-              )}
+              <div className="flex items-center ml-6 space-x-4">
+                 <AiCreditCounter currentUser={currentUser} />
+                {onLogout && (
+                    <Button 
+                    onClick={onLogout} 
+                    variant="ghost" 
+                    size="sm"
+                    className="text-textSecondary hover:bg-primary/20 hover:text-white" 
+                    leftIcon={<ArrowRightOnRectangleIcon className="h-5 w-5 transform rotate-180" />}
+                    title="Logout"
+                    >
+                    Logout
+                    </Button>
+                )}
+              </div>
             </div>
           )}
 
@@ -284,6 +312,9 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, isAuthe
                 )}
               </div>
             ))}
+             <div className="py-4 px-2 border-t border-lightBorder">
+                 <AiCreditCounter currentUser={currentUser} />
+             </div>
           </div>
           {onLogout && (
              <div className="py-4 px-2 border-t border-lightBorder">

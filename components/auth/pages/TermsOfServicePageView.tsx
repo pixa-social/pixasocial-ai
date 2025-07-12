@@ -1,8 +1,11 @@
-import React from 'react';
+
+import React, { useMemo } from 'react';
 import { Card } from '../../ui/Card';
 import { APP_TITLE } from '../../../constants';
 
 export const TermsOfServicePageView: React.FC = () => {
+  const effectiveDate = useMemo(() => new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }), []);
+
   return (
     <div className="bg-background py-16 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto prose prose-lg text-textSecondary">
@@ -55,7 +58,7 @@ export const TermsOfServicePageView: React.FC = () => {
           If you have any questions about these Terms, please contact us.
         </p>
 
-        <p>This policy is effective as of {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}.</p>
+        <p>This policy is effective as of {effectiveDate}.</p>
       </div>
     </div>
   );

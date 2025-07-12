@@ -1,4 +1,5 @@
 
+
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '../types'; // Assuming this is the type for your DB schema
 

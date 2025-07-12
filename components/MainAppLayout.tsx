@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Navbar } from './Navbar';
-import { ViewName, User, Persona, Operator, ContentDraft, ScheduledPost, ScheduledPostDbRow, ContentLibraryAsset, CustomChannel, UserProfile, ConnectedAccount, SocialPlatformType } from '../types';
+import { ViewName, User, Persona, Operator, ContentDraft, ScheduledPost, ScheduledPostDbRow, ContentLibraryAsset, CustomChannel, UserProfile, ConnectedAccount, SocialPlatformType, Database, Json } from '../types';
 import { APP_TITLE, CONTENT_PLATFORMS } from '../constants';
 import { Breadcrumbs } from './ui/Breadcrumbs';
 
 import { DashboardView } from './DashboardView';
 import { AudienceModelingView } from './AudienceModelingView';
+import { AnalyticsView } from './AnalyticsView';
 import { OperatorBuilderView } from './OperatorBuilderView';
 import { ContentPlannerView } from './ContentPlannerView';
 import { CalendarView } from './CalendarView'; 
@@ -46,13 +47,48 @@ export const MainAppLayout: React.FC<MainAppLayoutProps> = ({
   const [customChannels, setCustomChannels] = useState<CustomChannel[]>([]);
   const [connectedAccounts, setConnectedAccounts] = useState<ConnectedAccount[]>([]);
   
+  const fetchContentLibraryAssets = useCallback(async () => {
+    if (!currentUser) return;
+    const { data, error } = await supabase
+      .from('content_library_assets')
+      .select('*')
+      .eq('user_id', currentUser.id)
+      .order('uploaded_at', { ascending: false });
+
+    if (error) {
+      showToast('Could not fetch content library assets.', 'error');
+      setContentLibraryAssets([]);
+      return;
+    }
+
+    if (data) {
+       const assetsWithUrls = await Promise.all(
+        data.map(async (asset) => {
+          const { data: urlData, error: urlError } = await supabase.storage
+            .from('content-library')
+            .createSignedUrl(asset.storage_path, 3600); // 1 hour expiry
+
+          if (urlError) {
+            console.error(`Error creating signed URL for ${asset.storage_path}:`, urlError.message);
+            // Return the asset without a publicUrl so the UI can handle it gracefully if needed
+            return { ...asset, publicUrl: undefined };
+          }
+          
+          return { ...asset, publicUrl: urlData.signedUrl };
+        })
+      );
+      setContentLibraryAssets(assetsWithUrls as ContentLibraryAsset[]);
+    }
+  }, [currentUser, showToast]);
+
+
   // Data fetching
   useEffect(() => {
     if (!currentUser) return;
     
     const fetchAllData = async () => {
       const { data: personaData } = await supabase.from('personas').select('*').eq('user_id', currentUser.id);
-      setPersonas(personaData || []);
+      setPersonas(personaData as Persona[] || []);
 
       const { data: operatorData } = await supabase.from('operators').select('*').eq('user_id', currentUser.id);
       setOperators(operatorData || []);
@@ -69,8 +105,7 @@ export const MainAppLayout: React.FC<MainAppLayoutProps> = ({
       });
       setContentDrafts(processedDrafts);
 
-      const assetsFromStorage = JSON.parse(localStorage.getItem(`pixasocial_assets_${currentUser.id}`) || '[]');
-      setContentLibraryAssets(assetsFromStorage);
+      fetchContentLibraryAssets();
       
       const channelsFromStorage = JSON.parse(localStorage.getItem(`pixasocial_channels_${currentUser.id}`) || '[]');
       setCustomChannels(channelsFromStorage);
@@ -101,33 +136,87 @@ export const MainAppLayout: React.FC<MainAppLayoutProps> = ({
       setConnectedAccounts(accountData || []);
     };
     fetchAllData();
-  }, [currentUser]);
+  }, [currentUser, fetchContentLibraryAssets]);
 
   const handleAddContentDraft = useCallback(async (draftData: Omit<ContentDraft, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
-    const dbPayload: any = { ...draftData };
-    if (dbPayload.platform_media_overrides) {
-        dbPayload.platform_contents = { ...dbPayload.platform_contents, _media_overrides: dbPayload.platform_media_overrides };
-        delete dbPayload.platform_media_overrides;
-    }
-    const dataToInsert = { ...dbPayload, user_id: currentUser.id };
+    const dataToInsert: Database['public']['Tables']['content_drafts']['Insert'] = {
+        id: `draft_${Date.now()}`,
+        user_id: currentUser.id,
+        operator_id: draftData.operator_id,
+        persona_id: draftData.persona_id,
+        key_message: draftData.key_message || null,
+        custom_prompt: draftData.custom_prompt,
+        platform_contents: draftData.platform_contents as unknown as Json,
+        platform_media_overrides: draftData.platform_media_overrides as unknown as Json || null
+    };
+
     const { data, error } = await supabase.from('content_drafts').insert(dataToInsert).select().single();
     if (error) { showToast(`Failed to save draft: ${error.message}`, 'error');
     } else if (data) {
-        const newDraft: any = { ...data };
-        if (newDraft.platform_contents && (newDraft.platform_contents as any)._media_overrides) {
-            newDraft.platform_media_overrides = (newDraft.platform_contents as any)._media_overrides;
-            delete (newDraft.platform_contents as any)._media_overrides;
-        }
-        setContentDrafts(prev => [...prev, newDraft as ContentDraft]);
+        setContentDrafts(prev => [...prev, data as ContentDraft]);
         showToast("Draft saved successfully to your account!", "success");
     }
   }, [currentUser.id, showToast]);
+
+  const handleDeleteContentDraft = useCallback(async (draftId: string) => {
+    if (window.confirm('Are you sure you want to delete this entire draft? This action cannot be undone.')) {
+        const { error } = await supabase.from('content_drafts').delete().eq('id', draftId);
+        if (error) {
+            showToast(`Failed to delete draft: ${error.message}`, 'error');
+        } else {
+            setContentDrafts(prev => prev.filter(d => d.id !== draftId));
+            showToast('Entire draft deleted.', 'info');
+        }
+    }
+  }, [showToast]);
+  
+  const handleDeletePlatformContent = useCallback(async (draftId: string, platformKey: string) => {
+    const draft = contentDrafts.find(d => d.id === draftId);
+    if (!draft) {
+      showToast("Draft not found to modify.", "error");
+      return;
+    }
+
+    const newPlatformContents = { ...draft.platform_contents };
+    delete newPlatformContents[platformKey];
+
+    const contentKeys = Object.keys(newPlatformContents).filter(k => k !== '_media_overrides');
+    if (contentKeys.length === 0) {
+      handleDeleteContentDraft(draftId);
+      return;
+    }
+    
+    const updatePayload: Database['public']['Tables']['content_drafts']['Update'] = {
+        platform_contents: newPlatformContents as unknown as Json,
+    };
+
+    const { error } = await supabase
+        .from('content_drafts')
+        .update(updatePayload)
+        .eq('id', draftId);
+    
+    if (error) {
+        showToast(`Failed to update draft: ${error.message}`, 'error');
+    } else {
+        setContentDrafts(prev => prev.map(d => 
+            d.id === draftId 
+            ? { ...d, platform_contents: newPlatformContents } 
+            : d
+        ));
+        showToast(`Removed platform content from draft.`, 'success');
+    }
+  }, [contentDrafts, showToast, handleDeleteContentDraft]);
   
   const handleAddScheduledPost = useCallback(async (post: ScheduledPost) => {
-    const { data, error } = await supabase.from('scheduled_posts').insert({
-        user_id: currentUser.id, content_draft_id: post.resource.contentDraftId, platform_key: post.resource.platformKey,
-        status: post.resource.status, notes: post.resource.notes, scheduled_at: post.start.toISOString(),
-    }).select().single();
+    const insertPayload: Database['public']['Tables']['scheduled_posts']['Insert'] = {
+        user_id: currentUser.id, 
+        content_draft_id: post.resource.contentDraftId, 
+        platform_key: post.resource.platformKey,
+        status: post.resource.status, 
+        notes: post.resource.notes || null, 
+        scheduled_at: post.start.toISOString(),
+    };
+    const { data, error } = await supabase.from('scheduled_posts').insert(insertPayload).select().single();
     if(error) { showToast(`Failed to save schedule: ${error.message}`, 'error');
     } else {
         const newPostWithDbId = { ...post, db_id: data.id, id: `sch_${data.id}_${data.platform_key}` };
@@ -137,10 +226,14 @@ export const MainAppLayout: React.FC<MainAppLayoutProps> = ({
   }, [currentUser.id, showToast]);
 
   const handleUpdateScheduledPost = useCallback(async (post: ScheduledPost) => {
-    const { error } = await supabase.from('scheduled_posts').update({
-        notes: post.resource.notes, status: post.resource.status, scheduled_at: post.start.toISOString(),
-        error_message: post.resource.error_message, last_attempted_at: post.resource.last_attempted_at,
-    }).eq('id', post.db_id);
+    const updatePayload: Database['public']['Tables']['scheduled_posts']['Update'] = {
+        notes: post.resource.notes || null, 
+        status: post.resource.status, 
+        scheduled_at: post.start.toISOString(),
+        error_message: post.resource.error_message || null, 
+        last_attempted_at: post.resource.last_attempted_at || null,
+    };
+    const { error } = await supabase.from('scheduled_posts').update(updatePayload).eq('id', post.db_id);
     if (error) { showToast(`Failed to update schedule: ${error.message}`, 'error');
     } else {
         setScheduledPosts(prev => prev.map(p => p.id === post.id ? post : p));
@@ -159,7 +252,14 @@ export const MainAppLayout: React.FC<MainAppLayoutProps> = ({
   }, [scheduledPosts, showToast]);
   
   const handleAddConnectedAccount = useCallback(async (platform: SocialPlatformType, accountId: string, displayName: string, profileImageUrl?: string) => {
-    const newAccount = { platform, accountId, displayName, profileImageUrl: profileImageUrl || undefined, user_id: currentUser.id, connectedAt: new Date().toISOString() };
+    const newAccount: Database['public']['Tables']['connected_accounts']['Insert'] = { 
+        platform, 
+        accountId, 
+        displayName, 
+        profileImageUrl: profileImageUrl || null, 
+        user_id: currentUser.id, 
+        connectedAt: new Date().toISOString() 
+    };
     const { data, error } = await supabase.from('connected_accounts').insert(newAccount).select().single();
     if(error) { showToast(`Failed to connect account: ${error.message}`, 'error');
     } else {
@@ -177,26 +277,79 @@ export const MainAppLayout: React.FC<MainAppLayoutProps> = ({
     }
   }, [showToast]);
 
-  const handleAddAsset = useCallback((asset: ContentLibraryAsset) => {
-    const updatedAssets = [...contentLibraryAssets, asset];
-    setContentLibraryAssets(updatedAssets);
-    localStorage.setItem(`pixasocial_assets_${currentUser.id}`, JSON.stringify(updatedAssets));
-    showToast("Asset added to local library!", "success");
-  }, [contentLibraryAssets, currentUser.id, showToast]);
+  const handleAddAsset = useCallback(async (file: File, name: string, tags: string[]) => {
+    if (!currentUser) return;
 
-  const handleUpdateAsset = useCallback((asset: ContentLibraryAsset) => {
-    const updatedAssets = contentLibraryAssets.map(a => a.id === asset.id ? asset : a);
-    setContentLibraryAssets(updatedAssets);
-    localStorage.setItem(`pixasocial_assets_${currentUser.id}`, JSON.stringify(updatedAssets));
-    showToast("Asset updated!", "success");
-  }, [contentLibraryAssets, currentUser.id, showToast]);
+    const storagePath = `${currentUser.id}/${Date.now()}-${file.name}`;
+    const { error: uploadError } = await supabase.storage
+      .from('content-library')
+      .upload(storagePath, file);
 
-  const handleRemoveAsset = useCallback((assetId: string) => {
-    const updatedAssets = contentLibraryAssets.filter(a => a.id !== assetId);
-    setContentLibraryAssets(updatedAssets);
-    localStorage.setItem(`pixasocial_assets_${currentUser.id}`, JSON.stringify(updatedAssets));
-    showToast("Asset removed from local library.", "info");
-  }, [contentLibraryAssets, currentUser.id, showToast]);
+    if (uploadError) {
+      showToast(`Upload failed: ${uploadError.message}`, 'error');
+      return;
+    }
+    
+    const dbPayload: Database['public']['Tables']['content_library_assets']['Insert'] = {
+      user_id: currentUser.id,
+      name,
+      type: file.type.startsWith('image/') ? 'image' : 'video',
+      storage_path: storagePath,
+      file_name: file.name,
+      file_type: file.type,
+      size: file.size,
+      tags: tags.length > 0 ? tags : null,
+    };
+
+    const { error: dbError } = await supabase.from('content_library_assets').insert(dbPayload);
+
+    if (dbError) {
+      showToast(`Failed to save asset metadata: ${dbError.message}`, 'error');
+    } else {
+      showToast("Asset added to library!", "success");
+      fetchContentLibraryAssets();
+    }
+  }, [currentUser, showToast, fetchContentLibraryAssets]);
+
+  const handleUpdateAsset = useCallback(async (assetId: string, updates: Partial<Pick<ContentLibraryAsset, 'name' | 'tags'>>) => {
+    const updatePayload: Database['public']['Tables']['content_library_assets']['Update'] = updates;
+    const { error } = await supabase
+      .from('content_library_assets')
+      .update(updatePayload)
+      .eq('id', assetId);
+
+    if (error) {
+      showToast(`Failed to update asset: ${error.message}`, 'error');
+    } else {
+      showToast("Asset updated successfully!", "success");
+      fetchContentLibraryAssets();
+    }
+  }, [showToast, fetchContentLibraryAssets]);
+
+  const handleRemoveAsset = useCallback(async (assetId: string) => {
+    const assetToDelete = contentLibraryAssets.find(a => a.id === assetId);
+    if (!assetToDelete) return;
+    
+    const { error: storageError } = await supabase.storage
+      .from('content-library')
+      .remove([assetToDelete.storage_path]);
+
+    if (storageError) {
+      showToast(`Failed to delete file from storage: ${storageError.message}`, 'error');
+    }
+
+    const { error: dbError } = await supabase
+      .from('content_library_assets')
+      .delete()
+      .eq('id', assetId);
+
+    if (dbError) {
+      showToast(`Failed to delete asset record: ${dbError.message}`, 'error');
+    } else {
+      showToast("Asset deleted successfully.", "info");
+      fetchContentLibraryAssets();
+    }
+  }, [contentLibraryAssets, showToast, fetchContentLibraryAssets]);
   
   const handleAddCustomChannel = useCallback((name: string) => {
     const newChannel: CustomChannel = {
@@ -223,12 +376,17 @@ export const MainAppLayout: React.FC<MainAppLayoutProps> = ({
         return <DashboardView currentUser={currentUser} onNavigate={onNavigate} connectedAccounts={connectedAccounts} />;
       case ViewName.AudienceModeling:
         return <AudienceModelingView currentUser={currentUser} onNavigate={onNavigate} />;
+      case ViewName.Analytics:
+        return <AnalyticsView currentUser={currentUser} personas={personas} onNavigate={onNavigate} />;
       case ViewName.OperatorBuilder:
         return <OperatorBuilderView currentUser={currentUser} onNavigate={onNavigate} />;
       case ViewName.ContentPlanner:
         return <ContentPlannerView 
                   currentUser={currentUser} contentDrafts={contentDrafts} personas={personas} operators={operators} 
-                  onAddContentDraft={handleAddContentDraft} onAddScheduledPost={handleAddScheduledPost}
+                  onAddContentDraft={handleAddContentDraft}
+                  onDeleteContentDraft={handleDeleteContentDraft}
+                  onDeletePlatformContent={handleDeletePlatformContent}
+                  onAddScheduledPost={handleAddScheduledPost}
                   onAddContentLibraryAsset={handleAddAsset} onNavigate={onNavigate} 
                 />;
       case ViewName.Calendar:
@@ -251,15 +409,10 @@ export const MainAppLayout: React.FC<MainAppLayoutProps> = ({
         return <AuditToolView currentUser={currentUser} />;
       case ViewName.SocialPoster:
         return <SocialPosterView
-                  currentUser={currentUser}
-                  scheduledPosts={scheduledPosts}
-                  contentDrafts={contentDrafts}
-                  personas={personas}
-                  operators={operators}
-                  connectedAccounts={connectedAccounts}
+                  currentUser={currentUser} scheduledPosts={scheduledPosts} contentDrafts={contentDrafts}
+                  personas={personas} operators={operators} connectedAccounts={connectedAccounts} 
                   onUpdateScheduledPost={handleUpdateScheduledPost}
-                  onDeleteScheduledPost={handleDeleteScheduledPost}
-                  onNavigate={onNavigate}
+                  onDeleteScheduledPost={handleDeleteScheduledPost} onNavigate={onNavigate}
                 />;
       case ViewName.AdminPanel:
         return <AdminPanelView />;
@@ -288,7 +441,7 @@ export const MainAppLayout: React.FC<MainAppLayoutProps> = ({
         {renderView()}
       </main>
       <footer className="bg-gray-900 text-gray-400 text-center p-4 text-sm border-t border-lightBorder">
-        &copy; {new Date().getFullYear()} {APP_TITLE}. All rights reserved. For planning and educational purposes.
+        &copy; {new Date().getFullYear()} {APP_TITLE}. All rights reserved.
       </footer>
     </div>
   );

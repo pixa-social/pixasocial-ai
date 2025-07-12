@@ -11,7 +11,7 @@ This document outlines the backend architecture and specifications for the PixaS
 *   Act as a secure proxy for all AI API calls (Gemini, OpenAI, etc.), protecting API keys.
 *   Provide real-time chat functionality for team collaboration.
 *   Manage file uploads and storage for the Content Library and chat attachments.
-*   Enforce business logic and data validation.
+*   Enforce business logic and data validation, including AI credit usage.
 
 ### 1.2. Technology Stack Considerations
 
@@ -32,6 +32,9 @@ This document will primarily reference a **Node.js** environment, potentially us
     *   **Prisma** or **TypeORM** if using Node.js with PostgreSQL (or Supabase direct SDK).
 *   **Email Service (for password reset, invitations):**
     *   SendGrid, Mailgun, AWS SES.
+*   **Scheduled Jobs (for credit reset):**
+    *   **pg_cron** for PostgreSQL/Supabase.
+    *   Node-cron or similar for Node.js server.
 
 ## 2. Authentication and User Management
 
@@ -58,25 +61,13 @@ const UserSchema = new mongoose.Schema({
 **Supabase (PostgreSQL Table):**
 
 ```sql
-CREATE TABLE users (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name TEXT,
-  email TEXT UNIQUE NOT NULL,
-  password_hash TEXT NOT NULL,
-  wallet_address TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  password_reset_token TEXT,
-  password_reset_expires TIMESTAMPTZ
-  -- Supabase auth.users table is often used directly
-);
-
 -- Note: Supabase provides its own 'auth.users' table.
--- You might extend it using a separate 'profiles' table linked by user_id.
+-- You will extend it using a separate 'profiles' table linked by user_id.
 CREATE TABLE profiles (
   user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   name TEXT,
   wallet_address TEXT,
+  ai_usage_count_monthly INT DEFAULT 0 NOT NULL, -- ADD THIS FIELD
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```
@@ -89,7 +80,7 @@ CREATE TABLE profiles (
         1.  Validate input.
         2.  Check if email already exists.
         3.  Hash password (e.g., using bcrypt).
-        4.  Create new user record.
+        4.  Create new user record in `auth.users` (Supabase handles this) and `profiles`.
     *   **Response:** `201 Created` with `{ message: "User registered successfully" }` or user object (excluding password).
 
 *   **`POST /api/v1/auth/login`**
@@ -98,10 +89,10 @@ CREATE TABLE profiles (
         1.  Find user by email.
         2.  Compare hashed password.
         3.  If valid, generate JWT (containing user ID, possibly role).
-    *   **Response:** `200 OK` with `{ token, user: { id, name, email, walletAddress, teamIds } }`.
+    *   **Response:** `200 OK` with `{ token, user: { id, name, email, walletAddress, teamIds, aiUsageCount, role } }`.
 
 *   **`GET /api/v1/auth/me`** (Requires Authentication)
-    *   **Logic:** Validate JWT from Authorization header, fetch user details.
+    *   **Logic:** Validate JWT from Authorization header, fetch user details including profile, role, and AI usage.
     *   **Response:** `200 OK` with user object (excluding password).
 
 *   **`POST /api/v1/auth/forgot-password`**
@@ -406,65 +397,83 @@ CREATE TABLE content_library_assets (
 
 ## 10. Connected Social Accounts
 
-For a real backend, this involves OAuth flows. (Frontend simulates this).
+This section describes the backend implementation for a real OAuth 2.0 flow.
 
 ### 10.1. ConnectedAccount Model
 
-**MongoDB:**
-
-```javascript
-const ConnectedAccountSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  platform: { type: String, required: true }, // e.g., 'X', 'Facebook'
-  platformAccountId: { type: String, required: true },
-  displayName: { type: String, required: true },
-  profileImageUrl: { type: String },
-  encryptedAccessToken: { type: String, required: true },
-  encryptedRefreshToken: { type: String }, // If applicable
-  scopes: [{ type: String }],
-  connectedAt: { type: Date, default: Date.now }
-});
-```
+The model needs to securely store authentication tokens provided by the social platforms.
 
 **Supabase/PostgreSQL:**
 
 ```sql
-CREATE TABLE connected_social_accounts (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+-- Ensure the pgcrypto extension is enabled for encryption
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE TABLE connected_accounts (
+  id BIGSERIAL PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  platform TEXT NOT NULL,
-  platform_account_id TEXT NOT NULL,
+  platform TEXT NOT NULL, -- 'Instagram', 'Facebook', etc.
+  platform_account_id TEXT NOT NULL, -- The user's ID on the social platform
   display_name TEXT NOT NULL,
   profile_image_url TEXT,
+  -- Encrypt tokens at rest using a strong secret key managed by the backend
   encrypted_access_token TEXT NOT NULL,
-  encrypted_refresh_token TEXT,
-  scopes TEXT[],
+  encrypted_refresh_token TEXT, -- For services that use refresh tokens
+  scopes TEXT[], -- The permissions granted by the user
   connected_at TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ, -- If the access token has an expiry
   UNIQUE(user_id, platform)
 );
 ```
 
-### 10.2. API Endpoints (Conceptual for a Real Implementation)
+### 10.2. API Endpoints for OAuth 2.0 Flow
 
-*   **`GET /api/v1/connect/{platform}`** (Req Auth): Redirect user to platform's OAuth consent screen.
-*   **`GET /api/v1/connect/{platform}/callback`**: Handles callback from OAuth provider.
-    *   **Logic:** Exchange authorization code for access/refresh tokens. Fetch basic profile info. Encrypt and store tokens.
-    *   **Response:** Redirect to frontend settings page with success/error status.
-*   **`GET /api/v1/connected-accounts`** (Req Auth): List user's connected accounts (without tokens).
-*   **`DELETE /api/v1/connected-accounts/{platform}`** (Req Auth): Remove connection, (optional: revoke token with provider).
+*   **`GET /api/v1/connect/{platform}`** (Requires Authentication)
+    *   **Logic:**
+        1.  The backend retrieves its `client_id` and required `scopes` for the requested `{platform}` from secure environment variables.
+        2.  It generates a unique, unguessable `state` parameter and stores it in the user's session (e.g., in a secure, httpOnly cookie) to prevent CSRF attacks.
+        3.  It constructs the full authorization URL for the social platform, including `response_type=code`, `client_id`, `redirect_uri` (pointing to the callback endpoint below), `scope`, and the `state` parameter.
+        4.  It responds with a `302 Found` redirect, sending the user's browser to the platform's authentication and consent screen.
 
-## 11. AI Service Proxy
+*   **`GET /api/v1/connect/{platform}/callback`**
+    *   **Logic:**
+        1.  This endpoint is the `redirect_uri` registered with the social platform. The platform redirects the user here after they grant permission.
+        2.  The endpoint receives a `code` and `state` in the query parameters.
+        3.  **Security Check:** It compares the received `state` with the one stored in the user's session. If they don't match, the request is aborted to prevent CSRF.
+        4.  The backend makes a secure, server-to-server `POST` request to the platform's token endpoint, exchanging the `code`, its `client_id`, and its `client_secret` for an `access_token` and (if applicable) a `refresh_token`.
+        5.  The backend encrypts the received tokens using a strong encryption key (e.g., AES-256-GCM) before storing them.
+        6.  It uses the newly acquired access token to make a call to the platform's API to get the user's profile information (like `platform_account_id`, `display_name`, `profile_image_url`).
+        7.  It creates or updates the record in the `connected_accounts` table for the authenticated user with all the retrieved and encrypted information.
+        8.  Finally, it redirects the user back to the frontend's settings page (e.g., `https://app.pixasocial.ai/settings?connection_status=success&platform={platform}`).
 
-All AI calls from the frontend go through these backend endpoints. The backend then uses the appropriate (user/team-configured) AI provider and securely stored API key.
+*   **`GET /api/v1/connected-accounts`** (Requires Authentication)
+    *   **Logic:** Lists the user's connected accounts, providing non-sensitive information like `platform`, `displayName`, and `profileImageUrl`. It **must not** return the tokens.
+    *   **Response:** `200 OK` with an array of connected accounts.
 
-### 11.1. Common Logic
+*   **`DELETE /api/v1/connected-accounts/{platform_account_id}`** (Requires Authentication)
+    *   **Logic:**
+        1.  Removes the corresponding record from the `connected_accounts` table.
+        2.  (Optional but recommended) Makes an API call to the social platform to revoke the token, invalidating the application's access.
+    *   **Response:** `204 No Content`.
+
+
+## 11. AI Service Proxy & Credit System
+
+All AI calls from the frontend go through these backend endpoints. The backend then uses the appropriate (user/team-configured) AI provider and securely stored API key, while also enforcing usage limits.
+
+### 11.1. Common Logic for AI Endpoints
 
 1.  Identify authenticated user/team.
-2.  Determine active AI provider and model from user/team config (fallback to defaults if needed).
-3.  Retrieve (and decrypt if necessary) the API key for that provider.
-4.  Initialize the AI SDK (Gemini, OpenAI, etc.) with the key and any specific baseURL.
-5.  Make the actual API call to the AI provider.
-6.  Return the response (or error) to the client.
+2.  **Credit Check:**
+    *   Fetch the user's current `ai_usage_count_monthly` and their role's `max_ai_uses_monthly`.
+    *   If `usage >= max`, return a `403 Forbidden` error with a clear message (e.g., "AI credit limit reached").
+3.  **Execution Config:** Determine active AI provider and model from user/team config (fallback to defaults if needed).
+4.  Retrieve (and decrypt if necessary) the API key for that provider.
+5.  Initialize the AI SDK (Gemini, OpenAI, etc.) with the key and any specific baseURL.
+6.  Make the actual API call to the AI provider.
+7.  **On successful response, increment the user's credit usage:**
+    *   `UPDATE profiles SET ai_usage_count_monthly = ai_usage_count_monthly + 1 WHERE user_id = :userId;`
+8.  Return the response (or error) to the client.
 
 ### 11.2. API Endpoints
 
@@ -484,7 +493,42 @@ All AI calls from the frontend go through these backend endpoints. The backend t
 
 *   **WebSocket or SSE endpoint for `/api/v1/ai/stream-text`** (Req Auth)
     *   **Initial Message/Query Params:** `{ prompt: string, systemInstruction?: string }`
-    *   **Server-Sent Events / WebSocket Messages:** Stream text chunks as they arrive from the AI provider.
+    *   **Logic:** Perform credit check upon connection/initial message.
+    *   **Server-Sent Events / WebSocket Messages:** Stream text chunks as they arrive from the AI provider. Increment usage once the stream starts successfully.
+
+### 11.3. Monthly Credit Reset (Supabase Implementation)
+
+To automatically reset `ai_usage_count_monthly` to 0 for all users at the beginning of each month, use `pg_cron`.
+
+**Step 1: Create a PostgreSQL Function**
+Go to the Supabase SQL Editor and run this command to create a function that performs the reset.
+
+```sql
+CREATE OR REPLACE FUNCTION public.reset_monthly_ai_usage()
+RETURNS void
+LANGUAGE sql
+AS $$
+  UPDATE public.profiles
+  SET ai_usage_count_monthly = 0;
+$$;
+```
+
+**Step 2: Schedule the Job with pg_cron**
+This job will run at midnight (UTC) on the first day of every month.
+
+```sql
+-- This command must be run by a superuser. You may need to contact Supabase support
+-- or use the dashboard if direct superuser access isn't available.
+-- It only needs to be run ONCE.
+
+SELECT cron.schedule(
+  'reset-monthly-ai-credits', -- Job name
+  '0 0 1 * *', -- CRON schedule: at 00:00 on day-of-month 1
+  $$ SELECT public.reset_monthly_ai_usage() $$
+);
+```
+
+To verify the job is scheduled, you can run: `SELECT * FROM cron.job;`. To unschedule: `SELECT cron.unschedule('reset-monthly-ai-credits');`.
 
 ## 12. Feedback Simulator Backend
 

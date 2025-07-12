@@ -1,6 +1,5 @@
-
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { format } from 'date-fns';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
@@ -11,11 +10,12 @@ import {
     ServerStackIcon, UsersIcon as TeamIcon, WrenchScrewdriverIcon
 } from './ui/Icons';
 import { SOCIAL_PLATFORMS_TO_CONNECT, MAX_TEAM_MEMBERS } from '../constants';
-import { SocialPlatformType, ConnectedAccount, User } from '../types';
+import { SocialPlatformType, ConnectedAccount, User, SocialPlatformConnectionDetails } from '../types';
 import { useToast } from './ui/ToastProvider';
 import { useForm } from 'react-hook-form'; 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { ConnectionFlowModal } from './settings/ConnectionFlowModal';
 
 interface SettingsViewProps {
   currentUser: User;
@@ -23,13 +23,6 @@ interface SettingsViewProps {
   connectedAccounts: ConnectedAccount[];
   onAddConnectedAccount: (platform: SocialPlatformType, accountId: string, displayName: string, profileImageUrl?: string) => void;
   onDeleteConnectedAccount: (accountId: number, platformName: string) => void;
-}
-
-interface ConnectModalProps {
-  platform: typeof SOCIAL_PLATFORMS_TO_CONNECT[0];
-  onClose: () => void;
-  onConnect: (platform: SocialPlatformType, accountId: string, displayName: string, profileImageUrl?: string) => void;
-  showToast: (message: string, type: 'success' | 'error' | 'info', duration?: number) => void;
 }
 
 const userProfileSchema = z.object({
@@ -43,66 +36,11 @@ const teamInviteSchema = z.object({
 type TeamInviteFormData = z.infer<typeof teamInviteSchema>;
 
 
-const ConnectModalComponent: React.FC<ConnectModalProps> = ({ platform, onClose, onConnect, showToast }) => {
-  const [accountId, setAccountId] = useState('');
-  const [displayName, setDisplayName] = useState('');
-  const [profileImageUrl, setProfileImageUrl] = useState('');
-
-  const handleSubmit = useCallback(() => {
-    if (!accountId.trim() || !displayName.trim()) {
-      showToast('Mock Account ID/Username and Display Name are required.', 'error');
-      return;
-    }
-    onConnect(platform.id, accountId, displayName, profileImageUrl);
-    onClose(); 
-  }, [accountId, displayName, profileImageUrl, platform.id, onConnect, onClose, showToast]);
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
-      <Card title={`Connect to ${platform.name}`} className="w-full max-w-md shadow-xl">
-        <div className="mb-4 p-3 bg-blue-900/50 border border-blue-500/50 rounded-md">
-          <p className="text-sm text-blue-200">
-            <strong>This is a simulated connection.</strong> Enter mock details below.
-          </p>
-        </div>
-        <Input
-          label={`Mock ${platform.name} Account ID / Username`}
-          value={accountId}
-          onChange={(e) => setAccountId(e.target.value)}
-          placeholder={`e.g., your_${platform.name.toLowerCase()}_username`}
-          required
-          aria-required="true"
-        />
-        <Input
-          label={`Mock ${platform.name} Display Name`}
-          value={displayName}
-          onChange={(e) => setDisplayName(e.target.value)}
-          placeholder={`e.g., Your ${platform.name} Name`}
-          required
-          aria-required="true"
-        />
-        <Input
-          label={`Mock Profile Image URL (Optional)`}
-          type="url"
-          value={profileImageUrl}
-          onChange={(e) => setProfileImageUrl(e.target.value)}
-          placeholder="https://example.com/image.png"
-        />
-        <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-lightBorder">
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" onClick={handleSubmit}>Simulate Connection</Button>
-        </div>
-      </Card>
-    </div>
-  );
-};
-const ConnectModal = React.memo(ConnectModalComponent);
-
 export const SettingsView: React.FC<SettingsViewProps> = ({ 
   currentUser, onUpdateUser, connectedAccounts, onAddConnectedAccount, onDeleteConnectedAccount
 }) => {
   const { showToast } = useToast();
-  const [platformToConnect, setPlatformToConnect] = useState<typeof SOCIAL_PLATFORMS_TO_CONNECT[0] | null>(null);
+  const [platformToConnect, setPlatformToConnect] = useState<SocialPlatformConnectionDetails | null>(null);
   
   const { register: registerProfile, handleSubmit: handleSubmitProfile, formState: { errors: profileErrors }, reset: resetProfileForm } = useForm<UserProfileFormData>({
     resolver: zodResolver(userProfileSchema),
@@ -153,6 +91,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     return connectedAccounts.find(acc => acc.platform === platformType);
   }, [connectedAccounts]);
 
+  const handleSimulatedConnect = useCallback((platform: SocialPlatformType, connectionType: string) => {
+      const displayName = `${currentUser.name}'s ${connectionType} ${platform}`;
+      const accountId = `${platform.toLowerCase()}-${currentUser.id.substring(0,8)}`;
+      onAddConnectedAccount(platform, accountId, displayName);
+      setPlatformToConnect(null);
+  }, [currentUser, onAddConnectedAccount]);
+
+
   return (
     <div className="p-6 space-y-8">
       <div>
@@ -163,7 +109,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <div>
               <h3 className="text-lg font-semibold text-yellow-300">Simulation Notice</h3>
               <p className="text-yellow-400 text-sm">
-                User profile changes, team management, and account connections are now saved to your Supabase backend.
+                User profile changes and team management are now saved to your Supabase backend. Social account connections are simulated with a detailed UI flow.
               </p>
             </div>
           </div>
@@ -264,10 +210,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                                 <div>
                                 <p className="text-sm font-semibold text-green-300">Connected: {connectedAccount.displayName}</p>
                                 <p className="text-xs text-green-400">Account ID: {connectedAccount.accountId}</p>
-                                <p className="text-xs text-textSecondary">Connected: {new Date(connectedAccount.connectedAt).toLocaleDateString()}</p>
+                                <p className="text-xs text-textSecondary">Connected: {format(new Date(connectedAccount.connectedAt), 'PP')}</p>
                                 </div>
                             </div>
-                            <Button variant="danger" size="sm" onClick={() => onDeleteConnectedAccount(connectedAccount.id, platform.name)} leftIcon={<TrashIcon className="w-4 h-4"/>} className="w-full mt-2" title={`Disconnect ${platform.name}`}>
+                            <Button variant="destructive" size="sm" onClick={() => onDeleteConnectedAccount(connectedAccount.id, platform.name)} leftIcon={<TrashIcon className="w-4 h-4"/>} className="w-full mt-2" title={`Disconnect ${platform.name}`}>
                                 Disconnect
                             </Button>
                             </div>
@@ -287,7 +233,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
 
       {platformToConnect && (
-        <ConnectModal platform={platformToConnect} onClose={() => setPlatformToConnect(null)} onConnect={onAddConnectedAccount} showToast={showToast}/>
+        <ConnectionFlowModal 
+            platform={platformToConnect} 
+            onClose={() => setPlatformToConnect(null)} 
+            onConnect={handleSimulatedConnect}
+        />
       )}
     </div>
   );

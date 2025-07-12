@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ScheduledPost, ContentDraft, ScheduledPostStatus, Persona, Operator } from '../../types';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
@@ -53,6 +52,23 @@ const getStatusDisplay = (status: ScheduledPostStatus) => {
 };
 
 const PostCardComponent: React.FC<PostCardProps> = ({ post, draft, persona, operator, onPostNow, onDelete, onNavigateToCalendar }) => {
+    const [relativeTime, setRelativeTime] = useState<string>('');
+
+    useEffect(() => {
+        const calculateRelativeTime = () => {
+            const isPostInFuture = new Date(post.start) > new Date();
+            setRelativeTime(
+                isPostInFuture
+                    ? `in ${formatDistanceToNow(new Date(post.start))}`
+                    : `${formatDistanceToNow(new Date(post.start), { addSuffix: true })}`
+            );
+        };
+        calculateRelativeTime();
+        // Set an interval to update the time if needed, for this case we just need it on mount
+        const interval = setInterval(calculateRelativeTime, 60000); // update every minute
+        return () => clearInterval(interval);
+    }, [post.start]);
+
     const platformDetail = draft?.platform_contents[post.resource.platformKey];
     const { icon: platformIcon, label: platformLabel } = getPlatformDisplay(post.resource.platformKey);
     const { icon: statusIcon, text: statusText, color: statusColor } = getStatusDisplay(post.resource.status);
@@ -63,8 +79,6 @@ const PostCardComponent: React.FC<PostCardProps> = ({ post, draft, persona, oper
         else if (platformDetail.content) contentPreview = platformDetail.content;
         else if (platformDetail.imagePrompt) contentPreview = `Image: ${platformDetail.imagePrompt}`;
     }
-
-    const isPostInFuture = post.start > new Date();
 
   return (
     <Card className="p-4" shadow="soft-lg">
@@ -84,7 +98,7 @@ const PostCardComponent: React.FC<PostCardProps> = ({ post, draft, persona, oper
           <div className="mt-2 text-xs flex items-center space-x-3 text-textSecondary">
             <div className="flex items-center space-x-1" title={`Scheduled for ${format(post.start, 'PPpp')}`}>
               <ClockIcon className="w-3.5 h-3.5" />
-              <span>{isPostInFuture ? `in ${formatDistanceToNow(post.start)}` : `${formatDistanceToNow(post.start, { addSuffix: true })}`}</span>
+              <span>{relativeTime || '...'}</span>
             </div>
              <div className={`flex items-center space-x-1 font-medium ${statusColor}`}>
                 {statusIcon}

@@ -1,8 +1,6 @@
 
-
-
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { ContentDraft, Persona, Operator, PlatformContentMap, PlatformContentDetail, MediaType, ScheduledPost, ImageSourceType, ContentLibraryAsset, ViewName, UserProfile } from '../types';
+import { ContentDraft, Persona, Operator, PlatformContentMap, PlatformContentDetail, MediaType, ScheduledPost, ImageSourceType, ViewName, UserProfile } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { LoadingSpinner } from './ui/LoadingSpinner';
@@ -12,7 +10,7 @@ import {
     DEFAULT_FONT_FAMILY, DEFAULT_FONT_COLOR, FONT_CATEGORY_MAP, MEME_TEXT_COLOR_OPTIONS
 } from '../constants';
 import { useToast } from './ui/ToastProvider';
-import { CalendarDaysIcon } from './ui/Icons';
+import { CalendarDaysIcon, TrashIcon } from './ui/Icons';
 import { ScheduleModal } from './content-planner/ScheduleModal';
 import ContentPlannerConfig from './content-planner/ContentPlannerConfig';
 import { PrerequisiteMessageCard } from './ui/PrerequisiteMessageCard'; 
@@ -26,8 +24,10 @@ interface ContentPlannerViewProps {
   personas: Persona[];
   operators: Operator[];
   onAddContentDraft: (draft: Omit<ContentDraft, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  onDeleteContentDraft: (draftId: string) => void;
+  onDeletePlatformContent: (draftId: string, platformKey: string) => void;
   onAddScheduledPost: (post: ScheduledPost) => void;
-  onAddContentLibraryAsset: (asset: ContentLibraryAsset) => void;
+  onAddContentLibraryAsset: (file: File, name: string, tags: string[]) => Promise<void>;
   onNavigate?: (view: ViewName) => void; 
 }
 
@@ -50,7 +50,8 @@ const getPlatformIconDisplay = (icon: string | React.ReactNode | undefined) => {
 };
 
 export const ContentPlannerView: React.FC<ContentPlannerViewProps> = ({ 
-    currentUser, contentDrafts, personas, operators, onAddContentDraft, onAddScheduledPost, onAddContentLibraryAsset, onNavigate 
+    currentUser, contentDrafts, personas, operators, onAddContentDraft, onDeleteContentDraft, 
+    onDeletePlatformContent, onAddScheduledPost, onAddContentLibraryAsset, onNavigate 
 }) => {
   const { showToast } = useToast();
   const [selectedPersonaId, setSelectedPersonaId] = useState<number | null>(null);
@@ -85,14 +86,16 @@ export const ContentPlannerView: React.FC<ContentPlannerViewProps> = ({
   const [schedulingPostInfo, setSchedulingPostInfo] = useState<{draft: ContentDraft, platformKey: string, platformDetail: PlatformContentDetail} | null>(null);
   
   const imageUploadRefs = useRef<Record<string, React.RefObject<HTMLInputElement>>>({});
-  CONTENT_PLATFORMS.forEach(platform => {
-    if (!imageUploadRefs.current[platform.key]) {
-      imageUploadRefs.current[platform.key] = React.createRef<HTMLInputElement>();
-    }
-  });
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsInitialLoading(false), 750); 
+    const timer = setTimeout(() => setIsInitialLoading(false), 750);
+    
+    CONTENT_PLATFORMS.forEach(platform => {
+        if (!imageUploadRefs.current[platform.key]) {
+            imageUploadRefs.current[platform.key] = React.createRef<HTMLInputElement>();
+        }
+    });
+    
     return () => clearTimeout(timer);
   }, []);
 
@@ -206,7 +209,7 @@ export const ContentPlannerView: React.FC<ContentPlannerViewProps> = ({
     const exampleStructureParts = [socialExample, emailExample, posterExample].filter(Boolean).join(",\n        ");
 
     const systemInstruction = `You are a master propagandist and psychological operations content creator. Your goal is to be subtle yet effective, tailoring messages for different platforms. 
-For 'Poster' platforms: 'imagePrompt' MUST describe visual elements ONLY, no text. 'memeText' MUST be short, clear, grammatically correct. No 'content' or 'hashtags'.
+For 'Poster' platforms: 'imagePrompt' MUST describe visual elements ONLY, no text. 'memeText' MUST be short, grammatically correct. No 'content' or 'hashtags'.
 For all platforms with images: 'imagePrompt' must be visual only. 'memeText' must be clear and make sense.
 If asked for fontCategory, choose from: ${Object.keys(FONT_CATEGORY_MAP).join(', ')}.
 If asked for fontColorSuggestion, choose from: ${MEME_TEXT_COLOR_OPTIONS.map(c => c.label.toLowerCase()).join(', ')}.
@@ -545,35 +548,28 @@ const handleDownloadImage = useCallback((platformKey: string) => {
     }
 }, [platformContents, showToast]);
 
-const handlePushToLibrary = useCallback((platformKey: string) => {
-    const platformData = platformContents[platformKey];
-    const platformInfo = CONTENT_PLATFORMS.find(p => p.key === platformKey);
-    if (platformData?.processedImageUrl && platformInfo) {
-        const base64Data = platformData.processedImageUrl;
-        let assetName = platformData.memeText || platformData.imagePrompt?.substring(0, 30) || `${platformInfo.label} Image`;
-        if (assetName.length > 50) assetName = assetName.substring(0, 50) + "...";
-        
-        let size = 0;
-        if (base64Data.includes(',')) {
-            try { size = atob(base64Data.split(',')[1]).length; } catch (e) { console.error("Error decoding base64 for size", e); }
-        }
+const handlePushToLibrary = useCallback(async (platformKey: string) => {
+  const platformData = platformContents[platformKey];
+  const platformInfo = CONTENT_PLATFORMS.find(p => p.key === platformKey);
 
-        const newAsset: Omit<ContentLibraryAsset, 'user_id'> & { user_id?: string } = {
-            id: Date.now().toString() + Math.random().toString(36).substring(2,9),
-            name: assetName.trim(), 
-            type: 'image', 
-            publicUrl: base64Data,
-            storage_path: '',
-            file_name: `${assetName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.jpg`,
-            file_type: 'image/jpeg', 
-            size: size, 
-            uploaded_at: new Date().toISOString(),
-        };
-        onAddContentLibraryAsset(newAsset as ContentLibraryAsset);
-        showToast("Image saved to local library!", "success");
-    } else {
-        showToast("No processed image available to push to library.", "error");
+  if (platformData?.processedImageUrl && platformInfo) {
+    let assetName = platformData.memeText || platformData.imagePrompt?.substring(0, 30) || `${platformInfo.label} Image`;
+    if (assetName.length > 50) assetName = assetName.substring(0, 50) + "...";
+
+    try {
+      const response = await fetch(platformData.processedImageUrl);
+      const blob = await response.blob();
+      const fileName = `${assetName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.jpg`;
+      const file = new File([blob], fileName, { type: 'image/jpeg' });
+
+      await onAddContentLibraryAsset(file, assetName, []);
+    } catch (e) {
+      console.error("Error pushing to library:", e);
+      showToast("Failed to convert image for library.", "error");
     }
+  } else {
+    showToast("No processed image available to push to library.", "error");
+  }
 }, [platformContents, onAddContentLibraryAsset, showToast]);
 
 
@@ -763,6 +759,7 @@ const handlePushToLibrary = useCallback((platformKey: string) => {
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <ContentPlannerConfig
+          currentUser={currentUser}
           personas={personas}
           operators={operators}
           selectedPersonaId={String(selectedPersonaId || '')}
@@ -845,14 +842,25 @@ const handlePushToLibrary = useCallback((platformKey: string) => {
                       <h4 className="font-semibold text-textPrimary text-lg">To: {persona?.name || 'N/A'} | Using: {operator?.name || 'N/A'}</h4>
                       {draft.key_message && <p className="text-xs text-textSecondary mt-0.5">Key Message: "{draft.key_message.substring(0,50)}..."</p>}
                     </div>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleLoadDraft(draft.id)}
-                        className="text-xs py-1 px-2"
-                    >
-                        Load & Edit Draft
-                    </Button>
+                    <div className="flex items-center space-x-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleLoadDraft(draft.id)}
+                            className="text-xs py-1 px-2"
+                        >
+                            Load & Edit Draft
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => onDeleteContentDraft(draft.id)}
+                            className="text-xs py-1 px-2"
+                            title="Delete Entire Draft"
+                        >
+                            Delete Entire Draft
+                        </Button>
+                    </div>
                   </div>
                   <p className="text-xs text-textSecondary mt-1">Global Media Type at creation: <span className="font-medium">{MEDIA_TYPE_OPTIONS.find(opt => opt.value === (Object.values(draft.platform_contents).find(pc => !CONTENT_PLATFORMS.find(cp => cp.key === Object.keys(draft.platform_contents).find(k => draft.platform_contents[k] === pc)!)?.isPoster && pc.mediaType !== 'none')?.mediaType || 'none'))?.label || 'Text Only'}</span></p>
                   <p className="text-xs text-textSecondary mt-1 mb-3">Custom Instructions: {draft.custom_prompt || "None"}</p>
@@ -861,12 +869,31 @@ const handlePushToLibrary = useCallback((platformKey: string) => {
                       const platformInfo = CONTENT_PLATFORMS.find(p => p.key === platformKey);
                       if (!platformData || (!platformData.content && !platformData.processedImageUrl && !platformData.videoIdea && !platformData.subject && !platformData.imagePrompt)) return null;
                       return (
-                        <div key={platformKey} className="p-3 border border-lightBorder rounded bg-card shadow-sm">
+                        <div key={platformKey} className="p-3 border border-lightBorder rounded bg-card shadow-sm group">
                           <div className="flex justify-between items-start mb-2">
                             <h5 className="font-medium text-textPrimary flex items-center">
                                 {getPlatformIconDisplay(platformInfo?.icon)} {platformInfo?.label || platformKey}:
                             </h5>
-                            <Button size="sm" variant="primary" onClick={() => handleOpenScheduleModal(draft, platformKey, platformData)} className="ml-2 text-xs py-1 px-2" leftIcon={<CalendarDaysIcon className="w-3.5 h-3.5" />}> Schedule </Button>
+                            <div className="flex items-center space-x-1">
+                                <Button 
+                                    size="sm" 
+                                    variant="primary" 
+                                    onClick={() => handleOpenScheduleModal(draft, platformKey, platformData)} 
+                                    className="ml-2 text-xs py-1 px-2" 
+                                    leftIcon={<CalendarDaysIcon className="w-3.5 h-3.5" />}
+                                > 
+                                    Schedule 
+                                </Button>
+                                <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => onDeletePlatformContent(draft.id, platformKey)}
+                                    className="p-1 opacity-50 group-hover:opacity-100 transition-opacity"
+                                    title={`Delete ${platformInfo?.label} content`}
+                                >
+                                    <TrashIcon className="w-4 h-4" />
+                                </Button>
+                            </div>
                           </div>
                           {platformData.subject && <p className="text-sm font-semibold text-textPrimary mt-1">Subject: {platformData.subject}</p>}
                           {platformData.content && !platformInfo?.isPoster && <pre className="whitespace-pre-wrap text-sm text-textPrimary mt-1 mb-2 bg-background p-2 rounded">{platformData.content}</pre>}
@@ -905,15 +932,3 @@ const handlePushToLibrary = useCallback((platformKey: string) => {
     </div>
   );
 };
-
-if (!document.getElementById('pixasocial-text-xxs-style-dark')) {
-    const style = document.createElement('style');
-    style.id = 'pixasocial-text-xxs-style-dark';
-    style.innerHTML = `
-    .text-xxs {
-        font-size: 0.65rem; 
-        line-height: 0.8rem;
-    }
-    `;
-    document.head.appendChild(style);
-}

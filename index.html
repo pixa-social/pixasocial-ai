@@ -30,6 +30,9 @@
               'toast-out': 'toast-out 0.3s ease-in forwards',
               'fade-in-up': 'fade-in-up 0.8s ease-out forwards',
               'aurora': 'aurora 60s linear infinite',
+              "accordion-down": "accordion-down 0.2s ease-out",
+              "accordion-up": "accordion-up 0.2s ease-out",
+              'modal-appear': 'modal-appear 0.3s ease-out forwards',
             },
             keyframes: {
               'toast-in': {
@@ -47,7 +50,19 @@
               'aurora': {
                   'from': { backgroundPosition: '50% 50%, 50% 50%' },
                   'to': { backgroundPosition: '350% 50%, 350% 50%' },
-              }
+              },
+              "accordion-down": {
+                from: { height: "0" },
+                to: { height: "var(--radix-accordion-content-height)" },
+              },
+              "accordion-up": {
+                from: { height: "var(--radix-accordion-content-height)" },
+                to: { height: "0" },
+              },
+              'modal-appear': {
+                'from': { opacity: '0', transform: 'scale(0.95)' },
+                'to': { opacity: '1', transform: 'scale(1)' },
+              },
             },
             boxShadow: {
               'soft-lg': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.07)',
@@ -67,9 +82,35 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto:wght@400;700&family=Open+Sans:wght@400;700&family=Lato:wght@400;700&family=Montserrat:wght@400;700&family=Impact&family=Anton&family=Bangers&family=Creepster&family=Pacifico&family=Lobster&display=swap" rel="stylesheet">
 
 <style>
+  :root {
+      --background: 222.2 39.1% 11.2%;
+      --foreground: 210 16.7% 97.8%;
+      --card: 215.3 27.9% 17.1%;
+      --card-foreground: 210 16.7% 97.8%;
+      --popover: 215.3 27.9% 17.1%;
+      --popover-foreground: 210 16.7% 97.8%;
+      --primary: 201.4 91.5% 59.4%;
+      --primary-foreground: 222.2 47.4% 11.2%;
+      --secondary: 215.3 27.9% 35.1%;
+      --secondary-foreground: 210 16.7% 97.8%;
+      --muted: 215.3 27.9% 17.1%;
+      --muted-foreground: 214.8 13.8% 62.9%;
+      --accent: 188.1 84.8% 53.3%;
+      --accent-foreground: 222.2 47.4% 11.2%;
+      --destructive: 349.5 89.1% 60.4%;
+      --destructive-foreground: 210 16.7% 97.8%;
+      --success: 142.1 76.2% 36.3%; /* from #10b981 */
+      --success-foreground: 210 16.7% 97.8%;
+      --border: 217.2 19.5% 26.7%;
+      --input: 217.2 19.5% 26.7%;
+      --ring: 201.4 91.5% 59.4%;
+      --radius: 0.5rem;
+  }
+
   html.dark body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-    background-color: #111827; /* bg-background */
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
   }
   .rbc-overlay {
     z-index: 1000 !important; 
@@ -80,14 +121,14 @@
     height: 8px;
   }
   html.dark ::-webkit-scrollbar-track {
-    background: #1f2937; /* bg-card */
+    background: hsl(var(--card));
   }
   html.dark ::-webkit-scrollbar-thumb {
-    background: #4b5563; /* bg-secondary */
+    background: hsl(var(--secondary));
     border-radius: 10px;
   }
   html.dark ::-webkit-scrollbar-thumb:hover {
-    background: #6b7280; /* Gray-500 */
+    background: #6b7280;
   }
   /* Homepage Aurora effect - should not be affected by the dark theme color changes above */
   .aurora-bg {
@@ -97,6 +138,32 @@
     animation: aurora 60s linear infinite;
     background-color: #050816; /* Fallback for the homepage specifically */
   }
+  /* Custom utility class for extra small text */
+  .text-xxs {
+    font-size: 0.65rem; /* 10.4px */
+    line-height: 0.85rem; /* 13.6px */
+  }
+  
+  /* React Big Calendar Dark Theme Styles */
+  .rbc-calendar { font-family: inherit; color: hsl(var(--foreground)); }
+  .rbc-toolbar button { text-transform: capitalize; }
+  .rbc-event { padding: 0; border-radius: 4px; border: none; background-color: transparent; }
+  .rbc-agenda-date-cell, .rbc-agenda-time-cell { font-weight: 500; }
+  .rbc-header { padding: 8px 5px; text-align: center; font-weight: 600; border-bottom: 1px solid hsl(var(--border)); background-color: transparent; }
+  .rbc-off-range-bg { background: hsl(var(--card)); }
+  .rbc-today { background-color: hsla(var(--primary), 0.1) !important; }
+  .rbc-day-bg:hover, .rbc-time-slot:hover { background-color: hsla(var(--primary), 0.05) !important; }
+  .rbc-time-view, .rbc-month-view { border: 1px solid hsl(var(--border)); }
+  .rbc-time-header, .rbc-month-row { border-bottom: 1px solid hsl(var(--border)); }
+  .rbc-day-bg, .rbc-month-row, .rbc-day-slot .rbc-time-slot { border-left: 1px solid hsl(var(--border)); }
+  .rbc-rtl .rbc-day-bg, .rbc-rtl .rbc-month-row, .rbc-rtl .rbc-day-slot .rbc-time-slot { border-right: 1px solid hsl(var(--border)); border-left: none;}
+  .rbc-agenda-view table { border: 1px solid hsl(var(--border)); }
+  .rbc-agenda-view table tr { border-bottom: 1px solid hsl(var(--border)); }
+  .rbc-agenda-view table tr:last-child { border-bottom: none; }
+  .rbc-agenda-view table th, .rbc-agenda-view table td { padding: 0.5rem; border-right: 1px solid hsl(var(--border)); }
+  .rbc-agenda-view table th:last-child, .rbc-agenda-view table td:last-child { border-right: none; }
+  .rbc-agenda-empty { color: hsl(var(--muted-foreground)); }
+  .rbc-time-gutter, .rbc-header { background-color: hsl(var(--card)); }
 </style>
 <script type="importmap">
 {
@@ -105,6 +172,9 @@
     "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
     "react/": "https://esm.sh/react@^19.1.0/",
     "@google/genai": "https://esm.sh/@google/genai@^1.9.0",
+    "@radix-ui/react-slot": "https://esm.sh/@radix-ui/react-slot@^1.2.3",
+    "class-variance-authority": "https://esm.sh/class-variance-authority@^0.7.1",
+    "lucide-react": "https://esm.sh/lucide-react@^0.525.0",
     "date-fns": "https://esm.sh/date-fns@^4.1.0",
     "react-hook-form": "https://esm.sh/react-hook-form@^7.60.0",
     "@hookform/resolvers/": "https://esm.sh/@hookform/resolvers@^5.1.1/",
@@ -114,11 +184,13 @@
     "react-big-calendar": "https://esm.sh/react-big-calendar@^1.19.4",
     "date-fns/": "https://esm.sh/date-fns@^4.1.0/",
     "gun/": "https://esm.sh/gun@^0.2020.1241/",
-    "openai": "https://esm.sh/openai@^5.9.0"
+    "openai": "https://esm.sh/openai@^5.9.0",
+    "clsx": "https://esm.sh/clsx@^2.1.1",
+    "tailwind-merge": "https://esm.sh/tailwind-merge@^3.3.1",
+    "html2canvas": "https://esm.sh/html2canvas@^1.4.1"
   }
 }
 </script>
-
 </head>
   <body class="bg-background text-textPrimary">
     <div id="root"></div>

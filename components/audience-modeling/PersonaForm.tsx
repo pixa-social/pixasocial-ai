@@ -1,6 +1,7 @@
 
+
 import React, { useState, useCallback } from 'react';
-import { Persona, RSTProfile, RSTTraitLevel, UserProfile } from '../../types';
+import { Persona, RSTProfile, RSTTraitLevel, UserProfile, Json } from '../../types';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -37,13 +38,15 @@ const PersonaFormComponent: React.FC<PersonaFormProps> = ({ initialPersona, onSu
     acc[trait.key] = 'Not Assessed';
     return acc;
   }, {} as RSTProfile);
-  const initialRstProfile = initialPersona?.rst_profile || defaultRstProfile;
+  const initialRstProfile = (initialPersona?.rst_profile as unknown as RSTProfile) || defaultRstProfile;
   const [rstProfileState, setRstProfileState] = useState<RSTProfile>(initialRstProfile);
 
   const [selectedRegion, setSelectedRegion] = useState<string>('');
   const [keyInterests, setKeyInterests] = useState<string>('');
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [suggestionError, setSuggestionError] = useState<string | null>(null);
+
+  const hasNoCredits = currentUser.ai_usage_count_monthly >= currentUser.role.max_ai_uses_monthly;
 
   const handleRstProfileChange = useCallback((traitKey: keyof RSTProfile, value: RSTTraitLevel) => {
     setRstProfileState(prev => ({ ...prev, [traitKey]: value }));
@@ -80,7 +83,7 @@ const PersonaFormComponent: React.FC<PersonaFormProps> = ({ initialPersona, onSu
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({ name, demographics, psychographics, initial_beliefs: initialBeliefs, vulnerabilities: vulnerabilitiesInForm, rst_profile: rstProfileState });
+    onSubmit({ name, demographics, psychographics, initial_beliefs: initialBeliefs, vulnerabilities: vulnerabilitiesInForm, rst_profile: rstProfileState as unknown as Json });
   }, [onSubmit, name, demographics, psychographics, initialBeliefs, vulnerabilitiesInForm, rstProfileState]);
 
   return (
@@ -89,8 +92,18 @@ const PersonaFormComponent: React.FC<PersonaFormProps> = ({ initialPersona, onSu
       <Card title="AI Content Assistance" icon={<WrenchScrewdriverIcon className="w-5 h-5 text-primary"/>} className="bg-blue-950/30 border border-blue-800/50 p-4">
         <Select label="Region/Country Focus (for AI Suggestions)" options={REGION_COUNTRY_OPTIONS} value={selectedRegion} onChange={e => setSelectedRegion(e.target.value)} containerClassName="mb-2"/>
         <Input label="Key Interests/Topics (Optional, for AI)" value={keyInterests} onChange={e => setKeyInterests(e.target.value)} placeholder="e.g., sustainability, tech" containerClassName="mb-3"/>
-        <Button type="button" variant="secondary" onClick={handleFetchAISuggestions} isLoading={isSuggesting} disabled={!selectedRegion || isSuggesting}>Suggest Details with AI</Button>
+        <Button 
+            type="button" 
+            variant="secondary" 
+            onClick={handleFetchAISuggestions} 
+            isLoading={isSuggesting} 
+            disabled={!selectedRegion || isSuggesting || hasNoCredits}
+            title={hasNoCredits ? "You have no AI credits remaining." : "Get AI suggestions"}
+        >
+            Suggest Details with AI
+        </Button>
         {suggestionError && <p className="mt-2 text-xs text-danger">{suggestionError}</p>}
+        {hasNoCredits && <p className="mt-2 text-xs text-yellow-400">You have used all your AI credits for this month.</p>}
       </Card>
       <Textarea label="Demographics" value={demographics} onChange={(e) => setDemographics(e.target.value)} required placeholder="e.g., Age 25-35, urban..." />
       <Textarea label="Psychographics" value={psychographics} onChange={(e) => setPsychographics(e.target.value)} required placeholder="e.g., Values innovation..." />

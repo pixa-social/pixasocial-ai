@@ -1,16 +1,17 @@
 
 import React, { useCallback, useMemo } from 'react';
-import { Persona, Operator, MediaType } from '../../types';
+import { Persona, Operator, MediaType, UserProfile } from '../../types';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Textarea } from '../ui/Textarea';
 import { Select } from '../ui/Select';
 import { 
     CONTENT_PLATFORMS, MEDIA_TYPE_OPTIONS, TONE_OF_VOICE_OPTIONS,
-    CURATED_FONT_OPTIONS, MEME_TEXT_COLOR_OPTIONS // Added font/color constants
+    CURATED_FONT_OPTIONS, MEME_TEXT_COLOR_OPTIONS
 } from '../../constants';
 
 interface ContentPlannerConfigProps {
+  currentUser: UserProfile; // Added to check credits
   personas: Persona[];
   operators: Operator[];
   selectedPersonaId: string;
@@ -32,8 +33,6 @@ interface ContentPlannerConfigProps {
   onGenerateAll: () => void;
   isLoading: boolean;
   isAnyPlatformSelected: boolean;
-
-  // New props for font and color
   defaultFontFamily: string;
   onDefaultFontFamilyChange: (fontFamily: string) => void;
   defaultFontColor: string;
@@ -53,7 +52,7 @@ const platformMediaTypeOptions: Array<{value: MediaType | 'global', label: strin
 
 
 const ContentPlannerConfigComponent: React.FC<ContentPlannerConfigProps> = ({
-  personas, operators,
+  currentUser, personas, operators,
   selectedPersonaId, onSelectedPersonaIdChange,
   selectedOperatorId, onSelectedOperatorIdChange,
   keyMessage, onKeyMessageChange,
@@ -63,11 +62,12 @@ const ContentPlannerConfigComponent: React.FC<ContentPlannerConfigProps> = ({
   customPrompt, onCustomPromptChange,
   selectedPlatformsForGeneration, onSelectedPlatformChange,
   onGenerateAll, isLoading, isAnyPlatformSelected,
-  defaultFontFamily, onDefaultFontFamilyChange, // Destructure new props
+  defaultFontFamily, onDefaultFontFamilyChange,
   defaultFontColor, onDefaultFontColorChange
 }) => {
   const personaOptions = useMemo(() => personas.map(p => ({ value: p.id, label: p.name })), [personas]);
   const operatorOptions = useMemo(() => operators.map(o => ({ value: o.id, label: `${o.name} (${o.type})` })), [operators]);
+  const hasNoCredits = currentUser.ai_usage_count_monthly >= currentUser.role.max_ai_uses_monthly;
 
   const handlePlatformMediaTypeOverride = useCallback((platformKey: string, value: MediaType | 'global') => {
     onPlatformMediaOverridesChange({
@@ -155,13 +155,14 @@ const ContentPlannerConfigComponent: React.FC<ContentPlannerConfigProps> = ({
           ))}
         </div>
       </div>
-
+      {hasNoCredits && <p className="mt-4 text-sm text-yellow-400 text-center">You have used all your AI credits for this month.</p>}
       <Button 
         variant="primary" 
         onClick={onGenerateAll} 
         isLoading={isLoading} 
-        className="w-full mt-6" 
-        disabled={!selectedPersonaId || !selectedOperatorId || isLoading || !isAnyPlatformSelected}
+        className="w-full mt-2" 
+        disabled={!selectedPersonaId || !selectedOperatorId || isLoading || !isAnyPlatformSelected || hasNoCredits}
+        title={hasNoCredits ? "You have no AI credits remaining." : 'Generate content for selected platforms'}
         aria-label={isLoading ? 'Generating content, please wait' : 'Generate content for selected platforms'}
       >
         {isLoading ? 'Generating Suggestions...' : 'Generate All Platform Content'}

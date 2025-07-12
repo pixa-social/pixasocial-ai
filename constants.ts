@@ -1,7 +1,7 @@
 
 
 import React from 'react';
-import { ViewName, NavItem, AuditStep, Persona, MediaType, AiProviderType, AiProviderConfig, RSTTraitLevel, RSTProfile, SocialPlatformType } from './types';
+import { ViewName, NavItem, AuditStep, Persona, MediaType, AiProviderType, AiProviderConfig, RSTTraitLevel, RSTProfile, SocialPlatformType, SocialPlatformConnectionDetails } from './types';
 import type { Operator } from './types';
 import { 
     XIcon, FacebookIcon, InstagramIcon, LinkedInIcon, 
@@ -9,7 +9,10 @@ import {
     PhotoIcon,
     DocumentDuplicateIcon,
     ChatBubbleLeftEllipsisIcon,
-    PaperAirplaneIcon
+    PaperAirplaneIcon,
+    TelegramIcon, BlueskyIcon, GoogleBusinessIcon, 
+    ThreadsIcon, DiscordIcon,
+    ChartPieIcon
 } from './components/ui/Icons';
 
 export const APP_TITLE = "PixaSocial Ai";
@@ -17,6 +20,7 @@ export const APP_TITLE = "PixaSocial Ai";
 export const NAVIGATION_ITEMS: NavItem[] = [
   { label: ViewName.Dashboard, viewName: ViewName.Dashboard },
   { label: ViewName.AudienceModeling, viewName: ViewName.AudienceModeling },
+  { label: ViewName.Analytics, viewName: ViewName.Analytics, icon: React.createElement(ChartPieIcon, { className: 'w-4 h-4' }) },
   {
     label: 'Campaign Tools',
     children: [
@@ -282,14 +286,224 @@ export const AI_PROVIDERS_CONFIG_TEMPLATE: AiProviderConfig[] = [
   },
 ];
 
-export const SOCIAL_PLATFORMS_TO_CONNECT: Array<{ id: SocialPlatformType; name: string; icon: React.FC<React.SVGProps<SVGSVGElement>>; description: string; brandColor?: string }> = [
-  { id: SocialPlatformType.X, name: 'X (Twitter)', icon: XIcon, description: "Connect your X account to schedule and publish posts.", brandColor: "text-black dark:text-white" },
-  { id: SocialPlatformType.Facebook, name: 'Facebook', icon: FacebookIcon, description: "Link Facebook Pages to manage content and engage audiences.", brandColor: "text-blue-600" },
-  { id: SocialPlatformType.Instagram, name: 'Instagram', icon: InstagramIcon, description: "Connect Instagram Business accounts for content scheduling.", brandColor: "text-pink-500" },
-  { id: SocialPlatformType.LinkedIn, name: 'LinkedIn', icon: LinkedInIcon, description: "Manage LinkedIn Pages and personal profiles.", brandColor: "text-sky-700" },
-  { id: SocialPlatformType.Pinterest, name: 'Pinterest', icon: PinterestIcon, description: "Schedule Pins to your Pinterest boards.", brandColor: "text-red-600" },
-  { id: SocialPlatformType.TikTok, name: 'TikTok', icon: TikTokIcon, description: "Connect TikTok to plan and analyze video content (Note: Direct posting API is limited).", brandColor: "text-black dark:text-white" },
-  { id: SocialPlatformType.YouTube, name: 'YouTube', icon: YouTubeIcon, description: "Manage video uploads and scheduling for your YouTube channels.", brandColor: "text-red-500" },
+export const SOCIAL_PLATFORMS_TO_CONNECT: SocialPlatformConnectionDetails[] = [
+  { 
+    id: SocialPlatformType.Instagram, 
+    name: 'Instagram', 
+    icon: InstagramIcon, 
+    description: "Connect Business accounts for direct scheduling or Personal accounts for notifications.", 
+    brandColor: "text-pink-500",
+    connectionOptions: [
+      {
+        type: 'Personal',
+        title: 'Personal Profile',
+        description: 'Most used to share to family and friends.',
+        features: ['Notification-based publishing: Receive a mobile notification to post yourself.'],
+      },
+      {
+        type: 'Professional',
+        title: 'Professional',
+        description: 'For Business or Creator Accounts.',
+        features: [
+          'Automatic publishing: Schedule and we’ll publish for you (for images and short videos).',
+          'Analytics & engagement data (on our higher-tier plans).',
+          'Notification-based publishing for Stories and other formats.'
+        ],
+        recommended: true,
+        warning: "If your account type isn’t Professional yet, Instagram will prompt you to change it during the connection process."
+      }
+    ]
+  },
+  { 
+    id: SocialPlatformType.Facebook, 
+    name: 'Facebook', 
+    icon: FacebookIcon, 
+    description: "Link Facebook Pages to manage content and engage audiences.", 
+    brandColor: "text-blue-600",
+    connectionOptions: [
+      {
+        type: 'Page',
+        title: 'Facebook Page',
+        description: 'Connect a Facebook Page you manage to enable direct publishing.',
+        features: [
+            'Directly publish posts, images, and videos.',
+            'Schedule content far in advance.',
+            'Access to analytics for your Page (on higher-tier plans).'
+        ],
+        recommended: true,
+      }
+    ]
+  },
+  { 
+    id: SocialPlatformType.X, 
+    name: 'X (Twitter)', 
+    icon: XIcon, 
+    description: "Connect your X account to schedule and publish posts.", 
+    brandColor: "text-black dark:text-white",
+    connectionOptions: [
+        {
+        type: 'Profile',
+        title: 'X Profile',
+        description: 'Connect your X profile for direct posting and scheduling.',
+        features: [
+            'Directly publish posts (tweets) with text, images, and links.',
+            'Schedule posts for optimal timing.',
+            'Engage with your audience directly from the platform.'
+        ],
+        recommended: true,
+        }
+    ]
+  },
+  { 
+    id: SocialPlatformType.LinkedIn, 
+    name: 'LinkedIn', 
+    icon: LinkedInIcon, 
+    description: "Manage LinkedIn Pages and personal profiles for professional content.", 
+    brandColor: "text-sky-700",
+    connectionOptions: [
+        {
+        type: 'Profile',
+        title: 'LinkedIn Profile or Page',
+        description: 'Connect a LinkedIn profile or a Company Page you administer.',
+        features: [
+            'Directly publish professional articles, updates, and media.',
+            'Schedule content for your professional network or company followers.',
+        ],
+        recommended: true,
+        warning: 'LinkedIn API rules apply. Frequent non-engaging posts can be throttled.'
+        }
+    ]
+  },
+  { 
+    id: SocialPlatformType.Pinterest, 
+    name: 'Pinterest', 
+    icon: PinterestIcon, 
+    description: "Schedule Pins to your Pinterest boards.", 
+    brandColor: "text-red-600",
+    connectionOptions: [
+        {
+        type: 'Profile',
+        title: 'Pinterest Profile',
+        description: 'Connect your Pinterest account to schedule Pins to your boards.',
+        features: [
+            'Schedule image and video Pins to any of your public boards.',
+            'Plan visual content campaigns.',
+        ],
+        recommended: true,
+        }
+    ]
+  },
+  { 
+    id: SocialPlatformType.TikTok, 
+    name: 'TikTok', 
+    icon: TikTokIcon, 
+    description: "Connect TikTok for content planning and publishing reminders.", 
+    brandColor: "text-black dark:text-white",
+     connectionOptions: [
+        {
+        type: 'Business',
+        title: 'TikTok Business Account',
+        description: 'Connect your TikTok account to receive publishing reminders.',
+        features: [
+            'Notification-based publishing: We’ll prepare your video and send a notification to your phone for you to post.',
+        ],
+        recommended: true,
+        warning: 'Direct automatic posting to TikTok is highly restricted by their API. Our reminder workflow is the most reliable method.'
+        }
+    ]
+  },
+  { 
+    id: SocialPlatformType.YouTube, 
+    name: 'YouTube', 
+    icon: YouTubeIcon, 
+    description: "Manage video uploads and scheduling for your YouTube channels.", 
+    brandColor: "text-red-500",
+    connectionOptions: [
+        {
+        type: 'Channel',
+        title: 'YouTube Channel',
+        description: 'Connect your YouTube channel to manage video uploads.',
+        features: [
+            'Upload videos directly to your channel.',
+            'Schedule videos to go live at a specific time.',
+            'Update video titles, descriptions, and privacy settings.'
+        ],
+        recommended: true,
+        }
+    ]
+  },
+  { 
+    id: SocialPlatformType.Telegram, 
+    name: 'Telegram', 
+    icon: TelegramIcon, 
+    description: "Connect to broadcast messages to channels and groups.", 
+    brandColor: "text-sky-500",
+    connectionOptions: [{
+        type: 'Bot',
+        title: 'Telegram Bot/Channel',
+        description: 'Connect a Telegram bot to post messages to channels or groups.',
+        features: ['Directly publish messages to channels.', 'Schedule broadcasts.'],
+        recommended: true
+    }]
+  },
+  { 
+    id: SocialPlatformType.Bluesky, 
+    name: 'Bluesky', 
+    icon: BlueskyIcon, 
+    description: "Connect your Bluesky account to post and schedule content.", 
+    brandColor: "text-blue-500",
+    connectionOptions: [{
+        type: 'Profile',
+        title: 'Bluesky Profile',
+        description: 'Connect your Bluesky profile for direct posting.',
+        features: ['Directly publish posts (skeets).', 'Schedule content.'],
+        recommended: true
+    }]
+  },
+  { 
+    id: SocialPlatformType.GoogleBusiness, 
+    name: 'Google Business Profile', 
+    icon: GoogleBusinessIcon, 
+    description: "Manage posts and updates for your Google Business Profile listings.", 
+    brandColor: "text-green-600",
+    connectionOptions: [{
+        type: 'Profile',
+        title: 'Google Business Profile',
+        description: 'Connect your GBP to post updates, offers, and events.',
+        features: ['Publish posts directly to your profile.', 'Schedule updates to keep your profile active.'],
+        recommended: true
+    }]
+  },
+  { 
+    id: SocialPlatformType.Threads, 
+    name: 'Threads', 
+    icon: ThreadsIcon, 
+    description: "Connect Threads for content planning and posting.", 
+    brandColor: "text-black dark:text-white",
+    connectionOptions: [{
+        type: 'Profile',
+        title: 'Threads Profile',
+        description: 'Connect your Threads account for direct publishing.',
+        features: ['Directly publish posts and replies.', 'Schedule your Threads content in advance.'],
+        recommended: true,
+        warning: "Threads API is new and features may change."
+    }]
+  },
+  { 
+    id: SocialPlatformType.Discord, 
+    name: 'Discord', 
+    icon: DiscordIcon, 
+    description: "Connect Discord via webhooks to post messages to specific channels.", 
+    brandColor: "text-indigo-500",
+    connectionOptions: [{
+        type: 'Webhook',
+        title: 'Discord Webhook',
+        description: 'Connect a Discord channel webhook to send automated messages.',
+        features: ['Post messages to a specific channel.', 'Schedule announcements or updates.', 'Use markdown for formatting.'],
+        recommended: true,
+        warning: "This connection requires you to create a webhook in your Discord server settings."
+    }]
+  },
 ];
 
 export const MAX_FILE_UPLOAD_SIZE_MB = 10; 

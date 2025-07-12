@@ -1,5 +1,5 @@
-
 import React from 'react';
+import { format } from 'date-fns';
 import { ContentLibraryAsset } from '../../types';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
@@ -76,7 +76,7 @@ const AssetCardComponent: React.FC<AssetCardProps> = ({
         <div>
           <h4 className="font-semibold text-textPrimary truncate" title={asset.name}>{asset.name}</h4>
           <p className="text-xs text-textSecondary capitalize">{asset.type} &bull; {formatBytes(asset.size)}</p>
-          <p className="text-xs text-textSecondary">Uploaded: {new Date(asset.uploaded_at).toLocaleDateString()}</p>
+          <p className="text-xs text-textSecondary">Uploaded: {format(new Date(asset.uploaded_at), 'PP')}</p>
           <div className="mt-1.5">
             {editingTagsForAssetId === asset.id ? (
               <div className="space-y-1.5">
@@ -117,7 +117,7 @@ const AssetCardComponent: React.FC<AssetCardProps> = ({
           </div>
         </div>
         <Button
-          variant="danger"
+          variant="destructive"
           size="sm"
           onClick={() => onDeleteAsset(asset.id)}
           leftIcon={<TrashIcon className="w-4 h-4" />}
@@ -132,15 +132,3 @@ const AssetCardComponent: React.FC<AssetCardProps> = ({
 };
 
 export const AssetCard = React.memo(AssetCardComponent);
-
-if (!document.getElementById('pixasocial-cl-assetcard-text-xxs-style')) {
-    const style = document.createElement('style');
-    style.id = 'pixasocial-cl-assetcard-text-xxs-style';
-    style.innerHTML = `
-      .text-xxs {
-        font-size: 0.65rem; 
-        line-height: 0.8rem;
-      }
-    `;
-    document.head.appendChild(style);
-  }

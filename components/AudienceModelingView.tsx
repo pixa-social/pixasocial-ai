@@ -1,5 +1,7 @@
+
+
 import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
-import { Persona, RSTProfile, ViewName, RSTTraitLevel, UserProfile, LibraryPersona } from '../types'; 
+import { Persona, RSTProfile, ViewName, RSTTraitLevel, UserProfile, LibraryPersona, Database, Json } from '../types'; 
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
@@ -11,7 +13,7 @@ import RstIntroductionGraphic from './RstIntroductionGraphic';
 import { useToast } from './ui/ToastProvider'; 
 import { PersonaForm } from './audience-modeling/PersonaForm';
 import { PersonaCard } from './audience-modeling/PersonaCard';
-import { ArrowPathIcon, AdjustmentsHorizontalIcon, ChevronUpIcon, ChevronDownIcon, ArrowDownOnSquareIcon } from './ui/Icons';
+import { ArrowPathIcon, AdjustmentsHorizontalIcon, ChevronUpIcon, ChevronDownIcon, ArrowDownOnSquareIcon, TrashIcon } from './ui/Icons';
 import { PrerequisiteMessageCard } from './ui/PrerequisiteMessageCard';
 import { supabase } from '../services/supabaseClient';
 import { PersonaLibraryModal } from './audience-modeling/PersonaLibraryModal';
@@ -70,7 +72,7 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ curr
       setError(`Failed to fetch personas: ${error.message}`);
       showToast(`Failed to fetch personas: ${error.message}`, 'error');
     } else {
-      setPersonas(data || []);
+      setPersonas((data as Persona[]) || []);
     }
     setIsDataLoading(false);
   }, [currentUser.id, showToast, sortField, sortDirection]);
@@ -99,7 +101,7 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ curr
 
     const prompt = `
       You are an expert in psychological profiling. Based on the following persona data, generate a corresponding profile for our application.
-      The persona is from a general library, adapt their traits into our specific format. The persona name must be "${libraryPersona.name}".
+      The persona name must be "${libraryPersona.name}".
 
       Input Persona Data:
       ${JSON.stringify(libraryPersona, null, 2)}
@@ -131,7 +133,7 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ curr
             psychographics: result.data.psychographics || '',
             initial_beliefs: result.data.initial_beliefs || '',
             vulnerabilities: result.data.suggestedVulnerabilities || [],
-            rst_profile: rstProfile,
+            rst_profile: rstProfile as unknown as Json,
             avatar_url: `https://picsum.photos/seed/${libraryPersona.name.trim().toLowerCase().replace(/[^a-z0-9]/gi, '')}/100/100?noCache=${Date.now()}`
         };
         
@@ -150,28 +152,32 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ curr
     setIsSubmitting(true); setError(null);
     try {
       if (editingPersona && 'id' in editingPersona) { // It's an existing persona being edited
+        const updatePayload: Database['public']['Tables']['personas']['Update'] = {
+            ...personaData,
+            updated_at: new Date().toISOString()
+        };
         const { data, error } = await supabase
           .from('personas')
-          .update({ ...personaData, updated_at: new Date().toISOString() })
+          .update(updatePayload)
           .eq('id', editingPersona.id)
           .select()
           .single();
         if (error) throw error;
-        setPersonas(prev => prev.map(p => p.id === data.id ? data : p));
+        setPersonas(prev => prev.map(p => p.id === data.id ? (data as Persona) : p));
         showToast(`Persona "${data.name}" updated.`, "success");
       } else { // It's a new persona (either from scratch or imported)
         if (personas.length >= currentUser.role.max_personas) {
           throw new Error(`You have reached the maximum of ${currentUser.role.max_personas} personas for your '${currentUser.role.name}' plan.`);
         }
         const cleanedNameSeed = (personaData.name.trim().toLowerCase().replace(/[^a-z0-9]/gi, '') || 'defaultseed');
-        const newPersonaData = {
+        const newPersonaData: Database['public']['Tables']['personas']['Insert'] = {
           ...personaData,
           user_id: currentUser.id,
           avatar_url: `https://picsum.photos/seed/${cleanedNameSeed}/100/100?noCache=${Date.now()}`
         };
         const { data, error } = await supabase.from('personas').insert(newPersonaData).select().single();
         if (error) throw error;
-        setPersonas(prev => [...prev, data]);
+        setPersonas(prev => [...prev, data as Persona]);
         showToast(`Persona "${data.name}" created.`, "success");
       }
       setShowForm(false); setEditingPersona(undefined);
@@ -185,15 +191,33 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ curr
     finally { setIsSubmitting(false); }
   };
 
+  const handleDeletePersona = useCallback(async (personaId: number) => {
+    if (window.confirm("Are you sure you want to delete this persona? This action cannot be undone.")) {
+      const { error: deleteError } = await supabase.from('personas').delete().eq('id', personaId);
+      if (deleteError) {
+        if (deleteError.code === '23503') { // Foreign key violation
+          showToast("Cannot delete persona. It is currently being used by an Operator or Content Draft.", "error");
+        } else {
+          showToast(`Failed to delete persona: ${deleteError.message}`, "error");
+        }
+      } else {
+        setPersonas(prev => prev.filter(p => p.id !== personaId));
+        showToast("Persona deleted successfully.", "success");
+      }
+    }
+  }, [showToast]);
+
   const handleSimulateVulnerabilitiesOnCard = useCallback(async (persona: Persona) => {
     setIndividualLoading(prev => ({ ...prev, [String(persona.id)]: true })); setError(null);
-    const prompt = `Persona: ${persona.name}, Demo: ${persona.demographics}, Psycho: ${persona.psychographics}, Beliefs: ${persona.initial_beliefs}, RST: BAS ${persona.rst_profile?.bas}, BIS ${persona.rst_profile?.bis}, FFFS ${persona.rst_profile?.fffs}. Identify 3-5 key vulnerabilities. Return as comma-separated list.`;
+    const rstProfile = persona.rst_profile as unknown as RSTProfile | null;
+    const prompt = `Persona: ${persona.name}, Demo: ${persona.demographics}, Psycho: ${persona.psychographics}, Beliefs: ${persona.initial_beliefs}, RST: BAS ${rstProfile?.bas}, BIS ${rstProfile?.bis}, FFFS ${rstProfile?.fffs}. Identify 3-5 key vulnerabilities. Return as comma-separated list.`;
     const result = await generateText(prompt, currentUser, "Expert in psychological profiling. Return comma-separated list.");
     if (result.text) {
       const vulnerabilities = result.text.split(',').map(v => v.trim()).filter(v => v.length > 0);
+      const updatePayload: Database['public']['Tables']['personas']['Update'] = { vulnerabilities };
       const { data, error } = await supabase
         .from('personas')
-        .update({ vulnerabilities })
+        .update(updatePayload)
         .eq('id', persona.id)
         .select()
         .single();
@@ -201,7 +225,7 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ curr
         setError(`Failed to update vulnerabilities: ${error.message}`);
         showToast(`Failed to update vulnerabilities: ${error.message}`, "error");
       } else {
-        setPersonas(prev => prev.map(p => p.id === data.id ? data : p));
+        setPersonas(prev => prev.map(p => p.id === data.id ? (data as Persona) : p));
         showToast("Vulnerabilities refreshed with AI.", "success");
       }
     } else { 
@@ -220,13 +244,13 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ curr
       filtered = filtered.filter(p => p.name.toLowerCase().includes(filterName.toLowerCase()));
     }
     if (filterRstBas !== 'Any') {
-      filtered = filtered.filter(p => p.rst_profile?.bas === filterRstBas);
+      filtered = filtered.filter(p => (p.rst_profile as unknown as RSTProfile)?.bas === filterRstBas);
     }
     if (filterRstBis !== 'Any') {
-      filtered = filtered.filter(p => p.rst_profile?.bis === filterRstBis);
+      filtered = filtered.filter(p => (p.rst_profile as unknown as RSTProfile)?.bis === filterRstBis);
     }
     if (filterRstFffs !== 'Any') {
-      filtered = filtered.filter(p => p.rst_profile?.fffs === filterRstFffs);
+      filtered = filtered.filter(p => (p.rst_profile as unknown as RSTProfile)?.fffs === filterRstFffs);
     }
     return filtered;
   }, [personas, filterName, filterRstBas, filterRstBis, filterRstFffs]);
@@ -249,6 +273,8 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ curr
   ];
   
   const canCreatePersona = personas.length < currentUser.role.max_personas;
+  const hasNoCredits = currentUser.ai_usage_count_monthly >= currentUser.role.max_ai_uses_monthly;
+
 
   if (isDataLoading) {
     return <div className="p-6"><LoadingSpinner text="Loading personas..." /></div>;
@@ -272,9 +298,9 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ curr
                  <Button 
                     variant="secondary" 
                     onClick={() => setIsLibraryOpen(true)}
-                    disabled={!canCreatePersona} 
+                    disabled={!canCreatePersona || hasNoCredits} 
                     leftIcon={<ArrowDownOnSquareIcon className="w-5 h-5"/>}
-                    title={!canCreatePersona ? `Persona limit reached for your plan` : 'Import from Pixasocial Persona Library'}
+                    title={!canCreatePersona ? `Persona limit reached for your plan` : (hasNoCredits ? "You have no AI credits remaining." : 'Import from Pixasocial Persona Library')}
                   >
                     Import from Library
                   </Button>
@@ -347,8 +373,10 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ curr
                     key={persona.id}
                     persona={persona}
                     onEdit={handleEdit}
+                    onDelete={handleDeletePersona}
                     onRefreshVulnerabilities={handleSimulateVulnerabilitiesOnCard}
                     isRefreshingVulnerabilities={individualLoading[String(persona.id)] || false}
+                    currentUser={currentUser}
                 />
                 ))}
             </div>

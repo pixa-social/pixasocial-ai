@@ -40,7 +40,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ currentUser, onNav
       const { data: draftData } = await supabase.from('content_drafts').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
       const { data: scheduleData } = await supabase.from('scheduled_posts').select('*').eq('user_id', currentUser.id).order('scheduled_at', { ascending: true });
       
-      setPersonas(personaData || []);
+      setPersonas((personaData as Persona[]) || []);
       setOperators(operatorData || []);
       setContentDrafts(draftData || []);
       setScheduledPostRows(scheduleData || []);
@@ -80,9 +80,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ currentUser, onNav
     };
   }), [scheduledPostRows, contentDrafts]);
 
-  const upcomingPosts = (scheduledPosts ?? [])
-    .filter(post => post.start >= new Date())
-    .slice(0, 5);
+  const now = useMemo(() => new Date(), []);
+  const upcomingPosts = useMemo(() => (scheduledPosts ?? [])
+    .filter(post => post.start >= now)
+    .slice(0, 5), [scheduledPosts, now]);
 
   const latestPersona = (personas?.length ?? 0) > 0 ? personas[0] : null;
   const latestOperator = (operators?.length ?? 0) > 0 ? operators[0] : null;

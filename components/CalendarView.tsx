@@ -1,5 +1,4 @@
 
-
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Calendar as BigCalendar, dateFnsLocalizer, Views, EventProps, ToolbarProps, View, DayPropGetter, SlotPropGetter, Event } from 'react-big-calendar';
 import { format, getDay, isValid } from 'date-fns';
@@ -93,17 +92,6 @@ const EventDetailModalComponent: React.FC<EventDetailModalProps> = ({
         className="w-full max-w-lg bg-card shadow-xl rounded-lg transform transition-all duration-300 ease-in-out scale-95 opacity-0 animate-modal-appear"
         shadow="xl"
       >
-        <style>{`
-          @keyframes modal-appear {
-            to {
-              opacity: 1;
-              transform: scale(1);
-            }
-          }
-          .animate-modal-appear {
-            animation: modal-appear 0.3s forwards;
-          }
-        `}</style>
         <div className="space-y-4 max-h-[70vh] overflow-y-auto p-1 pr-3"> 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div><strong className="text-textSecondary">Platform:</strong> <span className="text-textPrimary">{platformInfo?.label}</span></div>
@@ -166,7 +154,7 @@ const EventDetailModalComponent: React.FC<EventDetailModalProps> = ({
           </div>
         </div>
         <div className="mt-6 flex justify-between items-center pt-4 border-t border-lightBorder">
-          <Button variant="danger" onClick={onDelete} size="sm">Unschedule Post</Button>
+          <Button variant="destructive" onClick={onDelete} size="sm">Unschedule Post</Button>
           <div className="space-x-2">
             <Button variant="ghost" onClick={onClose} size="sm">Cancel</Button>
             <Button variant="primary" onClick={handleSaveChanges} size="sm">Save Changes</Button>
@@ -187,6 +175,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const jumpDateInputRef = useRef<HTMLInputElement>(null);
   const navigateTo = useNavigateToView(onNavigate);
   const [isLoading, setIsLoading] = useState(true);
+
+  const todayString = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 750); 
@@ -344,14 +334,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const showPrerequisiteMessage = contentDrafts.length === 0 && scheduledPosts.length === 0;
 
   const dayPropGetter = useCallback((date: Date) => {
-    const isToday = format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+    const isToday = format(date, 'yyyy-MM-dd') === todayString;
     return {
       className: `${isToday ? 'bg-primary/5 rbc-today' : 'hover:bg-card/50'} transition-colors duration-150`,
       style: {
         minHeight: '100px',
       },
     };
-  }, []);
+  }, [todayString]);
 
   const slotPropGetter = useCallback((date: Date) => {
     return {
@@ -391,28 +381,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           slotPropGetter={slotPropGetter}
         />
       </div>
-       <style>{`
-        .rbc-calendar { font-family: inherit; color: var(--text-color, #f9fafb); }
-        .rbc-toolbar button { text-transform: capitalize; }
-        .rbc-event { padding: 0; border-radius: 4px; border: none; background-color: transparent; } 
-        .rbc-agenda-date-cell, .rbc-agenda-time-cell { font-weight: 500; }
-        .rbc-header { padding: 8px 5px; text-align: center; font-weight: 600; border-bottom: 1px solid #374151; background-color: transparent; }
-        .rbc-off-range-bg { background: #1f2937; }
-        .rbc-today { background-color: rgba(56, 189, 248, 0.1) !important; } 
-        .rbc-day-bg:hover, .rbc-time-slot:hover { background-color: rgba(56, 189, 248, 0.05) !important; }
-        .rbc-time-view, .rbc-month-view { border: 1px solid #374151; }
-        .rbc-time-header, .rbc-month-row { border-bottom: 1px solid #374151; }
-        .rbc-day-bg, .rbc-month-row, .rbc-day-slot .rbc-time-slot { border-left: 1px solid #374151; }
-        .rbc-rtl .rbc-day-bg, .rbc-rtl .rbc-month-row, .rbc-rtl .rbc-day-slot .rbc-time-slot { border-right: 1px solid #374151; border-left: none;}
-        .rbc-agenda-view table { border: 1px solid #374151; }
-        .rbc-agenda-view table tr { border-bottom: 1px solid #374151; }
-        .rbc-agenda-view table tr:last-child { border-bottom: none; }
-        .rbc-agenda-view table th, .rbc-agenda-view table td { padding: 0.5rem; border-right: 1px solid #374151; }
-        .rbc-agenda-view table th:last-child, .rbc-agenda-view table td:last-child { border-right: none; }
-        .rbc-agenda-empty { color: #9ca3af; }
-        .rbc-time-gutter, .rbc-header { background-color: #1f2937; }
-        .text-xxs { font-size: 0.65rem; line-height: 0.85rem; }
-       `}</style>
       {selectedEventFullDetails.event && (
         <EventDetailModal
           event={selectedEventFullDetails.event}

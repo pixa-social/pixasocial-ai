@@ -1,5 +1,7 @@
+
+
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { Operator, Persona, RSTProfile, RSTTraitLevel, ViewName, UserProfile } from '../types';
+import { Operator, Persona, RSTProfile, RSTTraitLevel, ViewName, UserProfile, Database } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
@@ -16,6 +18,7 @@ import { useForm, Controller, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '../services/supabaseClient';
+import { TrashIcon } from './ui/Icons';
 
 interface OperatorBuilderViewProps {
   currentUser: UserProfile;
@@ -41,6 +44,7 @@ interface OperatorFormProps {
   onCancel?: () => void;
   isLoading?: boolean;
   onSuggestOperatorDetails?: (details: { type: Operator['type'], target_audience_id: number, desiredCR: string }) => Promise<{cs?: string, us?: string, reinforcementLoop?: string} | null>;
+  currentUser: UserProfile;
 }
 
 interface AiOperatorSuggestion {
@@ -49,7 +53,7 @@ interface AiOperatorSuggestion {
     reinforcementLoop: string;
 }
 
-const OperatorFormComponent: React.FC<OperatorFormProps> = ({ initialOperator, personas, onSubmitForm, onCancel, isLoading, onSuggestOperatorDetails }) => {
+const OperatorFormComponent: React.FC<OperatorFormProps> = ({ initialOperator, personas, onSubmitForm, onCancel, isLoading, onSuggestOperatorDetails, currentUser }) => {
   const { showToast } = useToast();
   const { control, register, handleSubmit, watch, setValue, formState: { errors } } = useForm<OperatorFormData>({
     resolver: zodResolver(operatorFormSchema),
@@ -70,6 +74,7 @@ const OperatorFormComponent: React.FC<OperatorFormProps> = ({ initialOperator, p
   const watchDesiredCR = watch("desired_conditioned_response");
 
   const selectedPersona = useMemo(() => personas.find(p => p.id === watchTargetAudienceId), [personas, watchTargetAudienceId]);
+  const hasNoCredits = currentUser.ai_usage_count_monthly >= currentUser.role.max_ai_uses_monthly;
 
   const handleSuggestClick = useCallback(async () => {
     if (!onSuggestOperatorDetails || !watchTargetAudienceId || !watchType || !watchDesiredCR) {
@@ -118,8 +123,8 @@ const OperatorFormComponent: React.FC<OperatorFormProps> = ({ initialOperator, p
           {RST_TRAITS.map(traitInfo => (
             <div key={traitInfo.key} className="mb-1">
               <span className="font-medium text-indigo-300">{traitInfo.label.split(' (')[0]}: </span>
-              <span className="text-indigo-200">{selectedPersona.rst_profile?.[traitInfo.key]}</span>
-              <RstVisualBar level={selectedPersona.rst_profile?.[traitInfo.key] || 'Not Assessed'} />
+              <span className="text-indigo-200">{(selectedPersona.rst_profile as unknown as RSTProfile)?.[traitInfo.key]}</span>
+              <RstVisualBar level={(selectedPersona.rst_profile as unknown as RSTProfile)?.[traitInfo.key] || 'Not Assessed'} />
             </div>
           ))}
         </Card>
@@ -137,11 +142,20 @@ const OperatorFormComponent: React.FC<OperatorFormProps> = ({ initialOperator, p
       <div className="my-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-md">
         <h4 className="font-semibold text-blue-300 mb-2">AI Suggestions</h4>
         {onSuggestOperatorDetails && (
-            <Button type="button" variant="secondary" size="sm" onClick={handleSuggestClick} isLoading={isSuggesting} disabled={!watchTargetAudienceId || !watchType || !watchDesiredCR || isSuggesting}>
-            Suggest CS, US & Reinforcement
+            <Button 
+                type="button" 
+                variant="secondary" 
+                size="sm" 
+                onClick={handleSuggestClick} 
+                isLoading={isSuggesting} 
+                disabled={!watchTargetAudienceId || !watchType || !watchDesiredCR || isSuggesting || hasNoCredits}
+                title={hasNoCredits ? "You have no AI credits remaining." : "Get AI suggestions"}
+            >
+                Suggest CS, US & Reinforcement
             </Button>
         )}
         <p className="text-xs text-textSecondary mt-1">AI can suggest Conditioned Stimulus, Unconditioned Stimulus, and Reinforcement Loop based on selections.</p>
+        {hasNoCredits && <p className="mt-2 text-xs text-yellow-400">You have used all your AI credits for this month.</p>}
       </div>
       
       <Textarea label="Conditioned Stimulus (CS)" {...register("conditioned_stimulus")} error={errors.conditioned_stimulus?.message} aria-invalid={!!errors.conditioned_stimulus} placeholder="e.g., A specific symbol, phrase, or image type" required />
@@ -160,7 +174,7 @@ const OperatorFormComponent: React.FC<OperatorFormProps> = ({ initialOperator, p
 const OperatorForm = React.memo(OperatorFormComponent);
 
 
-export const OperatorBuilderView: React.FC<OperatorBuilderViewProps> = ({ currentUser, onNavigate }) => {
+const OperatorBuilderViewComponent: React.FC<OperatorBuilderViewProps> = ({ currentUser, onNavigate }) => {
   const [operators, setOperators] = useState<Operator[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [isDataLoading, setIsDataLoading] = useState(true);
@@ -187,7 +201,7 @@ export const OperatorBuilderView: React.FC<OperatorBuilderViewProps> = ({ curren
         setError(prev => `${prev}\nFailed to fetch personas: ${pError.message}`);
         showToast(`Failed to fetch personas: ${pError.message}`, 'error');
       } else {
-        setPersonas(personaData || []);
+        setPersonas((personaData as Persona[]) || []);
       }
       setIsDataLoading(false);
     };
@@ -200,9 +214,13 @@ export const OperatorBuilderView: React.FC<OperatorBuilderViewProps> = ({ curren
     setError(null);
     try {
       if (editingOperator) {
+        const updatePayload: Database['public']['Tables']['operators']['Update'] = {
+            ...operatorData,
+            updated_at: new Date().toISOString(),
+        };
         const { data, error } = await supabase
           .from('operators')
-          .update(operatorData)
+          .update(updatePayload)
           .eq('id', editingOperator.id)
           .select()
           .single();
@@ -210,7 +228,7 @@ export const OperatorBuilderView: React.FC<OperatorBuilderViewProps> = ({ curren
         setOperators(prev => prev.map(o => o.id === data.id ? data : o));
         showToast("Operator updated", "success");
       } else {
-        const newOperatorData = { ...operatorData, user_id: currentUser.id };
+        const newOperatorData: Database['public']['Tables']['operators']['Insert'] = { ...operatorData, user_id: currentUser.id };
         const { data, error } = await supabase
           .from('operators')
           .insert(newOperatorData)
@@ -230,9 +248,27 @@ export const OperatorBuilderView: React.FC<OperatorBuilderViewProps> = ({ curren
     finally { setIsLoading(false); }
   }, [editingOperator, currentUser.id, showToast]);
   
+  const handleDeleteOperator = useCallback(async (operatorId: number) => {
+    if (window.confirm("Are you sure you want to delete this operator?")) {
+        const { error: deleteError } = await supabase.from('operators').delete().eq('id', operatorId);
+        if (deleteError) {
+            if (deleteError.code === '23503') { // Foreign key violation
+                showToast("Cannot delete operator. It is currently being used by a Content Draft.", "error");
+            } else {
+                showToast(`Failed to delete operator: ${deleteError.message}`, "error");
+            }
+        } else {
+            setOperators(prev => prev.filter(o => o.id !== operatorId));
+            showToast("Operator deleted.", "success");
+        }
+    }
+  }, [showToast]);
+
   const handleSuggestOperatorDetails = useCallback(async (details: { type: Operator['type'], target_audience_id: number, desiredCR: string }): Promise<AiOperatorSuggestion | null> => {
     const persona = personas.find(p => p.id === details.target_audience_id);
     if (!persona) { setError("Target persona not found for suggestion."); return null; }
+
+    const rstProfile = persona.rst_profile as unknown as RSTProfile | null;
 
     const prompt = `
       Persona Details:
@@ -241,7 +277,7 @@ export const OperatorBuilderView: React.FC<OperatorBuilderViewProps> = ({ curren
       Psychographics: ${persona.psychographics}
       Initial Beliefs: ${persona.initial_beliefs}
       Vulnerabilities: ${persona.vulnerabilities?.join(', ') || 'Not specified'}
-      RST Profile: BAS: ${persona.rst_profile?.bas || 'N/A'}, BIS: ${persona.rst_profile?.bis || 'N/A'}, FFFS: ${persona.rst_profile?.fffs || 'N/A'}
+      RST Profile: BAS: ${rstProfile?.bas || 'N/A'}, BIS: ${rstProfile?.bis || 'N/A'}, FFFS: ${rstProfile?.fffs || 'N/A'}
 
       Campaign Goal: Operator Type: ${details.type}, Desired Conditioned Response (CR): "${details.desiredCR}"
       Based on these details, suggest a plausible Conditioned Stimulus (CS), an Unconditioned Stimulus (US), and a Reinforcement Loop.
@@ -275,7 +311,7 @@ export const OperatorBuilderView: React.FC<OperatorBuilderViewProps> = ({ curren
             Craft powerful operators to influence and engage your audience with precision.
         </p>
         <img 
-          src="/assets/operator-builder-conceptual-diagram.png" 
+          src="https://i.postimg.cc/nLLcr631/operator-builder-conceptual-diagram.png" 
           alt="Operator Builder conceptual diagram: Audience Persona -> Operator Builder -> Operator Type" 
           className="mx-auto mb-6 max-w-lg w-full h-auto rounded-lg shadow-md"
         />
@@ -302,7 +338,8 @@ export const OperatorBuilderView: React.FC<OperatorBuilderViewProps> = ({ curren
             onSubmitForm={handleFormSubmit} 
             onCancel={() => { setShowForm(false); setEditingOperator(undefined); setError(null);}} 
             isLoading={isLoading} 
-            onSuggestOperatorDetails={handleSuggestOperatorDetails} 
+            onSuggestOperatorDetails={handleSuggestOperatorDetails}
+            currentUser={currentUser}
           />
         </Card>
       ) : (
@@ -323,7 +360,12 @@ export const OperatorBuilderView: React.FC<OperatorBuilderViewProps> = ({ curren
                   <p className="text-sm text-textSecondary mb-1"><strong>US:</strong> {op.unconditioned_stimulus}</p>
                   <p className="text-sm text-textSecondary mb-1"><strong>Desired CR:</strong> {op.desired_conditioned_response}</p>
                   <p className="text-sm text-textSecondary mb-3"><strong>Reinforcement:</strong> {op.reinforcement_loop}</p>
-                  <div className="mt-4 pt-4 border-t border-lightBorder"><Button size="sm" variant="ghost" onClick={() => handleEdit(op)}>Edit</Button></div>
+                  <div className="mt-4 pt-4 border-t border-lightBorder flex justify-between items-center">
+                    <Button size="sm" variant="ghost" onClick={() => handleEdit(op)}>Edit</Button>
+                    <Button size="sm" variant="destructive" onClick={() => handleDeleteOperator(op.id)}>
+                        <TrashIcon className="w-4 h-4"/>
+                    </Button>
+                  </div>
                 </Card>
               );
             })}
@@ -333,3 +375,5 @@ export const OperatorBuilderView: React.FC<OperatorBuilderViewProps> = ({ curren
     </div>
   );
 };
+
+export const OperatorBuilderView = OperatorBuilderViewComponent;

@@ -19,6 +19,7 @@ interface TabsProps {
   tabButtonClassName?: string;
   activeTabButtonClassName?: string;
   tabPanelClassName?: string;
+  onTabChange?: (index: number) => void;
 }
 
 export const Tabs: React.FC<TabsProps> = ({
@@ -28,13 +29,21 @@ export const Tabs: React.FC<TabsProps> = ({
   tabListClassName = '',
   tabButtonClassName = '',
   activeTabButtonClassName = '',
-  tabPanelClassName = ''
+  tabPanelClassName = '',
+  onTabChange,
 }) => {
   const [activeTab, setActiveTab] = useState(defaultActiveTab);
 
   const tabs = Children.toArray(children).filter(
     (child): child is React.ReactElement<TabProps> => isValidElement(child) && child.type === Tab
   );
+
+  const handleTabClick = (index: number) => {
+    setActiveTab(index);
+    if (onTabChange) {
+      onTabChange(index);
+    }
+  };
 
   return (
     <div className={`w-full ${className}`}>
@@ -49,7 +58,7 @@ export const Tabs: React.FC<TabsProps> = ({
                     : `border-transparent text-textSecondary hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300 ${tabButtonClassName}`
                   }
                 `}
-                onClick={() => setActiveTab(index)}
+                onClick={() => handleTabClick(index)}
                 role="tab"
                 aria-controls={`tab-panel-${index}`}
                 aria-selected={activeTab === index}

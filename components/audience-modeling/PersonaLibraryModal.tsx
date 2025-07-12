@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { LibraryPersona } from '../../types';
 import { Card } from '../ui/Card';
@@ -48,27 +49,31 @@ export const PersonaLibraryModal: React.FC<PersonaLibraryModalProps> = ({ isOpen
     const from = (currentPage - 1) * ITEMS_PER_PAGE;
     const to = from + ITEMS_PER_PAGE - 1;
 
-    let query;
-
-    // Use the RPC function for searching, otherwise a simple select for non-search
     if (debouncedSearchTerm) {
-        query = supabase.rpc('search_personas', { search_term: debouncedSearchTerm })
+        const { data, error: dbError } = await supabase.rpc('search_personas', { search_term: debouncedSearchTerm })
                         .range(from, to)
-                        .select('*', { count: 'exact' });
+                        .select('*');
+
+        if (dbError) {
+          console.error("Error fetching library personas:", dbError);
+          setError("Could not load personas from the library.");
+        } else {
+          setPersonas(data as LibraryPersona[] || []);
+          // Estimate total count for pagination to work during search
+          const newCount = (data?.length || 0) < ITEMS_PER_PAGE ? from + (data?.length || 0) : from + (data?.length || 0) + 1;
+          setTotalCount(newCount);
+        }
     } else {
-        query = supabase.from('persona_library')
+        const { data, error: dbError, count } = await supabase.from('persona_library')
                         .select('*', { count: 'exact' })
                         .range(from, to);
-    }
-
-    const { data, error: dbError, count } = await query;
-    
-    if (dbError) {
-      console.error("Error fetching library personas:", dbError);
-      setError("Could not load personas from the library.");
-    } else {
-      setPersonas(data as LibraryPersona[] || []);
-      setTotalCount(count || 0);
+        if (dbError) {
+          console.error("Error fetching library personas:", dbError);
+          setError("Could not load personas from the library.");
+        } else {
+          setPersonas(data as LibraryPersona[] || []);
+          setTotalCount(count || 0);
+        }
     }
     setIsLoading(false);
   }, [currentPage, debouncedSearchTerm]);

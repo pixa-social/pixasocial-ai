@@ -1,23 +1,26 @@
 
 
-import { AIParsedJsonResponse, GroundingChunk, AiProviderType, UserProfile } from "../types";
+import { AIParsedJsonResponse, GroundingChunk, AiProviderType, UserProfile, Database } from "../types";
 import { handleNonImplementedProvider, getExecutionConfig } from './ai/aiUtils';
 import * as GeminiService from './ai/geminiAIService';
 import * as OpenAICompatibleService from './ai/openAICompatibleAIService';
 import { supabase } from './supabaseClient';
-import { supabase as sb } from './supabaseClient';
 
 const checkAndIncrementUsage = async (user: UserProfile): Promise<{allowed: boolean, error?: string}> => {
     if (user.ai_usage_count_monthly >= user.role.max_ai_uses_monthly) {
         return { 
             allowed: false, 
-            error: `You have exceeded your monthly AI usage limit (${user.role.max_ai_uses_monthly}) for the '${user.role.name}' plan.` 
+            error: `You have exceeded your monthly AI usage limit (${user.role.max_ai_uses_monthly}) for the '${user.role.name}' plan. Please upgrade your plan to continue.` 
         };
     }
     
+    const updatePayload: Database['public']['Tables']['profiles']['Update'] = {
+        ai_usage_count_monthly: user.ai_usage_count_monthly + 1
+    };
+
     const { error: updateError } = await supabase
         .from('profiles')
-        .update({ ai_usage_count_monthly: user.ai_usage_count_monthly + 1 })
+        .update(updatePayload)
         .eq('id', user.id);
 
     if (updateError) {

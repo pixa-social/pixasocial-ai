@@ -35,6 +35,7 @@ export const AuditToolView: React.FC<AuditToolViewProps> = ({ currentUser }) => 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPlanGenerated, setIsPlanGenerated] = useState(false);
+  const hasNoCredits = currentUser.ai_usage_count_monthly >= currentUser.role.max_ai_uses_monthly;
 
   const handleGenerateFullAuditPlan = useCallback(async () => {
     if (!campaignObjective.trim()) {
@@ -137,12 +138,16 @@ export const AuditToolView: React.FC<AuditToolViewProps> = ({ currentUser }) => 
           rows={4}
           containerClassName="mb-0"
         />
+        {hasNoCredits && (
+             <p className="mt-4 text-sm text-yellow-400 text-center">You have used all your AI credits for this month.</p>
+        )}
         <Button 
           variant="primary" 
           onClick={handleGenerateFullAuditPlan} 
           isLoading={isLoading}
-          className="w-full mt-4"
-          disabled={isLoading || !campaignObjective.trim()}
+          className="w-full mt-2"
+          disabled={isLoading || !campaignObjective.trim() || hasNoCredits}
+          title={hasNoCredits ? "You have no AI credits remaining." : "Generate AI audit plan"}
         >
           {isLoading ? 'AI Generating Full 8D Plan...' : 'Generate Full 8D Audit Plan with AI'}
         </Button>
