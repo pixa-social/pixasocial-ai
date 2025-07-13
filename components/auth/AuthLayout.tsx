@@ -46,7 +46,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({ authView, setAuthView })
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-textPrimary">
+    <div className="min-h-screen flex flex-col bg-background text-foreground">
       <AuthHeader authView={authView} setAuthView={setAuthView} />
 
       <main className="flex-grow">

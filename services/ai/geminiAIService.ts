@@ -79,15 +79,16 @@ export const generateJsonInternal = async <T,>(
   if (!ai) return { data: null, error: "Gemini API client not initialized." };
 
   try {
-    // Rely on prompt engineering for JSON output as a more robust method than responseMimeType
-    const jsonPrompt = `${prompt}\n\nIMPORTANT: Your entire response must be a single, valid JSON object. Do not include any text, explanations, or markdown formatting (like \`\`\`json) outside of the JSON object.`;
-
     const params: GenerateContentParameters = {
       model: modelName,
-      contents: jsonPrompt,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+      }
     };
+
     if (systemInstruction) {
-        params.config = { systemInstruction };
+      params.config!.systemInstruction = systemInstruction;
     }
     
     const response: GenerateContentResponse = await ai.models.generateContent(params);

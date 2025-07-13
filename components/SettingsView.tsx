@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+
+
+import React, { useState, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
@@ -7,22 +9,24 @@ import { Tabs, Tab } from './ui/Tabs';
 import { 
     ExclamationTriangleIcon, LinkIcon, PlusCircleIcon, TrashIcon, UserCircleIcon, 
     KeyIcon, WalletIcon, UserGroupIcon, EnvelopeIcon, CheckCircleIcon,
-    ServerStackIcon, UsersIcon as TeamIcon, WrenchScrewdriverIcon
+    PaperAirplaneIcon
 } from './ui/Icons';
 import { SOCIAL_PLATFORMS_TO_CONNECT, MAX_TEAM_MEMBERS } from '../constants';
-import { SocialPlatformType, ConnectedAccount, User, SocialPlatformConnectionDetails } from '../types';
+import { SocialPlatformType, ConnectedAccount, UserProfile, SocialPlatformConnectionDetails, RoleName, User } from '../types';
 import { useToast } from './ui/ToastProvider';
 import { useForm } from 'react-hook-form'; 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ConnectionFlowModal } from './settings/ConnectionFlowModal';
+import { supabase } from '../services/supabaseClient';
 
 interface SettingsViewProps {
-  currentUser: User;
+  currentUser: UserProfile;
   onUpdateUser: (updatedUserData: Partial<User>) => void;
   connectedAccounts: ConnectedAccount[];
   onAddConnectedAccount: (platform: SocialPlatformType, accountId: string, displayName: string, profileImageUrl?: string) => void;
-  onDeleteConnectedAccount: (accountId: number, platformName: string) => void;
+  onDeleteConnectedAccount: (accountId: string, platformName: string) => void;
+  onAccountConnectOrDelete: () => void;
 }
 
 const userProfileSchema = z.object({
@@ -37,11 +41,17 @@ type TeamInviteFormData = z.infer<typeof teamInviteSchema>;
 
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ 
-  currentUser, onUpdateUser, connectedAccounts, onAddConnectedAccount, onDeleteConnectedAccount
+  currentUser, onUpdateUser, connectedAccounts, onAddConnectedAccount, onDeleteConnectedAccount, onAccountConnectOrDelete
 }) => {
   const { showToast } = useToast();
   const [platformToConnect, setPlatformToConnect] = useState<SocialPlatformConnectionDetails | null>(null);
   
+  // State for Telegram Connection Form
+  const [telegramBotToken, setTelegramBotToken] = useState('');
+  const [telegramChannelId, setTelegramChannelId] = useState('');
+  const [isConnectingTelegram, setIsConnectingTelegram] = useState(false);
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
+
   const { register: registerProfile, handleSubmit: handleSubmitProfile, formState: { errors: profileErrors }, reset: resetProfileForm } = useForm<UserProfileFormData>({
     resolver: zodResolver(userProfileSchema),
     defaultValues: {
@@ -52,6 +62,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const { register: registerInvite, handleSubmit: handleSubmitInvite, formState: { errors: inviteErrors }, reset: resetInviteForm } = useForm<TeamInviteFormData>({
     resolver: zodResolver(teamInviteSchema),
   });
+
+  const isAdmin = currentUser.role_name === RoleName.Admin;
 
   useEffect(() => {
     resetProfileForm({ walletAddress: currentUser.walletAddress || '' });
@@ -97,7 +109,72 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       onAddConnectedAccount(platform, accountId, displayName);
       setPlatformToConnect(null);
   }, [currentUser, onAddConnectedAccount]);
+  
+  const handleConnectTelegram = async (isForAdmin: boolean) => {
+    if (!telegramChannelId) {
+        showToast("Channel ID is required.", 'error');
+        return;
+    }
+    if (isForAdmin && !telegramBotToken) {
+        showToast("Bot Token is required for admin connection.", 'error');
+        return;
+    }
 
+    setIsConnectingTelegram(true);
+    const body: {
+        platform: SocialPlatformType;
+        displayName: string;
+        channelId: string;
+        botToken?: string;
+    } = {
+        platform: SocialPlatformType.Telegram,
+        displayName: `Channel (${telegramChannelId})`,
+        channelId: telegramChannelId,
+    };
+    if (isForAdmin) {
+        body.botToken = telegramBotToken;
+    }
+
+    const { error } = await supabase.functions.invoke('connect-telegram', { body });
+
+    if (error) {
+        let errorMessage = error.message;
+        if ((error as any).context && typeof (error as any).context.json === 'function') {
+            try {
+                const functionError = await (error as any).context.json();
+                if (functionError.error) errorMessage = functionError.error;
+            } catch (e) {}
+        }
+        showToast(`Telegram connection failed: ${errorMessage}`, 'error');
+    } else {
+        showToast("Telegram connected successfully!", 'success');
+        onAccountConnectOrDelete();
+        setTelegramBotToken('');
+        setTelegramChannelId('');
+    }
+    setIsConnectingTelegram(false);
+  };
+
+  const handleTestTelegram = async () => {
+      setIsTestingConnection(true);
+      const { data, error } = await supabase.functions.invoke('telegram-poster');
+      
+      if (error) {
+          let errorMessage = error.message;
+          if ((error as any).context && typeof (error as any).context.json === 'function') {
+            try {
+                const functionError = await (error as any).context.json();
+                if (functionError.error) errorMessage = functionError.error;
+            } catch (e) { /* Ignore parsing errors */ }
+          }
+          showToast(`Test failed: ${errorMessage}`, 'error');
+      } else if (data.error) {
+          showToast(`Test failed: ${data.error}`, 'error');
+      } else {
+          showToast(data.message || "Test message sent successfully!", 'success');
+      }
+      setIsTestingConnection(false);
+  };
 
   return (
     <div className="p-6 space-y-8">
@@ -141,7 +218,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </form>
             </Card>
         </Tab>
-        <Tab label="Team Management" icon={<TeamIcon className="w-5 h-5" />}>
+        <Tab label="Team Management" icon={<UserGroupIcon className="w-5 h-5" />}>
             <Card title="Manage Your Team" className="mt-4">
                 <form onSubmit={handleSubmitInvite(handleInviteTeamMember)} className="space-y-4">
                 <Input
@@ -199,27 +276,51 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         <p className="text-sm text-textSecondary mb-4 min-h-[40px]">{platform.description}</p>
                         {connectedAccount ? (
                             <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-md">
-                            <div className="flex items-center mb-2">
-                                {connectedAccount.profileImageUrl ? (
-                                <img src={connectedAccount.profileImageUrl} alt={connectedAccount.displayName} className="w-10 h-10 rounded-full mr-3 border border-gray-600 object-cover" />
-                                ) : (
-                                <div className="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center text-gray-300 text-lg font-medium mr-3">
-                                    {connectedAccount.displayName.substring(0,1).toUpperCase()}
+                                <div className="flex items-center mb-2">
+                                    <div className="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center text-gray-300 text-lg font-medium mr-3">
+                                        {(connectedAccount.accountname || '?').substring(0,1).toUpperCase()}
+                                    </div>
+                                    <div>
+                                    <p className="text-sm font-semibold text-green-300">Connected: {connectedAccount.accountname}</p>
+                                    <p className="text-xs text-green-400">Account ID: {connectedAccount.accountid}</p>
+                                    {connectedAccount.created_at && <p className="text-xs text-textSecondary">Connected: {format(new Date(connectedAccount.created_at), 'PP')}</p>}
+                                    </div>
                                 </div>
-                                )}
-                                <div>
-                                <p className="text-sm font-semibold text-green-300">Connected: {connectedAccount.displayName}</p>
-                                <p className="text-xs text-green-400">Account ID: {connectedAccount.accountId}</p>
-                                <p className="text-xs text-textSecondary">Connected: {format(new Date(connectedAccount.connectedAt), 'PP')}</p>
+                                <div className="flex space-x-2 mt-2">
+                                    {platform.id === SocialPlatformType.Telegram && (
+                                        <Button variant="outline" size="sm" onClick={handleTestTelegram} isLoading={isTestingConnection} leftIcon={<PaperAirplaneIcon className="w-4 h-4"/>} className="flex-1" title="Test Connection">
+                                            Test
+                                        </Button>
+                                    )}
+                                    <Button variant="destructive" size="sm" onClick={() => onDeleteConnectedAccount(connectedAccount.id, platform.name)} leftIcon={<TrashIcon className="w-4 h-4"/>} className="flex-1" title={`Disconnect ${platform.name}`}>
+                                        Disconnect
+                                    </Button>
                                 </div>
                             </div>
-                            <Button variant="destructive" size="sm" onClick={() => onDeleteConnectedAccount(connectedAccount.id, platform.name)} leftIcon={<TrashIcon className="w-4 h-4"/>} className="w-full mt-2" title={`Disconnect ${platform.name}`}>
-                                Disconnect
-                            </Button>
-                            </div>
+                        ) : platform.id === SocialPlatformType.Telegram ? (
+                            isAdmin ? (
+                                <div className="space-y-3">
+                                    <Input label="Bot Token (Admin Only)" type="password" value={telegramBotToken} onChange={e => setTelegramBotToken(e.target.value)} placeholder="Enter bot token" containerClassName="mb-0"/>
+                                    <Input label="Channel ID" value={telegramChannelId} onChange={e => setTelegramChannelId(e.target.value)} placeholder="Enter channel ID" containerClassName="mb-0" />
+                                    <Button variant="secondary" onClick={() => handleConnectTelegram(true)} leftIcon={<PlusCircleIcon className="w-5 h-5"/>} className="w-full" title="Connect Telegram" isLoading={isConnectingTelegram}>
+                                        Save & Connect
+                                    </Button>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    <div className="text-sm text-textSecondary space-y-1 p-2 bg-background rounded-md">
+                                        <p>1. In Telegram, add our bot <strong className="text-primary">@pixasocial_bot</strong> as an admin to your channel.</p>
+                                        <p>2. Enter your unique Channel ID below.</p>
+                                    </div>
+                                    <Input label="Channel ID" value={telegramChannelId} onChange={e => setTelegramChannelId(e.target.value)} placeholder="Enter your channel ID" containerClassName="mb-0" />
+                                    <Button variant="secondary" onClick={() => handleConnectTelegram(false)} leftIcon={<PlusCircleIcon className="w-5 h-5"/>} className="w-full" title="Connect Telegram" isLoading={isConnectingTelegram}>
+                                        Save & Connect
+                                    </Button>
+                                </div>
+                            )
                         ) : (
                             <Button variant="secondary" onClick={() => setPlatformToConnect(platform)} leftIcon={<PlusCircleIcon className="w-5 h-5"/>} className="w-full" title={`Connect ${platform.name}`}>
-                            Connect {platform.name}
+                                Connect {platform.name}
                             </Button>
                         )}
                         </div>

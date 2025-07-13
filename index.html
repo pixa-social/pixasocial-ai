@@ -11,18 +11,43 @@
         theme: {
           extend: {
             colors: {
-              primary: '#38bdf8', // Light Blue-400 (Vibrant Accent)
-              secondary: '#475569', // Slate-600
-              accent: '#22d3ee', // Cyan-400
-              background: '#111827', // Deep Indigo (Gray-900)
-              card: '#1f2937', // Darker Indigo (Gray-800) for components
-              textPrimary: '#f9fafb', // Off-white (Gray-50)
-              textSecondary: '#9ca3af', // Soft gray (Gray-400)
-              danger: '#f43f5e', // Rose-500
-              warning: '#f59e0b', // Amber-500
-              success: '#10b981', // Emerald-500
-              lightBorder: '#374151', // Gray-700
-              mediumBorder: '#4b5563', // Gray-600
+              border: "hsl(var(--border))",
+              input: "hsl(var(--input))",
+              ring: "hsl(var(--ring))",
+              background: "hsl(var(--background))",
+              foreground: "hsl(var(--foreground))",
+              primary: {
+                DEFAULT: "hsl(var(--primary))",
+                foreground: "hsl(var(--primary-foreground))",
+              },
+              secondary: {
+                DEFAULT: "hsl(var(--secondary))",
+                foreground: "hsl(var(--secondary-foreground))",
+              },
+              destructive: {
+                DEFAULT: "hsl(var(--destructive))",
+                foreground: "hsl(var(--destructive-foreground))",
+              },
+              muted: {
+                DEFAULT: "hsl(var(--muted))",
+                foreground: "hsl(var(--muted-foreground))",
+              },
+              accent: {
+                DEFAULT: "hsl(var(--accent))",
+                foreground: "hsl(var(--accent-foreground))",
+              },
+              success: {
+                DEFAULT: "hsl(var(--success))",
+                foreground: "hsl(var(--success-foreground))",
+              },
+              card: {
+                DEFAULT: "hsl(var(--card))",
+                foreground: "hsl(var(--card-foreground))",
+              },
+              popover: {
+                DEFAULT: "hsl(var(--popover))",
+                foreground: "hsl(var(--popover-foreground))",
+              },
             },
             animation: {
               'spin-slow': 'spin 3s linear infinite',
@@ -57,7 +82,7 @@
               },
               "accordion-up": {
                 from: { height: "var(--radix-accordion-content-height)" },
-                to: { height: "0" },
+                to: { height: "var(--radix-accordion-content-height)" },
               },
               'modal-appear': {
                 'from': { opacity: '0', transform: 'scale(0.95)' },
@@ -191,8 +216,9 @@
   }
 }
 </script>
+
 </head>
-  <body class="bg-background text-textPrimary">
+  <body class="bg-background text-foreground">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

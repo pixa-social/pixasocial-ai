@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Calendar as BigCalendar, dateFnsLocalizer, Views, EventProps, ToolbarProps, View, DayPropGetter, SlotPropGetter, Event } from 'react-big-calendar';
 import { format, getDay, isValid } from 'date-fns';
@@ -94,9 +95,9 @@ const EventDetailModalComponent: React.FC<EventDetailModalProps> = ({
       >
         <div className="space-y-4 max-h-[70vh] overflow-y-auto p-1 pr-3"> 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div><strong className="text-textSecondary">Platform:</strong> <span className="text-textPrimary">{platformInfo?.label}</span></div>
-            <div><strong className="text-textSecondary">Persona:</strong> <span className="text-textPrimary">{persona.name}</span></div>
-            <div><strong className="text-textSecondary">Operator:</strong> <span className="text-textPrimary">{operator.name} ({operator.type})</span></div>
+            <div><strong className="text-muted-foreground">Platform:</strong> <span className="text-foreground">{platformInfo?.label}</span></div>
+            <div><strong className="text-muted-foreground">Persona:</strong> <span className="text-foreground">{persona.name}</span></div>
+            <div><strong className="text-muted-foreground">Operator:</strong> <span className="text-foreground">{operator.name} ({operator.type})</span></div>
           </div>
           
           <Input 
@@ -123,7 +124,7 @@ const EventDetailModalComponent: React.FC<EventDetailModalProps> = ({
 
           <div className="mt-3 relative group">
             <div className="flex justify-between items-center mb-1">
-                <h4 className="text-sm font-semibold text-textSecondary">Content Preview:</h4>
+                <h4 className="text-sm font-semibold text-muted-foreground">Content Preview:</h4>
                 <CopyButton 
                     textToCopy={combinedContentForCopy()} 
                     tooltipText="Copy Subject & Content" 
@@ -132,28 +133,28 @@ const EventDetailModalComponent: React.FC<EventDetailModalProps> = ({
                     isVisible={!!combinedContentForCopy()}
                 />
             </div>
-            <div className="bg-background p-3 rounded-md border border-lightBorder max-h-48 overflow-y-auto text-sm">
-                {platformDetail.subject && <p className="font-semibold text-textPrimary mb-1">Subject: {platformDetail.subject}</p>}
-                <pre className="whitespace-pre-wrap text-textPrimary">{platformDetail.content}</pre>
+            <div className="bg-background p-3 rounded-md border border-border max-h-48 overflow-y-auto text-sm">
+                {platformDetail.subject && <p className="font-semibold text-foreground mb-1">Subject: {platformDetail.subject}</p>}
+                <pre className="whitespace-pre-wrap text-foreground">{platformDetail.content}</pre>
                 {platformDetail.processedImageUrl && (
-                    <img src={platformDetail.processedImageUrl} alt="Processed media" className="max-w-xs w-full h-auto max-h-32 rounded my-2 border border-mediumBorder object-contain"/>
+                    <img src={platformDetail.processedImageUrl} alt="Processed media" className="max-w-xs w-full h-auto max-h-32 rounded my-2 border border-border object-contain"/>
                 )}
                 {platformDetail.memeText && (
                     <div className="flex justify-between items-start mt-1">
-                        <p className="text-xs italic text-textSecondary">Meme: {platformDetail.memeText}</p>
+                        <p className="text-xs italic text-muted-foreground">Meme: {platformDetail.memeText}</p>
                         <CopyButton textToCopy={platformDetail.memeText} tooltipText="Copy Meme Text" size="xs" className="ml-2 shrink-0"/>
                     </div>
                 )}
                 {platformDetail.videoIdea && (
                     <div className="flex justify-between items-start mt-1">
-                        <p className="text-xs text-textSecondary">Video Idea: {platformDetail.videoIdea.substring(0,100)}...</p>
+                        <p className="text-xs text-muted-foreground">Video Idea: {platformDetail.videoIdea.substring(0,100)}...</p>
                         <CopyButton textToCopy={platformDetail.videoIdea} tooltipText="Copy Video Idea" size="xs" className="ml-2 shrink-0"/>
                     </div>
                 )}
             </div>
           </div>
         </div>
-        <div className="mt-6 flex justify-between items-center pt-4 border-t border-lightBorder">
+        <div className="mt-6 flex justify-between items-center pt-4 border-t border-border">
           <Button variant="destructive" onClick={onDelete} size="sm">Unschedule Post</Button>
           <div className="space-x-2">
             <Button variant="ghost" onClick={onClose} size="sm">Cancel</Button>
@@ -251,7 +252,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     }, [toolbar]);
 
     return (
-      <div className="mb-4 p-3 flex flex-col md:flex-row justify-between items-center bg-card rounded-t-lg border-b border-lightBorder">
+      <div className="mb-4 p-3 flex flex-col md:flex-row justify-between items-center bg-card rounded-t-lg border-b border-border">
         <div className="flex items-center space-x-1 sm:space-x-2 mb-2 md:mb-0">
           <Button onClick={() => toolbar.onNavigate('PREV')} size="sm" variant="secondary" aria-label="Previous Period" title="Previous Period" leftIcon={<ChevronLeftIcon className="h-4 h-4"/>} />
           <Button onClick={() => toolbar.onNavigate('TODAY')} size="sm" variant="primary" title="Go to Today">Today</Button>
@@ -259,7 +260,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         </div>
         
         <div className="flex items-center space-x-1 sm:space-x-2 mb-2 md:mb-0 order-first md:order-none">
-            <label htmlFor="jump-to-date-input" className="text-sm font-medium text-textSecondary flex items-center">
+            <label htmlFor="jump-to-date-input" className="text-sm font-medium text-muted-foreground flex items-center">
                 <CalendarIcon className="w-4 h-4 mr-1 text-gray-500"/> Jump to:
             </label>
             <input 
@@ -267,7 +268,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 id="jump-to-date-input"
                 ref={jumpDateInputRef}
                 onChange={handleJumpToDate} 
-                className="px-2 py-1 border border-mediumBorder rounded-md shadow-sm text-sm focus:ring-primary focus:border-primary bg-card text-textPrimary"
+                className="px-2 py-1 border border-input rounded-md shadow-sm text-sm focus:ring-primary focus:border-primary bg-card text-foreground"
                 aria-label="Jump to date"
                 title="Select a date to jump to"
             />
@@ -283,7 +284,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               onClick={() => toolbar.onView(view)}
               size="sm"
               variant={toolbar.view === view ? 'primary' : 'ghost'}
-              className={`capitalize ${toolbar.view === view ? '' : 'text-textSecondary hover:text-primary'}`}
+              className={`capitalize ${toolbar.view === view ? '' : 'text-muted-foreground hover:text-primary'}`}
               title={`Switch to ${view} view`}
             >
               {view}
@@ -303,8 +304,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     switch(event.resource.status) {
         case 'Published': bgColor = 'bg-success hover:bg-emerald-600'; borderColor = 'border-emerald-700'; break;
         case 'Failed':
-        case 'Missed': bgColor = 'bg-danger hover:bg-rose-600'; borderColor = 'border-rose-700'; break;
-        case 'Publishing': bgColor = 'bg-warning hover:bg-amber-600'; borderColor = 'border-amber-700'; break;
+        case 'Missed': bgColor = 'bg-destructive hover:bg-rose-600'; borderColor = 'border-rose-700'; break;
+        case 'Publishing': bgColor = 'bg-yellow-500 hover:bg-amber-600'; borderColor = 'border-amber-700'; break;
         case 'Cancelled': bgColor = 'bg-gray-400 hover:bg-gray-500'; textColor = 'text-gray-800'; borderColor = 'border-gray-600'; break;
         default: bgColor = 'bg-primary hover:bg-sky-400'; borderColor = 'border-sky-700';
     }
@@ -355,7 +356,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   return (
     <div className="p-2 md:p-4">
-      <h2 className="text-3xl font-bold text-textPrimary mb-6 ml-2 md:ml-0">Content Calendar</h2>
+      <h2 className="text-3xl font-bold text-foreground mb-6 ml-2 md:ml-0">Content Calendar</h2>
       {showPrerequisiteMessage && (
         <PrerequisiteMessageCard
           title="Calendar Information"

@@ -1,12 +1,9 @@
 
 
 import { 
-    LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY, 
     AI_PROVIDERS_CONFIG_TEMPLATE, 
     GEMINI_TEXT_MODEL_NAME, 
-    GEMINI_IMAGE_MODEL_NAME,
-    LOCAL_STORAGE_GLOBAL_DEFAULT_TEXT_MODEL_KEY,
-    LOCAL_STORAGE_GLOBAL_DEFAULT_IMAGE_MODEL_KEY
+    GEMINI_IMAGE_MODEL_NAME
 } from '../../constants';
 import { AIParsedJsonResponse, AiProviderType, AiProviderConfig, UserProfile } from "../../types";
 import { supabase } from '../supabaseClient';
@@ -54,9 +51,31 @@ export const getStoredAiProviderConfigs = async (forceRefetch = false): Promise<
   return configsWithDefaults;
 };
 
-export const getActiveAiProviderType = (): AiProviderType => {
-  // This remains client-side preference, but we could move it to user profiles later
-  return (localStorage.getItem(LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY) as AiProviderType) || AiProviderType.Gemini;
+let globalSettingsCache: { active_ai_provider: string; global_default_text_model: string | null; global_default_image_model: string | null; } | null = null;
+let lastGlobalSettingsFetchTime = 0;
+const GLOBAL_SETTINGS_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+export const getGlobalAiSettings = async (forceRefetch = false) => {
+  const now = Date.now();
+  if (!forceRefetch && globalSettingsCache && (now - lastGlobalSettingsFetchTime < GLOBAL_SETTINGS_CACHE_DURATION)) {
+    return globalSettingsCache;
+  }
+
+  const { data, error } = await supabase
+    .from('app_global_settings')
+    .select('active_ai_provider, global_default_text_model, global_default_image_model')
+    .eq('id', 1)
+    .single();
+
+  if (error && error.code !== 'PGRST116') { // Ignore "no rows" error
+    console.error("Error fetching global AI settings:", error);
+    return { active_ai_provider: 'Gemini', global_default_text_model: null, global_default_image_model: null }; // Fallback
+  }
+
+  const settings = data || { active_ai_provider: 'Gemini', global_default_text_model: null, global_default_image_model: null };
+  globalSettingsCache = settings;
+  lastGlobalSettingsFetchTime = now;
+  return settings;
 };
 
 export const getProviderConfig = async (providerType: AiProviderType): Promise<AiProviderConfig | undefined> => {
@@ -100,6 +119,7 @@ export const getExecutionConfig = async (
   ): Promise<{ provider: AiProviderType; model: string; apiKey: string | null; baseUrl?: string } | null> => {
   
     const allConfigs = await getStoredAiProviderConfigs();
+    const globalSettings = await getGlobalAiSettings();
   
     const findProviderForModel = (modelName: string): AiProviderConfig | undefined => {
       return allConfigs.find(p => 
@@ -127,8 +147,7 @@ export const getExecutionConfig = async (
   
     // 2. If no user model, check for global default model
     if (!targetProvider) {
-      const globalDefaultModelKey = modelType === 'image' ? LOCAL_STORAGE_GLOBAL_DEFAULT_IMAGE_MODEL_KEY : LOCAL_STORAGE_GLOBAL_DEFAULT_TEXT_MODEL_KEY;
-      targetModel = localStorage.getItem(globalDefaultModelKey) || undefined;
+      targetModel = modelType === 'image' ? globalSettings.global_default_image_model || undefined : globalSettings.global_default_text_model || undefined;
       if (targetModel) {
         targetProvider = findProviderForModel(targetModel);
       }
@@ -136,7 +155,7 @@ export const getExecutionConfig = async (
   
     // 3. If still no provider, fall back to active provider
     if (!targetProvider) {
-      const activeProviderType = getActiveAiProviderType();
+      const activeProviderType = globalSettings.active_ai_provider as AiProviderType;
       targetProvider = allConfigs.find(p => p.id === activeProviderType && p.is_enabled);
       targetModel = undefined; // Reset targetModel so we can pick a default from the active provider
     }

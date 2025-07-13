@@ -16,10 +16,10 @@ export const AuthHeader: React.FC<AuthHeaderProps> = ({ authView, setAuthView })
   ];
 
   return (
-    <header className="py-4 px-4 sm:px-6 lg:px-8 sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-lightBorder">
+    <header className="py-4 px-4 sm:px-6 lg:px-8 sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
       <div className="max-w-7xl mx-auto flex justify-between items-center">
         <h1
-          className="text-2xl font-bold tracking-tight cursor-pointer text-white transition-opacity hover:opacity-80"
+          className="text-2xl font-bold tracking-tight cursor-pointer text-foreground transition-opacity hover:opacity-80"
           onClick={() => setAuthView('home')}
           aria-label={`${APP_TITLE} - Home`}
         >
@@ -32,17 +32,17 @@ export const AuthHeader: React.FC<AuthHeaderProps> = ({ authView, setAuthView })
                   key={link.view}
                   variant='ghost'
                   onClick={() => setAuthView(link.view)}
-                  className={`${authView === link.view ? 'text-white bg-white/10' : 'text-textSecondary'}`}
+                  className={`${authView === link.view ? 'text-foreground bg-accent' : 'text-muted-foreground'}`}
                 >
                   {link.label}
                 </Button>
               ))}
             </nav>
-            <div className='hidden md:block w-px h-6 bg-lightBorder mx-2'></div>
+            <div className='hidden md:block w-px h-6 bg-border mx-2'></div>
             <Button
               variant='ghost'
               onClick={() => setAuthView('login')}
-              className={`${authView === 'login' ? 'text-white bg-white/10' : 'text-textSecondary'}`}
+              className={`${authView === 'login' ? 'text-foreground bg-accent' : 'text-muted-foreground'}`}
             >
               Login
             </Button>

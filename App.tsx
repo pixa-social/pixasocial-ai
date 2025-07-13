@@ -1,13 +1,12 @@
+
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { AuthLayout } from './components/auth/AuthLayout';
 import { MainAppLayout } from './components/MainAppLayout';
 import { ViewName, User, AuthViewType, UserProfile, RoleName, RoleType, Database } from './types';
 import { 
-  LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY, 
-  LOCAL_STORAGE_AI_CONFIG_KEY, 
   AI_PROVIDERS_CONFIG_TEMPLATE
 } from './constants';
-import { getActiveAiProviderType } from './services/ai/aiUtils';
 import { ToastProvider, useToast } from './components/ui/ToastProvider';
 import { supabase } from './services/supabaseClient';
 import type { AuthSession } from '@supabase/supabase-js';
@@ -29,13 +28,6 @@ const AppContent: React.FC = () => {
       setSession(session);
     });
 
-    if (!localStorage.getItem(LOCAL_STORAGE_AI_CONFIG_KEY)) {
-      localStorage.setItem(LOCAL_STORAGE_AI_CONFIG_KEY, JSON.stringify(AI_PROVIDERS_CONFIG_TEMPLATE));
-    }
-    if (!localStorage.getItem(LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY)) {
-      localStorage.setItem(LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY, getActiveAiProviderType());
-    }
-
     return () => {
         subscription?.unsubscribe();
     };
@@ -50,12 +42,14 @@ const AppContent: React.FC = () => {
           .select('header_scripts, footer_scripts')
           .single();
 
-        if (error || !data) {
-          if (error && error.code !== 'PGRST116') { // Don't log "no rows" error
-            console.error('Error fetching SEO settings:', error.message);
-          }
-          return;
+        if (error) {
+            if (error.code !== 'PGRST116') { // Don't log "no rows" error, it's expected if not set
+              console.warn('Could not fetch SEO settings:', error.message);
+            }
+            return;
         }
+
+        if (!data) return;
         
         const inject = (content: string, target: 'head' | 'body') => {
           if (!content) return;
@@ -88,7 +82,8 @@ const AppContent: React.FC = () => {
         inject(data.footer_scripts || '', 'body');
         
       } catch (e) {
-        console.error('Failed to inject SEO scripts:', e);
+        // This catch block handles network errors like "TypeError: Failed to fetch"
+        console.warn('Failed to fetch or inject SEO scripts:', (e as Error).message);
       }
     };
 
@@ -210,8 +205,7 @@ const AppContent: React.FC = () => {
         updated_at: new Date().toISOString(),
     };
 
-    const { error: profileError } = await supabase
-        .from('profiles')
+    const { error: profileError } = await (supabase.from('profiles') as any)
         .update(updatePayload)
         .eq('id', currentUser.id);
 

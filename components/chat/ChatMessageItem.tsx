@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { format } from 'date-fns';
 import { ChatMessage, User } from '../../types';
@@ -65,8 +64,8 @@ const ChatMessageItemComponent: React.FC<ChatMessageItemProps> = ({
       <div
         className={`w-full max-w-md lg:max-w-lg rounded-lg px-3 py-2 shadow-sm
           ${isCurrentUser
-            ? 'bg-primary text-white rounded-br-none'
-            : 'bg-card text-textPrimary rounded-bl-none'
+            ? 'bg-primary text-primary-foreground rounded-br-none'
+            : 'bg-card text-card-foreground rounded-bl-none'
           }`}
       >
         {isFirstInGroup && !isCurrentUser && (
@@ -79,7 +78,7 @@ const ChatMessageItemComponent: React.FC<ChatMessageItemProps> = ({
               value={editingText}
               onChange={(e) => setEditingText(e.target.value)}
               onKeyDown={handleEditKeyDown}
-              className="w-full bg-background text-textPrimary p-2 rounded-md border border-primary focus:ring-primary focus:outline-none text-sm"
+              className="w-full bg-background text-foreground p-2 rounded-md border border-primary focus:ring-primary focus:outline-none text-sm"
               rows={3}
               autoFocus
             />
@@ -95,12 +94,12 @@ const ChatMessageItemComponent: React.FC<ChatMessageItemProps> = ({
             {msg.attachment && (
               <div className={`mt-2 p-2 rounded-md ${isCurrentUser ? 'bg-primary/80' : 'bg-background'}`}>
                 <div className="flex items-center space-x-2">
-                  <PaperClipIcon className={`w-5 h-5 ${isCurrentUser ? 'text-blue-100' : 'text-textSecondary'}`} />
-                  <span className={`text-sm font-medium truncate ${isCurrentUser ? 'text-blue-50' : 'text-textPrimary'}`} title={msg.attachment.name}>
+                  <PaperClipIcon className={`w-5 h-5 ${isCurrentUser ? 'text-blue-100' : 'text-muted-foreground'}`} />
+                  <span className={`text-sm font-medium truncate ${isCurrentUser ? 'text-blue-50' : 'text-foreground'}`} title={msg.attachment.name}>
                     {msg.attachment.name}
                   </span>
                 </div>
-                <p className={`text-xxs mt-0.5 opacity-80 ${isCurrentUser ? 'text-blue-200' : 'text-textSecondary'}`}>
+                <p className={`text-xxs mt-0.5 opacity-80 ${isCurrentUser ? 'text-blue-200' : 'text-muted-foreground'}`}>
                   {msg.attachment.type} - {formatBytes(msg.attachment.size)}
                 </p>
                 {msg.attachment.publicUrl && msg.attachment.type.startsWith('image/') && (
@@ -120,10 +119,10 @@ const ChatMessageItemComponent: React.FC<ChatMessageItemProps> = ({
       {isCurrentUser && !isEditing && (
         <div className="flex-shrink-0 self-center flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(msg)} title="Edit Message">
-            <PencilIcon className="w-4 h-4 text-textSecondary" />
+            <PencilIcon className="w-4 h-4 text-muted-foreground" />
           </Button>
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDelete(msg.id)} title="Delete Message">
-            <TrashIcon className="w-4 h-4 text-textSecondary" />
+            <TrashIcon className="w-4 h-4 text-muted-foreground" />
           </Button>
         </div>
       )}

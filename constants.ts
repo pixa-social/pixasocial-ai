@@ -11,7 +11,7 @@ import {
     ChatBubbleLeftEllipsisIcon,
     PaperAirplaneIcon,
     TelegramIcon, BlueskyIcon, GoogleBusinessIcon, 
-    ThreadsIcon, DiscordIcon,
+    ThreadsIcon, DiscordIcon, RedditIcon, SnapchatIcon,
     ChartPieIcon
 } from './components/ui/Icons';
 
@@ -43,7 +43,7 @@ export const GEMINI_IMAGE_MODEL_NAME = 'imagen-3.0-generate-002';
 
 export const DEFAULT_PERSONA_AVATAR = 'https://picsum.photos/seed/persona/100/100';
 
-export const OPERATOR_TYPES: Operator['type'][] = [
+export const OPERATOR_TYPES = [
     'Hope', 
     'Fear', 
     'Belonging', 
@@ -55,7 +55,7 @@ export const OPERATOR_TYPES: Operator['type'][] = [
     'Nostalgia', 
     'Convenience', 
     'Custom'
-];
+] as const;
 
 export const AUDIT_TOOL_STEPS_DATA: Array<Pick<AuditStep, 'id' | 'title' | 'description'>> = [
     { id: 'D0', title: 'D0: Plan', description: 'Define the campaign objectives and scope.' },
@@ -169,11 +169,8 @@ export const TONE_OF_VOICE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'Concerned', label: 'Concerned' },
 ];
 
-// Local Storage Keys - Deprecated for most data, but kept for reference or minor client-side state if needed.
-export const LOCAL_STORAGE_AI_CONFIG_KEY = 'pixasocial_ai_provider_configs';
-export const LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY = 'pixasocial_active_ai_provider';
-export const LOCAL_STORAGE_GLOBAL_DEFAULT_TEXT_MODEL_KEY = 'pixasocial_global_default_text_model';
-export const LOCAL_STORAGE_GLOBAL_DEFAULT_IMAGE_MODEL_KEY = 'pixasocial_global_default_image_model';
+// Local Storage Keys are deprecated in favor of database storage for settings.
+// This section is now empty.
 
 
 export const AI_PROVIDERS_CONFIG_TEMPLATE: AiProviderConfig[] = [
@@ -489,6 +486,34 @@ export const SOCIAL_PLATFORMS_TO_CONNECT: SocialPlatformConnectionDetails[] = [
         warning: "Threads API is new and features may change."
     }]
   },
+    { 
+    id: SocialPlatformType.Reddit,
+    name: 'Reddit', 
+    icon: RedditIcon, 
+    description: "Share content and join discussions on Reddit communities.", 
+    brandColor: "text-orange-500",
+    connectionOptions: [{
+        type: 'Profile',
+        title: 'Reddit Profile',
+        description: 'Connect your Reddit profile to post to subreddits.',
+        features: ['Post links, text, and media to relevant subreddits.'],
+        recommended: true
+    }]
+  },
+  { 
+    id: SocialPlatformType.Snapchat,
+    name: 'Snapchat', 
+    icon: SnapchatIcon, 
+    description: "Share snaps and stories with your friends.", 
+    brandColor: "text-yellow-400",
+    connectionOptions: [{
+        type: 'Profile',
+        title: 'Snapchat Profile',
+        description: 'Connect via notification-based publishing.',
+        features: ['Receive reminders to post your content to Snapchat.'],
+        recommended: true
+    }]
+  },
   { 
     id: SocialPlatformType.Discord, 
     name: 'Discord', 
@@ -510,7 +535,7 @@ export const MAX_FILE_UPLOAD_SIZE_MB = 10;
 export const CHAT_IMAGE_PREVIEW_MAX_SIZE_BYTES = 100 * 1024; 
 export const MAX_FILE_UPLOAD_SIZE_BYTES = MAX_FILE_UPLOAD_SIZE_MB * 1024 * 1024;
 export const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-export const ACCEPTED_VIDEO_TYPES = ['video/mp4', 'video/webm']; 
+export const ACCEPTED_VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo']; 
 export const ACCEPTED_CHAT_FILE_TYPES = [...ACCEPTED_IMAGE_TYPES, ...ACCEPTED_VIDEO_TYPES, 'application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']; 
 export const ACCEPTED_MEDIA_TYPES = [...ACCEPTED_IMAGE_TYPES, ...ACCEPTED_VIDEO_TYPES];
 

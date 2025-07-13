@@ -5,7 +5,7 @@ import { Textarea } from '../ui/Textarea';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { supabase } from '../../services/supabaseClient';
 import { useToast } from '../ui/ToastProvider';
-import { AuthViewType, Database } from '../../types';
+import { AuthViewType } from '../../types';
 
 // Helper to download files
 const downloadFile = (content: string, fileName: string, contentType: string) => {
@@ -53,7 +53,7 @@ export const SeoSettingsTab: React.FC = () => {
   // Handle saving scripts to the database
   const handleSaveScripts = async () => {
     setIsSaving(true);
-    const payload: Database['public']['Tables']['seo_settings']['Insert'] = {
+    const payload = {
         id: settingsId,
         header_scripts: headerScripts,
         footer_scripts: footerScripts,
@@ -61,7 +61,7 @@ export const SeoSettingsTab: React.FC = () => {
     };
     const { error } = await supabase
       .from('seo_settings')
-      .upsert(payload, { onConflict: 'id' });
+      .upsert(payload as any, { onConflict: 'id' });
       
     if (error) {
       showToast(`Error saving SEO settings: ${error.message}`, 'error');

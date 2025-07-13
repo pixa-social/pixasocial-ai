@@ -6,14 +6,9 @@ import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Select, SelectOption } from './ui/Select';
 import { AiProviderConfig, AiProviderType, RoleType, RoleName, AdminUserView, Database, Json } from '../types';
-import { 
-    LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY, 
-    LOCAL_STORAGE_GLOBAL_DEFAULT_TEXT_MODEL_KEY, 
-    LOCAL_STORAGE_GLOBAL_DEFAULT_IMAGE_MODEL_KEY 
-} from '../constants';
 import { EyeIcon, EyeSlashIcon, ExclamationTriangleIcon, WrenchScrewdriverIcon, ServerStackIcon, UsersIcon, ShieldCheckIcon } from './ui/Icons';
 import { useToast } from './ui/ToastProvider';
-import { getStoredAiProviderConfigs, getActiveAiProviderType } from '../services/ai/aiUtils';
+import { getStoredAiProviderConfigs, getGlobalAiSettings } from '../services/ai/aiUtils';
 import { Tabs, Tab } from './ui/Tabs';
 import { supabase } from '../services/supabaseClient';
 import { LoadingSpinner } from './ui/LoadingSpinner';
@@ -34,10 +29,12 @@ const AiProviderConfigTab: React.FC = () => {
         setIsLoading(true);
         const configsToUse = await getStoredAiProviderConfigs(true); // Force refetch
         setProviderConfigs(configsToUse);
-        const currentActiveProvider = getActiveAiProviderType();
-        setActiveProvider(currentActiveProvider);
-        setGlobalDefaultTextModel(localStorage.getItem(LOCAL_STORAGE_GLOBAL_DEFAULT_TEXT_MODEL_KEY) || '');
-        setGlobalDefaultImageModel(localStorage.getItem(LOCAL_STORAGE_GLOBAL_DEFAULT_IMAGE_MODEL_KEY) || '');
+
+        const globalSettings = await getGlobalAiSettings(true); // Force refetch from DB
+        setActiveProvider(globalSettings.active_ai_provider as AiProviderType || AiProviderType.Gemini);
+        setGlobalDefaultTextModel(globalSettings.global_default_text_model || '');
+        setGlobalDefaultImageModel(globalSettings.global_default_image_model || '');
+
         const initialShowState: Record<string, boolean> = {};
         configsToUse.forEach(p => initialShowState[p.id] = false);
         setShowApiKeys(initialShowState);
@@ -54,6 +51,7 @@ const AiProviderConfigTab: React.FC = () => {
     
     const handleIsEnabledChange = (id: AiProviderType, is_enabled: boolean) => {
         setProviderConfigs(prev => prev.map(p => (p.id === id ? { ...p, is_enabled } : p)));
+        // If the currently active provider is being disabled, fall back to Gemini or the first available one.
         if (!is_enabled && activeProvider === id) {
             const currentConfigs = providerConfigs.map(p => (p.id === id ? { ...p, is_enabled } : p));
             const geminiStillEnabled = currentConfigs.find(p => p.id === AiProviderType.Gemini && p.is_enabled);
@@ -70,6 +68,7 @@ const AiProviderConfigTab: React.FC = () => {
 
     const handleSaveConfigs = async () => {
         try {
+            // Save provider-specific configs (API keys, enabled status)
             const upsertData: Database['public']['Tables']['ai_provider_global_configs']['Insert'][] = providerConfigs.map(({ id, name, api_key, is_enabled, models, notes, base_url }) => ({
                 id, name, 
                 api_key: api_key || null, 
@@ -80,33 +79,24 @@ const AiProviderConfigTab: React.FC = () => {
                 updated_at: new Date().toISOString()
             }));
 
-            const { error } = await supabase.from('ai_provider_global_configs').upsert(upsertData, { onConflict: 'id' });
+            const { error: providerConfigError } = await supabase.from('ai_provider_global_configs').upsert(upsertData, { onConflict: 'id' });
+            if (providerConfigError) throw providerConfigError;
 
-            if (error) throw error;
-            
-            // This part for active provider remains client-side preference
-            const currentActiveConfig = providerConfigs.find(p => p.id === activeProvider);
-            if (!currentActiveConfig || !currentActiveConfig.is_enabled) {
-                const geminiConfig = providerConfigs.find(p => p.id === AiProviderType.Gemini && p.is_enabled);
-                const newActive = geminiConfig ? AiProviderType.Gemini : (providerConfigs.find(p => p.is_enabled)?.id || activeProvider);
-                localStorage.setItem(LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY, newActive);
-                setActiveProvider(newActive);
-                if (!providerConfigs.some(p => p.is_enabled)) {
-                    showToast('Warning: No AI provider is enabled.', 'error');
-                }
-            } else {
-                localStorage.setItem(LOCAL_STORAGE_ACTIVE_AI_PROVIDER_KEY, activeProvider);
-            }
+            // Save global app settings
+            const globalSettingsPayload: Database['public']['Tables']['app_global_settings']['Update'] = {
+                id: 1, // The table has a single row with id=1
+                active_ai_provider: activeProvider,
+                global_default_text_model: globalDefaultTextModel || null,
+                global_default_image_model: globalDefaultImageModel || null,
+                updated_at: new Date().toISOString()
+            };
+            const { error: globalSettingsError } = await supabase.from('app_global_settings').upsert(globalSettingsPayload, { onConflict: 'id' });
+            if (globalSettingsError) throw globalSettingsError;
 
-            if (globalDefaultTextModel) {
-                localStorage.setItem(LOCAL_STORAGE_GLOBAL_DEFAULT_TEXT_MODEL_KEY, globalDefaultTextModel);
-            } else {
-                localStorage.removeItem(LOCAL_STORAGE_GLOBAL_DEFAULT_TEXT_MODEL_KEY);
-            }
-            if (globalDefaultImageModel) {
-                localStorage.setItem(LOCAL_STORAGE_GLOBAL_DEFAULT_IMAGE_MODEL_KEY, globalDefaultImageModel);
-            } else {
-                localStorage.removeItem(LOCAL_STORAGE_GLOBAL_DEFAULT_IMAGE_MODEL_KEY);
+            // Check if the saved active provider is enabled and show a warning if not.
+            const activeConfig = providerConfigs.find(p => p.id === activeProvider);
+            if (!activeConfig || !activeConfig.is_enabled) {
+                showToast(`Warning: The selected provider '${activeConfig?.name || activeProvider}' is currently disabled. The app will fall back to another enabled provider.`, 'error', 6000);
             }
 
             showToast('Global AI configurations saved successfully!', 'success');
@@ -324,7 +314,7 @@ const UserManagementTab: React.FC = () => {
                                     <Select 
                                         options={roles.map(r => ({ value: r.name, label: r.name }))}
                                         value={user.role_name || ''}
-                                        onChange={e => handleRoleChange(user.id, e.target.value as RoleName)}
+                                        onChange={e => handleRoleChange(user.id!, e.target.value as RoleName)}
                                         containerClassName="mb-0"
                                     />
                                 </td>
@@ -332,7 +322,7 @@ const UserManagementTab: React.FC = () => {
                                     <Select
                                         options={textModelOptions}
                                         value={user.assigned_ai_model_text || ''}
-                                        onChange={(e) => handleModelChange(user.id, 'text', e.target.value)}
+                                        onChange={(e) => handleModelChange(user.id!, 'text', e.target.value)}
                                         containerClassName="mb-0"
                                     />
                                 </td>
@@ -340,7 +330,7 @@ const UserManagementTab: React.FC = () => {
                                      <Select
                                         options={imageModelOptions}
                                         value={user.assigned_ai_model_image || ''}
-                                        onChange={(e) => handleModelChange(user.id, 'image', e.target.value)}
+                                        onChange={(e) => handleModelChange(user.id!, 'image', e.target.value)}
                                         containerClassName="mb-0"
                                     />
                                 </td>
@@ -421,7 +411,7 @@ const PricingManagementTab: React.FC = () => {
                             <Input label="Max Personas" type="number" value={editedRole.max_personas} onChange={e => handleFieldChange(role.id, 'max_personas', parseInt(e.target.value) || 0)} containerClassName="mb-0" />
                             <Input label="Monthly AI Uses" type="number" value={editedRole.max_ai_uses_monthly} onChange={e => handleFieldChange(role.id, 'max_ai_uses_monthly', parseInt(e.target.value) || 0)} containerClassName="mb-0" />
                             <Input label="Monthly Price ($)" type="number" value={editedRole.price_monthly} onChange={e => handleFieldChange(role.id, 'price_monthly', parseFloat(e.target.value) || 0)} containerClassName="mb-0" />
-                            <Textarea label="Features (one per line)" value={(editedRole.features || []).join('\n')} onChange={e => handleFieldChange(role.id, 'features', e.target.value.split('\n'))} rows={4} containerClassName="mb-0" />
+                            <Textarea label="Features (one per line)" value={(editedRole.features || []).join('\\n')} onChange={e => handleFieldChange(role.id, 'features', e.target.value.split('\\n'))} rows={4} containerClassName="mb-0" />
                         </div>
                         <div className="mt-4 pt-4 border-t border-lightBorder">
                              <Button variant="primary" onClick={() => handleSaveRole(role.id)} className="w-full" disabled={!editingRoles[role.id]}>Save Changes</Button>

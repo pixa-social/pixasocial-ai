@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { NavItem, ViewName, UserProfile, RoleName } from '../types';
 import { APP_TITLE, NAVIGATION_ITEMS } from '../constants';
@@ -25,8 +26,8 @@ const NavLinkComponent: React.FC<{
     ? 'bg-primary/80 text-white' 
     : 'bg-primary text-white';
   const inactiveClasses = isDropdownChild 
-    ? 'text-textPrimary hover:bg-gray-700 hover:text-white block w-full text-left' 
-    : 'text-textSecondary hover:bg-gray-700 hover:text-white';
+    ? 'text-foreground hover:bg-gray-700 hover:text-white block w-full text-left' 
+    : 'text-muted-foreground hover:bg-gray-700 hover:text-white';
 
   return (
     <button
@@ -48,7 +49,7 @@ const MobileNavLinkComponent: React.FC<{
 }> = ({ item, isActive, onClick }) => {
   const baseClasses = `block px-3 py-3 rounded-md text-base font-medium cursor-pointer transition-colors duration-150 ease-in-out`;
   const activeClasses = 'bg-primary text-white';
-  const inactiveClasses = 'text-textSecondary hover:bg-primary/80 hover:text-white';
+  const inactiveClasses = 'text-muted-foreground hover:bg-primary/80 hover:text-white';
 
   return (
     <button
@@ -87,19 +88,19 @@ const AiCreditCounter: React.FC<{ currentUser: UserProfile }> = ({ currentUser }
     
     const creditsClass = remainingCredits > (max_ai_uses_monthly * 0.2)
       ? 'text-green-400'
-      : remainingCredits > 0 ? 'text-yellow-400' : 'text-danger';
+      : remainingCredits > 0 ? 'text-yellow-400' : 'text-destructive';
 
     return (
         <div 
-            className="flex items-center px-3 py-2 bg-card border border-lightBorder rounded-md"
+            className="flex items-center px-3 py-2 bg-card border border-border rounded-md"
             title={`You have ${remainingCredits} out of ${max_ai_uses_monthly} monthly AI credits remaining.`}
         >
             <span role="img" aria-label="credits" className="text-yellow-400 mr-2">⚡</span>
             <span className={`font-mono font-semibold text-sm ${creditsClass}`}>
                 {remainingCredits}
             </span>
-            <span className="text-xs text-textSecondary mx-1">/</span>
-            <span className="text-xs text-textSecondary">{max_ai_uses_monthly}</span>
+            <span className="text-xs text-muted-foreground mx-1">/</span>
+            <span className="text-xs text-muted-foreground">{max_ai_uses_monthly}</span>
         </div>
     );
 };
@@ -168,7 +169,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, isAuthe
   }, []);
 
   return (
-    <nav className="bg-background shadow-lg border-b border-lightBorder sticky top-0 z-50">
+    <nav className="bg-background shadow-lg border-b border-border sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16"> 
           <div className="flex items-center">
@@ -195,7 +196,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, isAuthe
                           className={`px-3 py-2 rounded-md text-sm font-medium flex items-center transition-colors duration-150 ease-in-out
                             ${isViewActive(item, currentView)
                               ? 'bg-primary/20 text-primary' 
-                              : 'text-textSecondary hover:bg-gray-700 hover:text-white'
+                              : 'text-muted-foreground hover:bg-gray-700 hover:text-white'
                             }`}
                           aria-expanded={openDropdownLabel === item.label}
                           aria-haspopup="true"
@@ -207,7 +208,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, isAuthe
                         </button>
                         {openDropdownLabel === item.label && (
                           <div
-                            className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-gray-800 ring-1 ring-lightBorder focus:outline-none z-50 py-1 transition-all duration-150 ease-out transform opacity-0 scale-95 group-focus-within:opacity-100 group-focus-within:scale-100"
+                            className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-gray-800 ring-1 ring-border focus:outline-none z-50 py-1 transition-all duration-150 ease-out transform opacity-0 scale-95 group-focus-within:opacity-100 group-focus-within:scale-100"
                             role="menu"
                             aria-orientation="vertical"
                             style={{ opacity: 1, transform: 'scale(1)' }} 
@@ -241,7 +242,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, isAuthe
                     onClick={onLogout} 
                     variant="ghost" 
                     size="sm"
-                    className="text-textSecondary hover:bg-primary/20 hover:text-white" 
+                    className="text-muted-foreground hover:bg-primary/20 hover:text-white" 
                     leftIcon={<ArrowRightOnRectangleIcon className="h-5 w-5 transform rotate-180" />}
                     title="Logout"
                     >
@@ -259,7 +260,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, isAuthe
                     onClick={onLogout} 
                     variant="ghost" 
                     size="sm"
-                    className="text-textSecondary hover:bg-primary/20 hover:text-white p-2 mr-2"
+                    className="text-muted-foreground hover:bg-primary/20 hover:text-white p-2 mr-2"
                     aria-label="Logout"
                     title="Logout"
                   >
@@ -269,7 +270,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, isAuthe
               <button
                 id="mobile-menu-button"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="p-2 rounded-md text-textSecondary hover:text-white hover:bg-primary/20 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white transition-colors duration-150 ease-in-out"
+                className="p-2 rounded-md text-muted-foreground hover:text-white hover:bg-primary/20 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white transition-colors duration-150 ease-in-out"
                 aria-controls="mobile-menu"
                 aria-expanded={isMobileMenuOpen}
                 aria-label={isMobileMenuOpen ? "Close main menu" : "Open main menu"}
@@ -293,7 +294,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, isAuthe
               <div key={item.label}>
                 {item.children ? (
                   <>
-                    <h3 className="px-3 py-2 text-sm font-semibold text-textSecondary uppercase tracking-wider">{item.label}</h3>
+                    <h3 className="px-3 py-2 text-sm font-semibold text-muted-foreground uppercase tracking-wider">{item.label}</h3>
                     {item.children.map((child) => (
                       <MobileNavLink
                         key={child.label}
@@ -312,16 +313,16 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, isAuthe
                 )}
               </div>
             ))}
-             <div className="py-4 px-2 border-t border-lightBorder">
+             <div className="py-4 px-2 border-t border-border">
                  <AiCreditCounter currentUser={currentUser} />
              </div>
           </div>
           {onLogout && (
-             <div className="py-4 px-2 border-t border-lightBorder">
+             <div className="py-4 px-2 border-t border-border">
                 <Button 
                   onClick={() => { onLogout(); setIsMobileMenuOpen(false);}} 
                   variant="ghost" 
-                  className="w-full text-textSecondary hover:bg-primary/20 hover:text-white justify-start px-3 py-3"
+                  className="w-full text-muted-foreground hover:bg-primary/20 hover:text-white justify-start px-3 py-3"
                   leftIcon={<ArrowRightOnRectangleIcon className="h-5 w-5 mr-2 transform rotate-180" />}
                   title="Logout"
                 >

@@ -1,9 +1,11 @@
+
 import React from 'react';
 import { Card } from '../../ui/Card';
 import { 
   UsersIcon, BeakerIcon, DocumentTextIcon, CalendarDaysIcon, 
-  ChatBubbleLeftEllipsisIcon, ShieldCheckIcon 
+  ChatBubbleLeftEllipsisIcon, ShieldCheckIcon, CheckCircleIcon, XCircleIcon 
 } from '../../ui/Icons';
+import { APP_TITLE } from '../../../constants';
 
 const features = [
   {
@@ -39,6 +41,53 @@ const features = [
 ];
 
 export const FeaturesPageView: React.FC = () => {
+    const comparisonData = [
+    {
+      feature: 'Psychographic personas',
+      pixasocial: { icon: <CheckCircleIcon className="w-5 h-5 text-success" />, text: 'AI-driven' },
+      buffer: { icon: <XCircleIcon className="w-5 h-5 text-destructive" /> },
+      hootsuite: { icon: <XCircleIcon className="w-5 h-5 text-destructive" /> },
+      sprout: { icon: <XCircleIcon className="w-5 h-5 text-destructive" /> },
+    },
+    {
+      feature: 'Message science engine',
+      pixasocial: { icon: <CheckCircleIcon className="w-5 h-5 text-success" />, text: 'Persona-based' },
+      buffer: { icon: <XCircleIcon className="w-5 h-5 text-destructive" /> },
+      hootsuite: { icon: <XCircleIcon className="w-5 h-5 text-destructive" /> },
+      sprout: { icon: <XCircleIcon className="w-5 h-5 text-destructive" /> },
+    },
+    {
+      feature: 'Auto A/B by persona',
+      pixasocial: { icon: <CheckCircleIcon className="w-5 h-5 text-success" /> },
+      buffer: { text: 'Manual' },
+      hootsuite: { text: 'Manual' },
+      sprout: { text: 'Manual' },
+    },
+    {
+      feature: 'Sentiment analysis',
+      pixasocial: { icon: <CheckCircleIcon className="w-5 h-5 text-success" /> },
+      buffer: { icon: <XCircleIcon className="w-5 h-5 text-destructive" /> },
+      hootsuite: { icon: <XCircleIcon className="w-5 h-5 text-destructive" /> },
+      sprout: { icon: <XCircleIcon className="w-5 h-5 text-destructive" /> },
+    },
+    {
+      feature: 'Free tier personas',
+      pixasocial: { text: '1' },
+      buffer: { text: '0' },
+      hootsuite: { text: '0' },
+      sprout: { text: '0' },
+    },
+  ];
+
+  const renderCellContent = (data?: { icon?: React.ReactNode; text?: string }) => {
+    if (!data) return <span className="text-muted-foreground/60">-</span>;
+    return (
+      <div className="flex items-center gap-2">
+        {data.icon}
+        {data.text && <span className="font-medium">{data.text}</span>}
+      </div>
+    );
+  };
   return (
     <div className="bg-background py-16 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
@@ -76,6 +125,44 @@ export const FeaturesPageView: React.FC = () => {
             ))}
           </div>
         </div>
+
+        {/* Comparison Table */}
+        <div className="mt-24 text-center">
+          <h2 className="text-3xl font-extrabold text-foreground sm:text-4xl">
+            How We <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent">Measure Up</span>
+          </h2>
+          <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
+            See how {APP_TITLE} compares to other leading platforms.
+          </p>
+        </div>
+
+        <div className="mt-12 overflow-hidden rounded-2xl border border-border/50 bg-card/40 shadow-xl backdrop-blur-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="border-b border-border/50 bg-card/60">
+                <tr>
+                  <th className="px-6 py-4 text-sm font-semibold text-foreground">Feature</th>
+                  <th className="px-6 py-4 text-sm font-semibold text-primary">{APP_TITLE}</th>
+                  <th className="px-6 py-4 text-sm font-semibold text-muted-foreground">Buffer</th>
+                  <th className="px-6 py-4 text-sm font-semibold text-muted-foreground">Hootsuite</th>
+                  <th className="px-6 py-4 text-sm font-semibold text-muted-foreground">Sprout</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/40">
+                {comparisonData.map((row) => (
+                  <tr key={row.feature} className="transition-colors hover:bg-muted/30">
+                    <td className="px-6 py-4 text-sm font-medium text-foreground">{row.feature}</td>
+                    <td className="px-6 py-4 text-sm">{renderCellContent(row.pixasocial)}</td>
+                    <td className="px-6 py-4 text-sm text-muted-foreground">{renderCellContent(row.buffer)}</td>
+                    <td className="px-6 py-4 text-sm text-muted-foreground">{renderCellContent(row.hootsuite)}</td>
+                    <td className="px-6 py-4 text-sm text-muted-foreground">{renderCellContent(row.sprout)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
     </div>
   );

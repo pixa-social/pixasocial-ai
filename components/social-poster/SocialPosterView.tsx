@@ -1,234 +1,357 @@
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { 
     ScheduledPost, ViewName, UserProfile, ContentDraft, 
-    ScheduledPostStatus, ConnectedAccount, Persona, Operator 
+    ScheduledPostStatus, ConnectedAccount, Persona, Operator, SocialPlatformType 
 } from '../../types';
 import { Card } from '../ui/Card';
+import { Button } from '../ui/Button';
+import { Textarea } from '../ui/Textarea';
+import { Select } from '../ui/Select';
+import { Switch } from '../ui/Switch';
 import { Tabs, Tab } from '../ui/Tabs';
+import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { useToast } from '../ui/ToastProvider';
-import { SocialPosterSkeleton } from './SocialPosterSkeleton';
-import { PrerequisiteMessageCard } from '../ui/PrerequisiteMessageCard';
-import { PostCard } from './PostCard';
-import { useNavigateToView } from '../../hooks/useNavigateToView';
-import { ClockIcon, CheckCircleIcon, ExclamationCircleIcon } from '../ui/Icons';
+import { SOCIAL_PLATFORMS_TO_CONNECT, ACCEPTED_MEDIA_TYPES, MAX_FILE_UPLOAD_SIZE_MB } from '../../constants';
+import { UploadCloudIcon } from '../ui/Icons';
+import { generateText } from '../../services/aiService';
+import { supabase } from '../../services/supabaseClient';
 
 interface SocialPosterViewProps {
     currentUser: UserProfile;
-    scheduledPosts: ScheduledPost[];
     contentDrafts: ContentDraft[];
     personas: Persona[];
     operators: Operator[];
+    onAddScheduledPost: (post: ScheduledPost) => void;
+    // The following props are kept for API consistency but may be used less in this new UI
+    scheduledPosts: ScheduledPost[];
     connectedAccounts: ConnectedAccount[];
     onUpdateScheduledPost: (post: ScheduledPost) => void;
     onDeleteScheduledPost: (postId: string) => void;
     onNavigate?: (view: ViewName) => void;
 }
 
-const SIMULATION_INTERVAL = 15000; // 15 seconds
+// Helper function to convert file to base64 data URL
+const fileToDataURL = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = error => reject(error);
+    reader.readAsDataURL(file);
+  });
+};
 
 export const SocialPosterView: React.FC<SocialPosterViewProps> = ({
-    currentUser, scheduledPosts, contentDrafts, personas, operators, connectedAccounts,
-    onUpdateScheduledPost, onDeleteScheduledPost, onNavigate
+    currentUser, contentDrafts, personas, operators, onAddScheduledPost, onNavigate
 }) => {
     const { showToast } = useToast();
-    const navigateTo = useNavigateToView(onNavigate);
-    const [isLoading, setIsLoading] = useState(true);
-    const [isProcessing, setIsProcessing] = useState<Record<string, boolean>>({});
+    const [selectedNetworks, setSelectedNetworks] = useState<Set<SocialPlatformType>>(new Set([SocialPlatformType.Instagram]));
+    const [postText, setPostText] = useState('');
+    const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+    const [isShortenLinks, setIsShortenLinks] = useState(false);
+    const [instagramPostType, setInstagramPostType] = useState('Regular Post');
+    const [isDragging, setIsDragging] = useState(false);
+    const [isPublishing, setIsPublishing] = useState(false);
 
-    const runPostingSimulation = useCallback(async (postsToProcess: ScheduledPost[]) => {
-        for (const post of postsToProcess) {
-            setIsProcessing(prev => ({ ...prev, [post.id]: true }));
+    const [selectedPersonaId, setSelectedPersonaId] = useState<string>('');
+    const [selectedOperatorId, setSelectedOperatorId] = useState<string>('');
+    const [isLoadingAi, setIsLoadingAi] = useState(false);
 
-            const publishingPost = { ...post, resource: { ...post.resource, status: 'Publishing' as ScheduledPostStatus, last_attempted_at: new Date().toISOString(), error_message: undefined } };
-            onUpdateScheduledPost(publishingPost);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-            await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 3000));
+    const personaOptions = useMemo(() => personas.map(p => ({ value: p.id.toString(), label: p.name })), [personas]);
+    const operatorOptions = useMemo(() => operators.map(o => ({ value: o.id.toString(), label: `${o.name} (${o.type})` })), [operators]);
+    const draftOptions = useMemo(() => contentDrafts.map(d => ({ value: d.id, label: `Draft for ${personas.find(p => p.id === d.persona_id)?.name || 'N/A'} (ID: ${d.id.substring(0,6)})`})), [contentDrafts, personas]);
 
-            const isSuccess = Math.random() > 0.15; // 85% success rate
-            let finalStatus: ScheduledPostStatus;
-            let errorMessage: string | undefined = undefined;
-
-            if (isSuccess) {
-                finalStatus = 'Published';
-                showToast(`Post for ${post.title.split(':')[0]} published successfully!`, 'success');
+    const handleNetworkToggle = (platformId: SocialPlatformType) => {
+        setSelectedNetworks(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(platformId)) {
+                newSet.delete(platformId);
             } else {
-                finalStatus = 'Failed';
-                errorMessage = 'Simulated API error: The connection timed out.';
-                showToast(`Failed to publish post for ${post.title.split(':')[0]}.`, 'error');
+                newSet.add(platformId);
             }
-
-            const finishedPost = { ...post, resource: { ...post.resource, status: finalStatus, error_message: errorMessage } };
-            onUpdateScheduledPost(finishedPost);
-            
-            setIsProcessing(prev => {
-                const newState = { ...prev };
-                delete newState[post.id];
-                return newState;
-            });
-        }
-    }, [onUpdateScheduledPost, showToast]);
-
-    useEffect(() => {
-        const checkQueue = () => {
-            if (connectedAccounts.length === 0) {
-                return; // Don't run simulation if no accounts are connected
-            }
-            const now = new Date();
-            const postsToPublish = scheduledPosts.filter(p => 
-                p.resource.status === 'Scheduled' && 
-                new Date(p.start) <= now &&
-                !isProcessing[p.id]
-            );
-            if (postsToPublish.length > 0) {
-                runPostingSimulation(postsToPublish);
-            }
-        };
-
-        const intervalId = setInterval(checkQueue, SIMULATION_INTERVAL);
-        checkQueue();
-        return () => clearInterval(intervalId);
-    }, [scheduledPosts, runPostingSimulation, isProcessing, connectedAccounts.length]);
+            return newSet;
+        });
+    };
     
-    useEffect(() => {
-        const timer = setTimeout(() => setIsLoading(false), 750);
-        return () => clearTimeout(timer);
-    }, []);
-
-    const handlePostNow = useCallback((postId: string) => {
-        if (connectedAccounts.length === 0) {
-            showToast("Cannot post now. Please connect a social account in Settings first.", "error");
+    const handleImportDraft = (draftId: string) => {
+        if (!draftId) {
+            setPostText('');
+            setSelectedPersonaId('');
+            setSelectedOperatorId('');
             return;
         }
-        const post = scheduledPosts.find(p => p.id === postId);
-        if (post) {
-            runPostingSimulation([post]);
+        const draft = contentDrafts.find(d => d.id === draftId);
+        if (draft) {
+            const firstPlatformWithContent = Object.values(draft.platform_contents)[0];
+            setPostText(firstPlatformWithContent?.content || '');
+            setSelectedPersonaId(draft.persona_id.toString());
+            setSelectedOperatorId(draft.operator_id.toString());
+            const draftPlatforms = new Set(Object.keys(draft.platform_contents) as SocialPlatformType[]);
+            setSelectedNetworks(draftPlatforms);
+            showToast('Draft content imported!', 'success');
         }
-    }, [scheduledPosts, runPostingSimulation, connectedAccounts.length, showToast]);
+    };
 
-    const navigateToCalendar = useCallback(() => {
-        if(onNavigate) onNavigate(ViewName.Calendar);
-    }, [onNavigate]);
-
-    const categorizedPosts = useMemo(() => {
-        const queue: ScheduledPost[] = [];
-        const history: ScheduledPost[] = [];
-        const errors: ScheduledPost[] = [];
+    const handleGenerateWithAi = async () => {
+        if (!selectedPersonaId || !selectedOperatorId) {
+            showToast("Please select a Persona and Operator for AI generation.", "error");
+            return;
+        }
+        setIsLoadingAi(true);
+        const persona = personas.find(p => p.id === parseInt(selectedPersonaId));
+        const operator = operators.find(o => o.id === parseInt(selectedOperatorId));
+        if (!persona || !operator) {
+            showToast("Selected persona or operator not found.", "error");
+            setIsLoadingAi(false);
+            return;
+        }
         
-        scheduledPosts.forEach(post => {
-            switch(post.resource.status) {
-                case 'Scheduled':
-                case 'Publishing':
-                    queue.push(post);
-                    break;
-                case 'Published':
-                case 'Cancelled':
-                    history.push(post);
-                    break;
-                case 'Failed':
-                case 'Missed':
-                    errors.push(post);
-                    break;
-            }
-        });
+        const prompt = `Based on Persona "${persona.name}" and Operator "${operator.name} (${operator.type})", write a generic social media post. The target platforms are: ${Array.from(selectedNetworks).join(', ')}.`;
+        const result = await generateText(prompt, currentUser, "You are a social media content creator.");
         
-        queue.sort((a,b) => new Date(a.start).getTime() - new Date(b.start).getTime());
-        history.sort((a,b) => new Date(b.start).getTime() - new Date(a.start).getTime());
-        errors.sort((a,b) => new Date(b.start).getTime() - new Date(a.start).getTime());
-
-        return { queue, history, errors };
-    }, [scheduledPosts]);
-
-    if (isLoading) {
-        return <SocialPosterSkeleton />;
-    }
+        if (result.text) {
+            setPostText(result.text);
+        } else {
+            showToast(result.error || "AI failed to generate text.", "error");
+        }
+        setIsLoadingAi(false);
+    };
     
+    const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            setUploadedFiles(Array.from(e.dataTransfer.files));
+            e.dataTransfer.clearData();
+        }
+    };
+
+    const handlePublish = async () => {
+        if (selectedNetworks.size === 0) {
+            showToast("Please select at least one social network.", "error");
+            return;
+        }
+
+        setIsPublishing(true);
+        let successCount = 0;
+        let errorCount = 0;
+        const errors: string[] = [];
+
+        for (const network of Array.from(selectedNetworks)) {
+             try {
+                if (network === SocialPlatformType.Telegram) {
+                    if (!postText.trim() && uploadedFiles.length === 0) {
+                        throw new Error("Telegram requires either text or an image.");
+                    }
+
+                    if (uploadedFiles.length > 1) {
+                        showToast("Telegram only supports one image per post. Using the first one.", "info");
+                    }
+                    
+                    let imageData: string | undefined = undefined;
+                    if (uploadedFiles.length > 0) {
+                        // Convert the first file to a data URL (base64)
+                        imageData = await fileToDataURL(uploadedFiles[0]);
+                    }
+
+                    const { data, error: postError } = await supabase.functions.invoke('post-to-telegram', {
+                        body: { 
+                            text: postText,
+                            imageData: imageData
+                        }
+                    });
+
+                    if (postError) throw postError;
+                    if (data.error) throw new Error(data.error);
+                    
+                    successCount++;
+
+                } else {
+                    // Placeholder for other platforms
+                    showToast(`Publishing to ${network} is not yet implemented for images/videos.`, "info");
+                }
+            } catch (e) {
+                const error = e as Error;
+                let errorMessage = error.message;
+                // Check if it's an HTTP error from the function and try to parse the body for a more detailed message
+                if ((error as any).context && typeof (error as any).context.json === 'function') {
+                    try {
+                        const functionError = await (error as any).context.json();
+                        if (functionError.error) {
+                            errorMessage = functionError.error;
+                        }
+                    } catch (parseErr) { /* ignore */ }
+                }
+                errors.push(`${network}: ${errorMessage}`);
+                errorCount++;
+            }
+        }
+
+        setIsPublishing(false);
+
+        if (successCount > 0) {
+            showToast(`Successfully published to ${successCount} network(s).`, 'success');
+            // Clear inputs on success
+            setPostText('');
+            setUploadedFiles([]);
+            if(fileInputRef.current) fileInputRef.current.value = "";
+        }
+        if (errorCount > 0) {
+            showToast(`Failed to publish to ${errorCount} network(s). Errors: ${errors.join('; ')}`, 'error', 10000);
+        }
+    };
+
+    const handleSchedule = () => {
+        if (selectedNetworks.size === 0) {
+            showToast("Please select at least one social network.", "error");
+            return;
+        }
+        showToast("Opening scheduler... (Not implemented in this version)", "info");
+        // In a real app, this would open a scheduling modal
+    };
+
+    const handleViewJson = () => {
+        const jsonData = {
+            platforms: Array.from(selectedNetworks),
+            postText,
+            mediaFiles: uploadedFiles.map(f => ({ name: f.name, size: f.size, type: f.type })),
+            options: {
+                isShortenLinks,
+                instagramPostType: selectedNetworks.has(SocialPlatformType.Instagram) ? instagramPostType : undefined,
+            }
+        };
+        console.log(JSON.stringify(jsonData, null, 2));
+        showToast("Current post state logged to browser console.", "info");
+    };
+
+
+    const platformToggles = SOCIAL_PLATFORMS_TO_CONNECT.filter(p => p.name !== 'Discord').sort((a,b) => a.name.localeCompare(b.name));
+
     return (
-        <div className="p-4 md:p-6">
-            <h2 className="text-3xl font-bold text-textPrimary mb-6">Social Poster</h2>
+        <div className="p-4 md:p-6 space-y-6">
+            <Card title="Social Networks">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-x-6 gap-y-4">
+                    {platformToggles.map(platform => (
+                        <div key={platform.id} className="flex items-center space-x-2">
+                            <Switch
+                                id={`switch-${platform.id}`}
+                                checked={selectedNetworks.has(platform.id)}
+                                onCheckedChange={() => handleNetworkToggle(platform.id)}
+                            />
+                            <label htmlFor={`switch-${platform.id}`} className="flex items-center space-x-1.5 text-sm font-medium text-textPrimary cursor-pointer">
+                                <platform.icon className="w-5 h-5" />
+                                <span>{platform.name}</span>
+                            </label>
+                        </div>
+                    ))}
+                </div>
+            </Card>
 
-            {connectedAccounts.length === 0 && (
-                <PrerequisiteMessageCard
-                    title="Connect a Social Account to Enable Posting"
-                    message="You can preview scheduled posts here, but the queue will not automatically publish them until at least one social account is connected. Please go to your settings to enable posting."
-                    action={{ label: "Go to Settings", onClick: () => navigateTo(ViewName.Settings) }}
-                />
-            )}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 space-y-6">
+                    <Card>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                            <Select label="Target Persona (for AI)" options={[{value: '', label: 'Select...'}, ...personaOptions]} value={selectedPersonaId} onChange={e => setSelectedPersonaId(e.target.value)} containerClassName="mb-0" />
+                             <Select label="Campaign Operator (for AI)" options={[{value: '', label: 'Select...'}, ...operatorOptions]} value={selectedOperatorId} onChange={e => setSelectedOperatorId(e.target.value)} containerClassName="mb-0" />
+                            <Button onClick={handleGenerateWithAi} isLoading={isLoadingAi} disabled={!selectedPersonaId || !selectedOperatorId || isLoadingAi} className="self-end h-10">Generate with AI</Button>
+                        </div>
+                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                             <Select label="Import from Draft" options={[{value: '', label: 'Select a draft...'}, ...draftOptions]} onChange={e => handleImportDraft(e.target.value)} containerClassName="mb-0 md:col-span-2" />
+                        </div>
+                    </Card>
 
-            <Tabs>
-                <Tab label={`Queue (${categorizedPosts.queue.length})`} icon={<ClockIcon className="w-5 h-5"/>}>
-                    <div className="mt-4 space-y-4">
-                        {categorizedPosts.queue.length === 0 ? (
-                            <Card className="text-center p-8 text-textSecondary">
-                                The queue is empty. Scheduled posts will appear here.
-                            </Card>
-                        ) : (
-                            categorizedPosts.queue.map(post => {
-                                const draft = contentDrafts.find(d => d.id === post.resource.contentDraftId)
-                                return (
-                                <PostCard
-                                    key={post.id}
-                                    post={post}
-                                    draft={draft}
-                                    persona={personas.find(p => p.id === draft?.persona_id)}
-                                    operator={operators.find(o => o.id === draft?.operator_id)}
-                                    onPostNow={handlePostNow}
-                                    onDelete={onDeleteScheduledPost}
-                                    onNavigateToCalendar={navigateToCalendar}
+                    <Card>
+                        <Textarea
+                            label="Post Text"
+                            placeholder="Enter post text"
+                            value={postText}
+                            onChange={(e) => setPostText(e.target.value)}
+                            rows={8}
+                            containerClassName="mb-4"
+                        />
+                        <h3 className="text-base font-semibold text-textPrimary mb-2">Add Images or a Video</h3>
+                        <Tabs>
+                            <Tab label="Upload Files">
+                                <div 
+                                    className={`mt-2 p-8 border-2 border-dashed rounded-lg text-center cursor-pointer transition-colors ${isDragging ? 'border-primary bg-primary/10' : 'border-mediumBorder hover:border-primary'}`}
+                                    onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
+                                    onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
+                                    onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
+                                    onDrop={handleFileDrop}
+                                    onClick={() => fileInputRef.current?.click()}
+                                >
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        multiple
+                                        className="hidden"
+                                        onChange={(e) => setUploadedFiles(Array.from(e.target.files || []))}
+                                        accept={ACCEPTED_MEDIA_TYPES.join(',')}
+                                    />
+                                    <UploadCloudIcon className="w-12 h-12 mx-auto text-textSecondary" />
+                                    <p className="mt-2 text-sm text-textPrimary font-semibold">
+                                        Click to Upload or Drag & Drop
+                                    </p>
+                                    <p className="text-xs text-textSecondary">PNG, JPG, GIF, WEBP, MP4, MOV or AVI up to {MAX_FILE_UPLOAD_SIZE_MB} MB</p>
+                                </div>
+                                {uploadedFiles.length > 0 && (
+                                    <div className="mt-4">
+                                        <p className="text-sm font-medium">Selected files:</p>
+                                        <ul className="list-disc list-inside text-sm text-textSecondary">
+                                            {uploadedFiles.map(file => <li key={file.name}>{file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)</li>)}
+                                        </ul>
+                                    </div>
+                                )}
+                            </Tab>
+                            <Tab label="Use URLs">
+                                <div className="mt-2 p-8 border-2 border-dashed border-mediumBorder rounded-lg text-center">
+                                    <p className="text-textSecondary">Pasting URLs for media is coming soon!</p>
+                                </div>
+                            </Tab>
+                        </Tabs>
+                         {selectedNetworks.has(SocialPlatformType.Instagram) && <p className="text-xs text-danger mt-4">Media required for Instagram. <a href="#" className="underline">Media guidelines</a></p>}
+                    </Card>
+                </div>
+
+                <div className="lg:col-span-1">
+                    <Card title="Additional Options">
+                        <div className="flex items-center justify-between">
+                            <label htmlFor="shorten-links" className="text-sm font-medium text-textPrimary">Shorten Links</label>
+                            <Switch id="shorten-links" checked={isShortenLinks} onCheckedChange={setIsShortenLinks} />
+                        </div>
+                        <p className="text-xs text-textSecondary mt-1">Track clicks and demographics</p>
+
+                        {selectedNetworks.has(SocialPlatformType.Instagram) && (
+                            <div className="mt-6">
+                                <Select 
+                                    label="Instagram Post Type"
+                                    options={[
+                                        { value: 'Regular Post', label: 'Regular Post'},
+                                        { value: 'Reel', label: 'Reel'},
+                                        { value: 'Story', label: 'Story'},
+                                    ]}
+                                    value={instagramPostType}
+                                    onChange={e => setInstagramPostType(e.target.value)}
+                                    containerClassName="mb-0"
                                 />
-                            )})
+                            </div>
                         )}
-                    </div>
-                </Tab>
-                <Tab label={`History (${categorizedPosts.history.length})`} icon={<CheckCircleIcon className="w-5 h-5"/>}>
-                     <div className="mt-4 space-y-4">
-                        {categorizedPosts.history.length === 0 ? (
-                            <Card className="text-center p-8 text-textSecondary">
-                                No posts have been published or cancelled yet.
-                            </Card>
-                        ) : (
-                            categorizedPosts.history.map(post => {
-                                const draft = contentDrafts.find(d => d.id === post.resource.contentDraftId)
-                                return (
-                                <PostCard
-                                    key={post.id}
-                                    post={post}
-                                    draft={draft}
-                                    persona={personas.find(p => p.id === draft?.persona_id)}
-                                    operator={operators.find(o => o.id === draft?.operator_id)}
-                                    onPostNow={handlePostNow}
-                                    onDelete={onDeleteScheduledPost}
-                                    onNavigateToCalendar={navigateToCalendar}
-                                />
-                            )})
-                        )}
-                    </div>
-                </Tab>
-                <Tab label={`Errors (${categorizedPosts.errors.length})`} icon={<ExclamationCircleIcon className="w-5 h-5"/>}>
-                     <div className="mt-4 space-y-4">
-                        {categorizedPosts.errors.length === 0 ? (
-                            <Card className="text-center p-8 text-textSecondary">
-                                No posts have failed.
-                            </Card>
-                        ) : (
-                            categorizedPosts.errors.map(post => {
-                                const draft = contentDrafts.find(d => d.id === post.resource.contentDraftId)
-                                return (
-                                <PostCard
-                                    key={post.id}
-                                    post={post}
-                                    draft={draft}
-                                    persona={personas.find(p => p.id === draft?.persona_id)}
-                                    operator={operators.find(o => o.id === draft?.operator_id)}
-                                    onPostNow={handlePostNow}
-                                    onDelete={onDeleteScheduledPost}
-                                    onNavigateToCalendar={navigateToCalendar}
-                                />
-                            )})
-                        )}
-                    </div>
-                </Tab>
-            </Tabs>
+                    </Card>
+                </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-4 mt-6">
+                 <Button variant="outline" onClick={handleViewJson}>
+                    {'</> View JSON'}
+                </Button>
+                <div className="flex items-center space-x-2">
+                    <Button variant="secondary" onClick={handleSchedule}>Schedule Post</Button>
+                    <Button variant="primary" onClick={handlePublish} isLoading={isPublishing}>Publish Post</Button>
+                </div>
+            </div>
         </div>
     );
 };

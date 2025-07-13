@@ -11,16 +11,16 @@ interface TestimonialItem {
 
 const TestimonialCard: React.FC<{ item: TestimonialItem; className?: string }> = ({ item, className = '' }) => {
   return (
-    <Card className={`h-full transition-all duration-300 ease-in-out hover:-translate-y-1 ${item.featured ? 'bg-primary/5 border-primary/30' : 'bg-card/50'} ${className}`}>
+    <Card className={`h-full transition-all duration-300 ease-in-out hover:-translate-y-1 ${item.featured ? 'bg-primary/10 border-primary/50' : 'bg-card/50'} ${className}`}>
       <div className="flex flex-col h-full">
         <div className="flex-grow">
-          <p className="text-textSecondary text-lg">{item.text}</p>
+          <p className="text-muted-foreground text-lg">{item.text}</p>
         </div>
         <div className="mt-6 flex items-center space-x-4">
           <img src={item.imageSrc} alt={item.name} className="w-12 h-12 rounded-full object-cover border-2 border-primary/50" />
           <div>
-            <p className="font-semibold text-textPrimary">{item.name}</p>
-            <p className="text-sm text-textSecondary">{item.handle}</p>
+            <p className="font-semibold text-foreground">{item.name}</p>
+            <p className="text-sm text-muted-foreground">{item.handle}</p>
           </div>
         </div>
       </div>
@@ -76,10 +76,10 @@ export const TestimonialSection: React.FC = () => {
   return (
     <div className="mt-16 sm:mt-20 lg:mt-24 max-w-7xl mx-auto px-4 animate-fade-in-up" style={{ animationDelay: '700ms', opacity: 0 }}>
         <div className="text-center mb-12">
-            <h3 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400">
+            <h3 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-foreground to-muted-foreground">
                 Don't take it from us
             </h3>
-            <p className="mt-4 text-lg text-gray-300 max-w-2xl mx-auto">
+            <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
                 See what our customers have to say.
             </p>
         </div>

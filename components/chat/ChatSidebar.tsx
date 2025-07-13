@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback } from 'react';
 import { User, CustomChannel } from '../../types';
 import { GENERAL_CHAT_CHANNEL_ID, GENERAL_CHAT_CHANNEL_NAME } from '../../constants';
@@ -55,13 +56,13 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
   }, [onRemoveCustomChannel, activeChannelId, setActiveChannelId]);
 
   return (
-    <aside className="w-1/4 min-w-[240px] max-w-[320px] bg-background border-r border-lightBorder p-3 flex flex-col">
+    <aside className="w-1/4 min-w-[240px] max-w-[320px] bg-background border-r border-border p-3 flex flex-col">
       <div className="flex-grow overflow-y-auto space-y-4">
         <div>
           <div className="flex justify-between items-center mb-1 px-2">
-            <h3 className="text-xs font-bold text-textSecondary uppercase tracking-wider">Channels</h3>
+            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Channels</h3>
             <Button variant="ghost" size="icon" onClick={() => setShowAddChannelInput(!showAddChannelInput)} className="h-7 w-7" aria-label="Add new channel" title="Add new channel">
-              <PlusIcon className="w-4 h-4 text-textSecondary" />
+              <PlusIcon className="w-4 h-4 text-muted-foreground" />
             </Button>
           </div>
           {showAddChannelInput && (
@@ -95,7 +96,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
           </ul>
         </div>
         <div>
-          <h3 className="text-xs font-bold text-textSecondary uppercase tracking-wider mb-1 px-2">Direct Messages</h3>
+          <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1 px-2">Direct Messages</h3>
           <ul className="space-y-1">
             {teamMembers.length > 0 ? (
               teamMembers.map(memberEmail => {
@@ -111,7 +112,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                 );
               })
             ) : (
-              <li className="text-xs text-textSecondary italic px-2 py-1">No team members available.</li>
+              <li className="text-xs text-muted-foreground italic px-2 py-1">No team members available.</li>
             )}
           </ul>
         </div>
@@ -125,14 +126,14 @@ const ChannelItem: React.FC<{ name: string; isActive: boolean; onClick: () => vo
   <li
     onClick={onClick}
     className={`w-full flex justify-between items-center px-2 py-1.5 rounded-md text-sm cursor-pointer group transition-colors
-      ${isActive ? 'bg-primary/10 text-primary font-semibold' : 'text-textSecondary hover:bg-card'}`}
+      ${isActive ? 'bg-primary/10 text-primary font-semibold' : 'text-muted-foreground hover:bg-card'}`}
   >
     <span className="flex items-center truncate">
       <HashtagIcon className="w-4 h-4 mr-2" />
       <span className="truncate">{name}</span>
     </span>
     {onDelete && (
-      <Button variant="ghost" size="icon" onClick={onDelete} className="h-6 w-6 opacity-0 group-hover:opacity-100 hover:bg-danger/20 hover:text-danger" title={`Delete channel ${name}`}>
+      <Button variant="ghost" size="icon" onClick={onDelete} className="h-6 w-6 opacity-0 group-hover:opacity-100 hover:bg-destructive/20 hover:text-destructive" title={`Delete channel ${name}`}>
         <TrashIcon className="w-3.5 h-3.5" />
       </Button>
     )}
@@ -144,7 +145,7 @@ const DMItem: React.FC<{ name: string; isActive: boolean; onClick: () => void }>
   <li
     onClick={onClick}
     className={`w-full flex items-center px-2 py-1.5 rounded-md text-sm cursor-pointer group transition-colors
-      ${isActive ? 'bg-primary/10 text-primary font-semibold' : 'text-textSecondary hover:bg-card'}`}
+      ${isActive ? 'bg-primary/10 text-primary font-semibold' : 'text-muted-foreground hover:bg-card'}`}
   >
     <UserCircleIcon className="w-4 h-4 mr-2" />
     <span className="truncate">{name}</span>

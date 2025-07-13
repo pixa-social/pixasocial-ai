@@ -31,17 +31,8 @@ export enum RoleName {
     Admin = 'Admin',
 }
 
-export interface RoleType {
-    id: string; // uuid
-    name: RoleName;
-    max_personas: number;
-    max_ai_uses_monthly: number;
-    price_monthly: number;
-    price_yearly: number;
-    features: string[]; // Stored as TEXT[] in postgres
-    created_at: string;
-    updated_at: string | null;
-}
+// Derived type from Supabase schema
+export type RoleType = Database['public']['Tables']['role_types']['Row'];
 
 // Represents the enriched User object with profile and role details
 export interface UserProfile extends User {
@@ -90,48 +81,15 @@ export interface RSTProfile {
   fffs: RSTTraitLevel; // Fight-Flight-Freeze System
 }
 
-export interface Persona {
-  id: number;
-  user_id: string;
-  name: string;
-  demographics: string | null;
-  psychographics: string | null;
-  initial_beliefs: string | null;
-  vulnerabilities: string[] | null;
-  avatar_url: string | null;
-  rst_profile: Json | null;
-  created_at: string;
-  updated_at: string | null;
-}
+// Derived type from Supabase schema
+export type Persona = Database['public']['Tables']['personas']['Row'];
 
 // Represents a persona from the imported library (Nemotron-style)
-export interface LibraryPersona {
-  id: string;
-  name: string;
-  occupation: string;
-  age: number;
-  personality: string;
-  hobbies: string[];
-  relationship_status: string;
-  values: string[];
-  fears: string[];
-  goals: string[];
-}
+// Derived type from Supabase schema
+export type LibraryPersona = Database['public']['Tables']['persona_library']['Row'];
 
-
-export interface Operator {
-  id: number;
-  user_id: string;
-  name: string;
-  target_audience_id: number;
-  type: 'Hope' | 'Fear' | 'Belonging' | 'Exclusivity' | 'Curiosity' | 'Authority' | 'Novelty' | 'Pride' | 'Nostalgia' | 'Convenience' | 'Custom';
-  conditioned_stimulus: string;
-  unconditioned_stimulus:string;
-  desired_conditioned_response: string;
-  reinforcement_loop: string;
-  created_at: string;
-  updated_at: string | null;
-}
+// Derived type from Supabase schema
+export type Operator = Database['public']['Tables']['operators']['Row'];
 
 export type MediaType = 'none' | 'image' | 'video';
 export type ImageSourceType = 'generate' | 'upload' | 'library';
@@ -279,17 +237,8 @@ export interface ScheduledPost {
   resource: ScheduledPostResource;
 }
 
-export interface ScheduledPostDbRow {
-    id: number;
-    user_id: string;
-    content_draft_id: string;
-    platform_key: string;
-    status: ScheduledPostStatus;
-    notes: string | null;
-    scheduled_at: string; // ISO string
-    error_message: string | null;
-    last_attempted_at: string | null;
-}
+// Derived type from Supabase schema
+export type ScheduledPostDbRow = Database['public']['Tables']['scheduled_posts']['Row'];
 
 export enum SocialPlatformType {
   X = 'X', 
@@ -304,17 +253,12 @@ export enum SocialPlatformType {
   GoogleBusiness = 'GoogleBusiness',
   Threads = 'Threads',
   Discord = 'Discord',
+  Reddit = 'Reddit',
+  Snapchat = 'Snapchat',
 }
 
-export interface ConnectedAccount {
-  id: number;
-  user_id: string;
-  platform: SocialPlatformType;
-  accountId: string; 
-  displayName: string; 
-  profileImageUrl: string | null; 
-  connectedAt: string; 
-}
+// Derived type from Supabase schema
+export type ConnectedAccount = Database['public']['Tables']['connected_accounts']['Row'];
 
 // For the detailed connection flow modal
 export interface ConnectionOption {
@@ -337,23 +281,10 @@ export interface SocialPlatformConnectionDetails {
   connectionOptions: ConnectionOption[];
 }
 
-
-export interface ContentLibraryAssetDbRow {
-  id: string; // uuid
-  user_id: string;
-  name: string;
-  type: 'image' | 'video'; 
-  storage_path: string; // e.g., 'public/user-id/filename.png'
-  file_name: string;
-  file_type: string; 
-  size: number; 
-  tags: string[] | null;
-  uploaded_at: string; 
-}
-
-export interface ContentLibraryAsset extends ContentLibraryAssetDbRow {
-  publicUrl?: string; // Only for client-side generation, not in DB
-}
+// Derived type from Supabase schema, with added publicUrl property for client-side use
+export type ContentLibraryAsset = Database['public']['Tables']['content_library_assets']['Row'] & {
+  publicUrl?: string;
+};
 
 export interface ChatMessageAttachment {
   name: string;
@@ -406,17 +337,36 @@ export interface ToastContextType {
 
 // --- Supabase Schema Definition ---
 
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+// Simplified Json type to avoid "type instantiation is excessively deep" errors with Supabase client.
+// This is a pragmatic fix for a common TS/compiler issue with complex recursive types.
+export type Json = any;
 
 export interface Database {
   public: {
     Tables: {
+      app_global_settings: {
+        Row: {
+          id: number;
+          active_ai_provider: string;
+          global_default_text_model: string | null;
+          global_default_image_model: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: number;
+          active_ai_provider?: string;
+          global_default_text_model?: string | null;
+          global_default_image_model?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          active_ai_provider?: string;
+          global_default_text_model?: string | null;
+          global_default_image_model?: string | null;
+          updated_at?: string | null;
+        };
+      };
       profiles: {
         Row: {
           id: string;
@@ -439,6 +389,7 @@ export interface Database {
           updated_at?: string | null;
         };
         Update: {
+          id?: string;
           name?: string | null;
           wallet_address?: string | null;
           team_members?: string[] | null;
@@ -462,6 +413,8 @@ export interface Database {
           assigned_at?: string;
         };
         Update: {
+          id?: number;
+          user_id?: string;
           role_id?: string;
           assigned_at?: string;
         };
@@ -513,6 +466,7 @@ export interface Database {
           updated_at: string | null;
         };
         Insert: {
+          id?: number;
           user_id: string;
           name: string;
           demographics?: string | null;
@@ -521,8 +475,12 @@ export interface Database {
           vulnerabilities?: string[] | null;
           avatar_url?: string | null;
           rst_profile?: Json | null;
+          created_at?: string;
+          updated_at?: string | null;
         };
         Update: {
+          id?: number;
+          user_id?: string;
           name?: string;
           demographics?: string | null;
           psychographics?: string | null;
@@ -530,7 +488,8 @@ export interface Database {
           vulnerabilities?: string[] | null;
           avatar_url?: string | null;
           rst_profile?: Json | null;
-          updated_at?: string;
+          created_at?: string;
+          updated_at?: string | null;
         };
       };
       operators: {
@@ -548,6 +507,7 @@ export interface Database {
           updated_at: string | null;
         };
         Insert: {
+          id?: number;
           user_id: string;
           name: string;
           target_audience_id: number;
@@ -556,8 +516,12 @@ export interface Database {
           unconditioned_stimulus:string;
           desired_conditioned_response: string;
           reinforcement_loop: string;
+          created_at?: string;
+          updated_at?: string | null;
         };
         Update: {
+          id?: number;
+          user_id?: string;
           name?: string;
           target_audience_id?: number;
           type?: 'Hope' | 'Fear' | 'Belonging' | 'Exclusivity' | 'Curiosity' | 'Authority' | 'Novelty' | 'Pride' | 'Nostalgia' | 'Convenience' | 'Custom';
@@ -565,7 +529,8 @@ export interface Database {
           unconditioned_stimulus?:string;
           desired_conditioned_response?: string;
           reinforcement_loop?: string;
-          updated_at?: string;
+          created_at?: string;
+          updated_at?: string | null;
         };
       };
       content_drafts: {
@@ -590,15 +555,20 @@ export interface Database {
           custom_prompt: string;
           platform_contents: Json;
           platform_media_overrides?: Json | null;
+          created_at?: string;
+          updated_at?: string | null;
         };
         Update: {
+          id?: string;
+          user_id?: string;
           operator_id?: number;
           persona_id?: number;
           key_message?: string | null;
           custom_prompt?: string;
           platform_contents?: Json;
           platform_media_overrides?: Json | null;
-          updated_at?: string;
+          created_at?: string;
+          updated_at?: string | null;
         };
       };
       content_library_assets: {
@@ -615,6 +585,7 @@ export interface Database {
           uploaded_at: string;
         };
         Insert: {
+          id?: string;
           user_id: string;
           name: string;
           type: 'image' | 'video';
@@ -623,10 +594,19 @@ export interface Database {
           file_type: string;
           size: number;
           tags?: string[] | null;
+          uploaded_at?: string;
         };
         Update: {
+          id?: string;
+          user_id?: string;
           name?: string;
+          type?: 'image' | 'video';
+          storage_path?: string;
+          file_name?: string;
+          file_type?: string;
+          size?: number;
           tags?: string[] | null;
+          uploaded_at?: string;
         };
       };
       scheduled_posts: {
@@ -637,11 +617,12 @@ export interface Database {
           platform_key: string;
           status: ScheduledPostStatus;
           notes: string | null;
-          scheduled_at: string;
+          scheduled_at: string; // ISO string
           error_message: string | null;
           last_attempted_at: string | null;
         };
         Insert: {
+          id?: number;
           user_id: string;
           content_draft_id: string;
           platform_key: string;
@@ -652,6 +633,8 @@ export interface Database {
           last_attempted_at?: string | null;
         };
         Update: {
+          id?: number;
+          user_id?: string;
           content_draft_id?: string;
           platform_key?: string;
           status?: ScheduledPostStatus;
@@ -663,28 +646,43 @@ export interface Database {
       };
       connected_accounts: {
         Row: {
-          id: number;
+          id: string;
           user_id: string;
           platform: SocialPlatformType;
-          accountId: string;
-          displayName: string;
-          profileImageUrl: string | null;
-          connectedAt: string;
+          accountid: string;
+          accountname: string | null;
+          accesstoken: string | null;
+          tokenexpiry: string | null;
+          refreshtoken: string | null;
+          created_at: string | null;
+          encrypted_bot_token: string | null;
+          channel_id: string | null;
         };
         Insert: {
+          id?: string;
           user_id: string;
           platform: SocialPlatformType;
-          accountId: string;
-          displayName: string;
-          profileImageUrl?: string | null;
-          connectedAt?: string;
+          accountid: string;
+          accountname?: string | null;
+          accesstoken?: string | null;
+          tokenexpiry?: string | null;
+          refreshtoken?: string | null;
+          created_at?: string | null;
+          encrypted_bot_token?: string | null;
+          channel_id?: string | null;
         };
         Update: {
+          id?: string;
+          user_id?: string;
           platform?: SocialPlatformType;
-          accountId?: string;
-          displayName?: string;
-          profileImageUrl?: string | null;
-          connectedAt?: string;
+          accountid?: string;
+          accountname?: string | null;
+          accesstoken?: string | null;
+          tokenexpiry?: string | null;
+          refreshtoken?: string | null;
+          created_at?: string | null;
+          encrypted_bot_token?: string | null;
+          channel_id?: string | null;
         };
       };
       role_types: {
@@ -707,14 +705,19 @@ export interface Database {
           price_monthly: number;
           price_yearly: number;
           features: string[];
+          created_at?: string;
+          updated_at?: string | null;
         };
         Update: {
+          id?: string;
+          name?: RoleName;
           max_personas?: number;
           max_ai_uses_monthly?: number;
           price_monthly?: number;
           price_yearly?: number;
           features?: string[];
-          updated_at?: string;
+          created_at?: string;
+          updated_at?: string | null;
         };
       };
       seo_settings: {
@@ -731,6 +734,7 @@ export interface Database {
           updated_at?: string | null;
         };
         Update: {
+          id?: string;
           header_scripts?: string | null;
           footer_scripts?: string | null;
           updated_at?: string | null;
@@ -761,20 +765,31 @@ export interface Database {
             fears: string[];
             goals: string[];
           };
-          Update: Partial<Database['public']['Tables']['persona_library']['Row']>;
+          Update: {
+            id?: string;
+            name?: string;
+            occupation?: string;
+            age?: number;
+            personality?: string;
+            hobbies?: string[];
+            relationship_status?: string;
+            values?: string[];
+            fears?: string[];
+            goals?: string[];
+          };
       };
     };
     Views: {
       admin_users_view: {
         Row: {
-          id: string;
+          id: string | null;
           email: string | null;
           name: string | null;
-          role_name: RoleName;
-          ai_usage_count_monthly: number;
+          role_name: RoleName | null;
+          ai_usage_count_monthly: number | null;
           assigned_ai_model_text: string | null;
           assigned_ai_model_image: string | null;
-          updated_at: string;
+          updated_at: string | null;
         };
       };
     };

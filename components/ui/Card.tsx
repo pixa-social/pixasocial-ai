@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 interface CardProps {
@@ -22,12 +21,12 @@ export const Card: React.FC<CardProps> = ({ children, className = '', title, act
   };
   
   return (
-    <div className={`bg-card border border-lightBorder rounded-xl p-6 md:p-7 ${className}`}>
+    <div className={`bg-card border border-border rounded-xl p-6 md:p-7 ${className}`}>
       {(title || actions || icon) && (
-        <div className="flex justify-between items-center mb-4 pb-4 border-b border-lightBorder">
+        <div className="flex justify-between items-center mb-4 pb-4 border-b border-border">
           <div className="flex items-center">
             {icon && <span className="mr-2 text-primary">{icon}</span>}
-            {title && <h3 className="text-xl font-semibold text-textPrimary">{title}</h3>}
+            {title && <h3 className="text-xl font-semibold text-card-foreground">{title}</h3>}
           </div>
           {actions && <div>{actions}</div>}
         </div>

@@ -1,6 +1,8 @@
+
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Navbar } from './Navbar';
-import { ViewName, User, Persona, Operator, ContentDraft, ScheduledPost, ScheduledPostDbRow, ContentLibraryAsset, CustomChannel, UserProfile, ConnectedAccount, SocialPlatformType } from '../types';
+import { ViewName, User, Persona, Operator, ContentDraft, ScheduledPost, ScheduledPostDbRow, ContentLibraryAsset, CustomChannel, UserProfile, ConnectedAccount, SocialPlatformType, Json } from '../types';
 import { APP_TITLE, CONTENT_PLATFORMS } from '../constants';
 import { Breadcrumbs } from './ui/Breadcrumbs';
 
@@ -138,14 +140,16 @@ export const MainAppLayout: React.FC<MainAppLayoutProps> = ({
   }, [currentUser, fetchContentLibraryAssets]);
 
   const handleAddContentDraft = useCallback(async (draftData: Omit<ContentDraft, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
-    const dbPayload: any = { ...draftData };
-    if (dbPayload.platform_media_overrides) {
-        dbPayload.platform_contents = { ...dbPayload.platform_contents, _media_overrides: dbPayload.platform_media_overrides };
-        delete dbPayload.platform_media_overrides;
-    }
-    const dataToInsert = { ...dbPayload, user_id: currentUser.id };
+    const dataToInsert = {
+      ...draftData,
+      id: `draft_${Date.now()}`,
+      user_id: currentUser.id,
+    };
+    
     const { data, error } = await supabase.from('content_drafts').insert(dataToInsert).select().single();
-    if (error) { showToast(`Failed to save draft: ${error.message}`, 'error');
+
+    if (error) { 
+      showToast(`Failed to save draft: ${error.message}`, 'error');
     } else if (data) {
         const newDraft: any = { ...data };
         if (newDraft.platform_contents && (newDraft.platform_contents as any)._media_overrides) {
@@ -187,7 +191,7 @@ export const MainAppLayout: React.FC<MainAppLayoutProps> = ({
 
     const { error } = await supabase
         .from('content_drafts')
-        .update({ platform_contents: newPlatformContents })
+        .update({ platform_contents: newPlatformContents as Json })
         .eq('id', draftId);
     
     if (error) {
@@ -203,10 +207,15 @@ export const MainAppLayout: React.FC<MainAppLayoutProps> = ({
   }, [contentDrafts, showToast, handleDeleteContentDraft]);
   
   const handleAddScheduledPost = useCallback(async (post: ScheduledPost) => {
-    const { data, error } = await supabase.from('scheduled_posts').insert({
-        user_id: currentUser.id, content_draft_id: post.resource.contentDraftId, platform_key: post.resource.platformKey,
-        status: post.resource.status, notes: post.resource.notes, scheduled_at: post.start.toISOString(),
-    }).select().single();
+    const payload = {
+        user_id: currentUser.id, 
+        content_draft_id: post.resource.contentDraftId, 
+        platform_key: post.resource.platformKey,
+        status: post.resource.status, 
+        notes: post.resource.notes, 
+        scheduled_at: post.start.toISOString(),
+    };
+    const { data, error } = await supabase.from('scheduled_posts').insert(payload).select().single();
     if(error) { showToast(`Failed to save schedule: ${error.message}`, 'error');
     } else {
         const newPostWithDbId = { ...post, db_id: data.id, id: `sch_${data.id}_${data.platform_key}` };
@@ -216,10 +225,14 @@ export const MainAppLayout: React.FC<MainAppLayoutProps> = ({
   }, [currentUser.id, showToast]);
 
   const handleUpdateScheduledPost = useCallback(async (post: ScheduledPost) => {
-    const { error } = await supabase.from('scheduled_posts').update({
-        notes: post.resource.notes, status: post.resource.status, scheduled_at: post.start.toISOString(),
-        error_message: post.resource.error_message, last_attempted_at: post.resource.last_attempted_at,
-    }).eq('id', post.db_id);
+    const payload = {
+        notes: post.resource.notes, 
+        status: post.resource.status, 
+        scheduled_at: post.start.toISOString(),
+        error_message: post.resource.error_message, 
+        last_attempted_at: post.resource.last_attempted_at,
+    };
+    const { error } = await supabase.from('scheduled_posts').update(payload).eq('id', post.db_id);
     if (error) { showToast(`Failed to update schedule: ${error.message}`, 'error');
     } else {
         setScheduledPosts(prev => prev.map(p => p.id === post.id ? post : p));
@@ -237,17 +250,23 @@ export const MainAppLayout: React.FC<MainAppLayoutProps> = ({
     }
   }, [scheduledPosts, showToast]);
   
-  const handleAddConnectedAccount = useCallback(async (platform: SocialPlatformType, accountId: string, displayName: string, profileImageUrl?: string) => {
-    const newAccount = { platform, accountId, displayName, profileImageUrl: profileImageUrl || undefined, user_id: currentUser.id, connectedAt: new Date().toISOString() };
+  const handleAddConnectedAccount = useCallback(async (platform: SocialPlatformType, accountId: string, displayName: string) => {
+    const newAccount = {
+        platform,
+        accountid: accountId,
+        accountname: displayName,
+        user_id: currentUser.id,
+        created_at: new Date().toISOString()
+    };
     const { data, error } = await supabase.from('connected_accounts').insert(newAccount).select().single();
     if(error) { showToast(`Failed to connect account: ${error.message}`, 'error');
     } else {
-        setConnectedAccounts(prev => [...prev, data]);
+        setConnectedAccounts(prev => [...prev, data as ConnectedAccount]);
         showToast(`Account ${displayName} connected.`, "success");
     }
   }, [currentUser.id, showToast]);
 
-  const handleDeleteConnectedAccount = useCallback(async (accountId: number, platformName: string) => {
+  const handleDeleteConnectedAccount = useCallback(async (accountId: string, platformName: string) => {
     const { error } = await supabase.from('connected_accounts').delete().eq('id', accountId);
     if(error) { showToast(`Failed to disconnect account: ${error.message}`, 'error');
     } else {
@@ -269,7 +288,7 @@ export const MainAppLayout: React.FC<MainAppLayoutProps> = ({
       return;
     }
 
-    const { error: dbError } = await supabase.from('content_library_assets').insert({
+    const payload = {
       user_id: currentUser.id,
       name,
       type: file.type.startsWith('image/') ? 'image' : 'video',
@@ -278,7 +297,9 @@ export const MainAppLayout: React.FC<MainAppLayoutProps> = ({
       file_type: file.type,
       size: file.size,
       tags,
-    });
+    };
+
+    const { error: dbError } = await supabase.from('content_library_assets').insert(payload);
 
     if (dbError) {
       showToast(`Failed to save asset metadata: ${dbError.message}`, 'error');

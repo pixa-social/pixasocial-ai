@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
@@ -38,7 +39,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ currentUser, onNav
       const { data: personaData } = await supabase.from('personas').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
       const { data: operatorData } = await supabase.from('operators').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
       const { data: draftData } = await supabase.from('content_drafts').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
-      const { data: scheduleData } = await supabase.from('scheduled_posts').select('*').eq('user_id', currentUser.id).order('scheduled_at', { ascending: true });
+      const { data: scheduleData } = await (supabase.from('scheduled_posts') as any).select('id, user_id, content_draft_id, platform_key, status, notes, scheduled_at, error_message, last_attempted_at').eq('user_id', currentUser.id).order('scheduled_at', { ascending: true });
       
       setPersonas((personaData as Persona[]) || []);
       setOperators(operatorData || []);
@@ -132,7 +133,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ currentUser, onNav
 
   return (
     <div className="p-4 md:p-6 space-y-6">
-      <h2 className="text-3xl font-bold text-textPrimary">Dashboard Overview</h2>
+      <h2 className="text-3xl font-bold text-foreground">Dashboard Overview</h2>
       
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-6">
         {summaryMetrics.map(metric => (
@@ -147,8 +148,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ currentUser, onNav
           >
             <Card className="text-center p-4 h-full flex flex-col justify-center items-center">
               <div className="flex justify-center mb-2">{metric.icon}</div>
-              <p className="text-3xl font-bold text-textPrimary">{metric.value}</p>
-              <p className="text-sm text-textSecondary">{metric.title}</p>
+              <p className="text-3xl font-bold text-foreground">{metric.value}</p>
+              <p className="text-sm text-muted-foreground">{metric.title}</p>
             </Card>
           </div>
         ))}
@@ -169,9 +170,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ currentUser, onNav
                 >
                 <div className="flex items-center">
                     {item.icon}
-                    <p className="ml-3 text-sm font-medium text-textPrimary">{item.label}</p>
+                    <p className="ml-3 text-sm font-medium text-foreground">{item.label}</p>
                 </div>
-                <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-warning text-yellow-800">
+                <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-yellow-400/20 text-yellow-300">
                     {item.count}
                 </span>
                 </div>
@@ -206,11 +207,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ currentUser, onNav
                   const persona = (personas ?? []).find(p => p.id === post.resource.personaId);
                   
                   return (
-                    <div key={post.id} className="p-3 bg-white/5 rounded-lg border border-lightBorder hover:shadow-lg transition-shadow">
+                    <div key={post.id} className="p-3 bg-white/5 rounded-lg border border-border hover:shadow-lg transition-shadow">
                         <div className="flex justify-between items-start">
                             <div>
-                                <h4 className="font-semibold text-textPrimary text-sm">{post.title}</h4>
-                                <p className="text-xs text-textSecondary">
+                                <h4 className="font-semibold text-foreground text-sm">{post.title}</h4>
+                                <p className="text-xs text-muted-foreground">
                                 To: {persona?.name || 'N/A'}
                                 </p>
                             </div>
@@ -219,17 +220,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ currentUser, onNav
                             </span>
                         </div>
                         {platformInfo?.content && (
-                            <p className="text-xs text-textSecondary mt-1 truncate">
+                            <p className="text-xs text-muted-foreground mt-1 truncate">
                                 {getContentPreview(platformInfo.subject || platformInfo.content, 60)}
                             </p>
                         )}
-                         <p className="text-xs text-textSecondary mt-1 capitalize">Status: <span className={`font-medium ${post.resource.status === 'Scheduled' ? 'text-primary' : 'text-textSecondary'}`}>{post.resource.status}</span></p>
+                         <p className="text-xs text-muted-foreground mt-1 capitalize">Status: <span className={`font-medium ${post.resource.status === 'Scheduled' ? 'text-primary' : 'text-muted-foreground'}`}>{post.resource.status}</span></p>
                     </div>
                   );
               })}
             </div>
           ) : (
-            <p className="text-textSecondary text-center py-4">No upcoming posts scheduled.</p>
+            <p className="text-muted-foreground text-center py-4">No upcoming posts scheduled.</p>
           )}
           <Button 
             variant="ghost" 
@@ -245,29 +246,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ currentUser, onNav
           <div className="space-y-4">
             {latestPersona && (
               <div className="p-3 bg-white/5 rounded-lg">
-                <p className="text-xs text-textSecondary mb-0.5">Latest Persona Added:</p>
+                <p className="text-xs text-muted-foreground mb-0.5">Latest Persona Added:</p>
                 <h5 className="font-semibold text-sm text-primary">{latestPersona.name}</h5>
-                <p className="text-xs text-textSecondary truncate">{latestPersona.demographics}</p>
+                <p className="text-xs text-muted-foreground truncate">{latestPersona.demographics}</p>
               </div>
             )}
             {latestOperator && (
               <div className="p-3 bg-white/5 rounded-lg">
-                <p className="text-xs text-textSecondary mb-0.5">Latest Operator Added:</p>
+                <p className="text-xs text-muted-foreground mb-0.5">Latest Operator Added:</p>
                 <h5 className="font-semibold text-sm text-accent">{latestOperator.name} ({latestOperator.type})</h5>
-                 <p className="text-xs text-textSecondary truncate">For: {(personas ?? []).find(p=>p.id === latestOperator.target_audience_id)?.name || 'N/A'}</p>
+                 <p className="text-xs text-muted-foreground truncate">For: {(personas ?? []).find(p=>p.id === latestOperator.target_audience_id)?.name || 'N/A'}</p>
               </div>
             )}
             {latestDraft && (
               <div className="p-3 bg-white/5 rounded-lg">
-                <p className="text-xs text-textSecondary mb-0.5">Latest Content Draft Added:</p>
+                <p className="text-xs text-muted-foreground mb-0.5">Latest Content Draft Added:</p>
                 <h5 className="font-semibold text-sm text-yellow-500">
                     Draft for {(personas ?? []).find(p => p.id === latestDraft.persona_id)?.name || 'N/A'}
                 </h5>
-                <p className="text-xs text-textSecondary truncate">Using Op: {(operators ?? []).find(o => o.id === latestDraft.operator_id)?.name || 'N/A'}</p>
+                <p className="text-xs text-muted-foreground truncate">Using Op: {(operators ?? []).find(o => o.id === latestDraft.operator_id)?.name || 'N/A'}</p>
               </div>
             )}
             {!latestPersona && !latestOperator && !latestDraft && (
-              <p className="text-textSecondary text-center py-4">No recent activity to display.</p>
+              <p className="text-muted-foreground text-center py-4">No recent activity to display.</p>
             )}
           </div>
         </Card>
