@@ -65,6 +65,7 @@ export const generateText = async (
     case AiProviderType.Groq:
     case AiProviderType.Openrouter:
     case AiProviderType.MistralAI:
+    case AiProviderType.NovitaAI:
       const result = await OpenAICompatibleService.generateTextInternal(provider, apiKey, model, prompt, systemInstruction);
       return { ...result, groundingChunks: [] };
     default:
@@ -125,6 +126,7 @@ export const generateJson = async <T,>(
     case AiProviderType.Groq:
     case AiProviderType.Openrouter:
     case AiProviderType.MistralAI:
+    case AiProviderType.NovitaAI:
       const result = await OpenAICompatibleService.generateJsonInternal<T>(provider, apiKey, model, prompt, systemInstruction);
       return { ...result, groundingChunks: [] };
     default:
@@ -195,6 +197,7 @@ export const generateTextStream = async (
     case AiProviderType.Groq:
     case AiProviderType.Openrouter:
     case AiProviderType.MistralAI:
+    case AiProviderType.NovitaAI:
       return OpenAICompatibleService.generateTextStreamInternal(provider, apiKey, model, prompt, onStreamChunk, onStreamComplete, onError, systemInstruction);
     default:
       const res = await handleNonImplementedProvider(provider, "Streaming text generation");

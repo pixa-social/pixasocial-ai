@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
 import { Card } from './ui/Card';
@@ -69,6 +68,28 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     resetProfileForm({ walletAddress: currentUser.walletAddress || '' });
   }, [currentUser, resetProfileForm]);
 
+  // Effect to handle OAuth callbacks
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const success = params.get('connect_success');
+    const error = params.get('connect_error');
+
+    if (success) {
+      showToast(`Successfully connected to ${success}! Refreshing accounts...`, 'success');
+      onAccountConnectOrDelete(); // This prop is passed down to refetch accounts
+    }
+    if (error) {
+      showToast(`Connection failed: ${error}`, 'error');
+    }
+
+    if (success || error) {
+      // Clean up URL to avoid re-triggering on refresh
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    }
+  }, [showToast, onAccountConnectOrDelete]);
+
+
   const handleSaveUserProfile = useCallback((data: UserProfileFormData) => {
     onUpdateUser({ walletAddress: data.walletAddress });
   }, [onUpdateUser]);
@@ -103,12 +124,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     return connectedAccounts.find(acc => acc.platform === platformType);
   }, [connectedAccounts]);
 
-  const handleSimulatedConnect = useCallback((platform: SocialPlatformType, connectionType: string) => {
-      const displayName = `${currentUser.name}'s ${connectionType} ${platform}`;
-      const accountId = `${platform.toLowerCase()}-${currentUser.id.substring(0,8)}`;
-      onAddConnectedAccount(platform, accountId, displayName);
+  const handleConnectPlatform = useCallback(async (platform: SocialPlatformType, connectionType: string) => {
+      if (platform === SocialPlatformType.Reddit) {
+        try {
+            const { data, error } = await supabase.functions.invoke('connect-reddit');
+            if (error) throw error;
+            if (data.redirectUrl) {
+                window.location.href = data.redirectUrl;
+            } else {
+                throw new Error("No redirect URL returned from function.");
+            }
+        } catch(error) {
+            showToast(`Could not start Reddit connection: ${(error as Error).message}`, 'error');
+        }
+      } else {
+          // Fallback to simulated connect for other platforms for now
+          const displayName = `${currentUser.name}'s ${connectionType} ${platform}`;
+          const accountId = `${platform.toLowerCase()}-${currentUser.id.substring(0,8)}`;
+          onAddConnectedAccount(platform, accountId, displayName);
+      }
       setPlatformToConnect(null);
-  }, [currentUser, onAddConnectedAccount]);
+  }, [currentUser, onAddConnectedAccount, showToast]);
   
   const handleConnectTelegram = async (isForAdmin: boolean) => {
     if (!telegramChannelId) {
@@ -337,7 +373,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <ConnectionFlowModal 
             platform={platformToConnect} 
             onClose={() => setPlatformToConnect(null)} 
-            onConnect={handleSimulatedConnect}
+            onConnect={handleConnectPlatform}
         />
       )}
     </div>

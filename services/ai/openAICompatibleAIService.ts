@@ -1,4 +1,5 @@
 
+
 import OpenAI, { ClientOptions } from "openai";
 import { AiProviderType, AIParsedJsonResponse } from "../../types";
 import { getProviderConfig, parseJsonFromText } from './aiUtils';
@@ -49,14 +50,31 @@ export const generateTextInternal = async (
   
   try {
       const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
-      if (systemInstruction) messages.push({ role: "system", content: systemInstruction });
-      messages.push({ role: "user", content: prompt });
+      const isOfficialOpenAI = providerType === AiProviderType.OpenAI;
+      let finalPrompt = prompt;
+      
+      // For non-OpenAI providers, merge system instruction into the user prompt for better compatibility.
+      if (systemInstruction && !isOfficialOpenAI) {
+          finalPrompt = `System Instruction: ${systemInstruction}\n\nUser Prompt: ${prompt}`;
+      } else if (systemInstruction) {
+          messages.push({ role: "system", content: systemInstruction });
+      }
+
+      messages.push({ role: "user", content: finalPrompt });
 
       const response = await ai.chat.completions.create({ model: modelName, messages: messages });
       return { text: response.choices?.[0]?.message?.content || null };
   } catch (error) {
-      console.error(`${providerType} API error (generateTextInternal):`, error);
-      return { text: null, error: (error as Error).message };
+    console.error(`${providerType} API error (generateTextInternal):`, error);
+    let errorMessage: string;
+    if (error instanceof OpenAI.APIError) {
+      errorMessage = `API Error from ${providerType} (${error.status}): ${error.message}`;
+    } else if (error instanceof Error) {
+      errorMessage = `Connection error for ${providerType}: ${error.message}. This could be a CORS issue, a network problem, or an incorrect API endpoint URL in the Admin Panel configuration. Please verify the Base URL.`;
+    } else {
+      errorMessage = `An unknown error occurred with ${providerType}.`;
+    }
+    return { text: null, error: errorMessage };
   }
 };
 
@@ -72,17 +90,21 @@ export const generateJsonInternal = async <T,>(
 
   try {
       const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
+      const isOfficialOpenAI = providerType === AiProviderType.OpenAI;
       let finalPrompt = prompt;
 
-      // Only use the official response_format for OpenAI.
-      // For others (like OpenRouter), we rely on stronger prompt engineering as it's more compatible.
-      const useJsonFormatParam = providerType === AiProviderType.OpenAI;
-      
-      if (!useJsonFormatParam) {
-          finalPrompt = `${prompt}\n\nIMPORTANT: Your entire response must be a single, valid JSON object. Do not include any text, explanations, or markdown formatting (like \`\`\`json) outside of the JSON object.`;
+      // For non-OpenAI providers, merge system instruction into the user prompt for better compatibility.
+      if (systemInstruction && !isOfficialOpenAI) {
+          finalPrompt = `System Instruction: ${systemInstruction}\n\nUser Prompt: ${prompt}`;
+      } else if (systemInstruction) {
+          messages.push({ role: "system", content: systemInstruction });
       }
-
-      if (systemInstruction) messages.push({ role: "system", content: systemInstruction });
+      
+      // Add a stronger JSON instruction to the prompt for non-OpenAI providers.
+      if (!isOfficialOpenAI) {
+          finalPrompt = `${finalPrompt}\n\nIMPORTANT: Your entire response MUST be a single, valid JSON object. Do not include any text, explanations, or markdown formatting (like \`\`\`json) outside of the JSON object.`;
+      }
+      
       messages.push({ role: "user", content: finalPrompt });
       
       const completionConfig: OpenAI.Chat.Completions.ChatCompletionCreateParams = { 
@@ -90,7 +112,8 @@ export const generateJsonInternal = async <T,>(
           messages: messages,
       };
 
-      if (useJsonFormatParam) {
+      // Only use the official response_format param for OpenAI models that support it.
+      if (isOfficialOpenAI) {
           completionConfig.response_format = { type: "json_object" };
       }
 
@@ -101,11 +124,19 @@ export const generateJsonInternal = async <T,>(
       
       return parseJsonFromText<T>(responseText);
   } catch (error) {
-      console.error(`${providerType} API error (generateJsonInternal):`, error);
-      if (error instanceof Error && error.message.includes("response_format")) {
-           return { data: null, error: `The selected ${providerType} model '${modelName}' may not support a forced JSON response format. Try a different model or adjust the prompt. Error: ${error.message}` };
+    console.error(`${providerType} API error (generateJsonInternal):`, error);
+    let errorMessage: string;
+    if (error instanceof OpenAI.APIError) {
+      errorMessage = `API Error from ${providerType} (${error.status}): ${error.message}`;
+      if (error.message.includes("response_format")) {
+        errorMessage = `The selected ${providerType} model '${modelName}' may not support a forced JSON response format. Try a different model or adjust the prompt. Error: ${error.message}`;
       }
-      return { data: null, error: (error as Error).message };
+    } else if (error instanceof Error) {
+      errorMessage = `Connection error for ${providerType}: ${error.message}. This could be a CORS issue, a network problem, or an incorrect API endpoint URL in the Admin Panel configuration. Please verify the Base URL.`;
+    } else {
+      errorMessage = `An unknown error occurred with ${providerType}.`;
+    }
+    return { data: null, error: errorMessage };
   }
 };
 
@@ -152,8 +183,16 @@ export const generateTextStreamInternal = async (
   
   try {
       const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
-      if (systemInstruction) messages.push({ role: "system", content: systemInstruction });
-      messages.push({ role: "user", content: prompt });
+      const isOfficialOpenAI = providerType === AiProviderType.OpenAI;
+      let finalPrompt = prompt;
+      
+      if (systemInstruction && !isOfficialOpenAI) {
+          finalPrompt = `System Instruction: ${systemInstruction}\n\nUser Prompt: ${prompt}`;
+      } else if (systemInstruction) {
+          messages.push({ role: "system", content: systemInstruction });
+      }
+      
+      messages.push({ role: "user", content: finalPrompt });
 
       const stream = await ai.chat.completions.create({ model: modelName, messages: messages, stream: true });
       let fullTextResponse = "";
@@ -166,6 +205,15 @@ export const generateTextStreamInternal = async (
       }
       onStreamComplete(fullTextResponse);
   } catch (error) {
-      onError((error as Error).message || `Unknown error during ${providerType} streaming.`);
+    console.error(`${providerType} API error (streaming):`, error);
+    let errorMessage: string;
+    if (error instanceof OpenAI.APIError) {
+      errorMessage = `API Error from ${providerType} (${error.status}): ${error.message}`;
+    } else if (error instanceof Error) {
+      errorMessage = `Connection error for ${providerType}: ${error.message}. This could be a CORS issue, a network problem, or an incorrect API endpoint URL in the Admin Panel configuration. Please verify the Base URL.`;
+    } else {
+      errorMessage = `An unknown error occurred with ${providerType} during streaming.`;
+    }
+    onError(errorMessage);
   }
 };

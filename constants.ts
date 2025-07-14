@@ -197,7 +197,7 @@ export const AI_PROVIDERS_CONFIG_TEMPLATE: AiProviderConfig[] = [
       chat: ['gpt-4-turbo', 'gpt-3.5-turbo']
     },
     notes: 'Uses OpenAI API.',
-    base_url: 'https://api.openai.com/v1'
+    base_url: 'https://api.openai.com/v1/'
   },
   {
     id: AiProviderType.Groq,
@@ -209,7 +209,7 @@ export const AI_PROVIDERS_CONFIG_TEMPLATE: AiProviderConfig[] = [
       chat: ['llama3-8b-8192', 'llama3-70b-8192', 'mixtral-8x7b-32768']
     },
     notes: 'Uses GroqCloud API (OpenAI compatible).',
-    base_url: 'https://api.groq.com/openai/v1'
+    base_url: 'https://api.groq.com/openai/v1/'
   },
   {
     id: AiProviderType.Deepseek,
@@ -221,7 +221,7 @@ export const AI_PROVIDERS_CONFIG_TEMPLATE: AiProviderConfig[] = [
       chat: ['deepseek-chat', 'deepseek-coder']
     },
     notes: 'Uses Deepseek API (OpenAI compatible).',
-    base_url: 'https://api.deepseek.com/v1'
+    base_url: 'https://api.deepseek.com/v1/'
   },
   {
     id: AiProviderType.Openrouter,
@@ -237,7 +237,10 @@ export const AI_PROVIDERS_CONFIG_TEMPLATE: AiProviderConfig[] = [
         'nvidia/llama-3.3-nemotron-super-49b-v1:free',
         'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
         'qwen/qwen3-235b-a22b:free',
-        'google/gemini-2.0-flash-exp:free'
+        'google/gemini-2.0-flash-exp:free',
+        'moonshotai/kimi-k2:free',
+        'tngtech/deepseek-r1t2-chimera:free',
+        'deepseek/deepseek-r1-0528-qwen3-8b:free'
       ],
       chat: [
         'google/gemma-3-27b-it:free', 
@@ -247,11 +250,14 @@ export const AI_PROVIDERS_CONFIG_TEMPLATE: AiProviderConfig[] = [
         'nvidia/llama-3.3-nemotron-super-49b-v1:free',
         'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
         'qwen/qwen3-235b-a22b:free',
-        'google/gemini-2.0-flash-exp:free'
+        'google/gemini-2.0-flash-exp:free',
+        'moonshotai/kimi-k2:free',
+        'tngtech/deepseek-r1t2-chimera:free',
+        'deepseek/deepseek-r1-0528-qwen3-8b:free'
       ]
     },
     notes: 'Acts as a router to many models. Use your OpenRouter API key.',
-    base_url: 'https://openrouter.ai/api/v1'
+    base_url: 'https://openrouter.ai/api/v1/'
   },
   {
     id: AiProviderType.MistralAI,
@@ -263,7 +269,20 @@ export const AI_PROVIDERS_CONFIG_TEMPLATE: AiProviderConfig[] = [
       chat: ['open-mistral-7b', 'open-mixtral-8x7b', 'mistral-large-latest']
     },
     notes: 'Uses the official Mistral AI API (OpenAI compatible).',
-    base_url: 'https://api.mistral.ai/v1'
+    base_url: 'https://api.mistral.ai/v1/'
+  },
+  {
+    id: AiProviderType.NovitaAI,
+    name: 'Novita.ai',
+    api_key: null,
+    is_enabled: false,
+    models: {
+      text: ['meta-llama/Llama-3-8b-chat', 'google/gemma-7b-it', 'mistralai/Mixtral-8x7B-Instruct-v0.1'],
+      image: ['dall-e-3', 'sd_xl_base_1.0.safetensors'],
+      chat: ['meta-llama/Llama-3-8b-chat', 'google/gemma-7b-it', 'mistralai/Mixtral-8x7B-Instruct-v0.1']
+    },
+    notes: 'Provides OpenAI-compatible endpoints for text/chat. Image generation uses a different API and may not work out-of-the-box.',
+    base_url: 'https://api.novita.ai/v3/openai/'
   },
   {
     id: AiProviderType.Anthropic,

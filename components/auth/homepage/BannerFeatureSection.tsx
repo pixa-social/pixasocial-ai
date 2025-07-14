@@ -18,7 +18,7 @@ export const BannerFeatureSection: React.FC = () => {
           <div className="lg:col-span-2">
             <Card
               shadow="2xl"
-              className="group relative overflow-hidden rounded-2xl border border-border/40 bg-card/40 p-1.5 shadow-xl backdrop-blur-md transition-transform duration-300 hover:-translate-y-1"
+              className="group relative overflow-hidden rounded-2xl border border-border/40 bg-card/40 p-1.5 backdrop-blur-md transition-transform duration-300 hover:-translate-y-1"
             >
               <div className="aspect-[4/3] overflow-hidden rounded-xl">
                 <img

@@ -61,14 +61,30 @@ export const useAppData = (currentUser: UserProfile | null) => {
             fetchPersonas();
             fetchOperators();
             const { data: rawDraftData } = await supabase.from('content_drafts').select('*').eq('user_id', currentUser.id);
-            setContentDrafts(rawDraftData || []);
+
+            // Process raw data to create the client-side ContentDraft shape
+            const processedDrafts = (rawDraftData || []).map(draft => {
+                const processedDraft: any = { ...draft };
+                const dbContents = processedDraft.platform_contents as any;
+                if (dbContents && dbContents._media_overrides) {
+                    processedDraft.platform_media_overrides = dbContents._media_overrides;
+                    delete dbContents._media_overrides;
+                } else {
+                    processedDraft.platform_media_overrides = null;
+                }
+                processedDraft.platform_contents = dbContents;
+                return processedDraft as ContentDraft;
+            });
+            setContentDrafts(processedDrafts);
+
             fetchContentLibraryAssets();
             fetchConnectedAccounts();
             const channelsFromStorage = JSON.parse(localStorage.getItem(`pixasocial_channels_${currentUser.id}`) || '[]');
             setCustomChannels(channelsFromStorage);
+
             const { data: scheduleData } = await supabase.from('scheduled_posts').select('*').eq('user_id', currentUser.id);
             const scheduledPostsFromDb: ScheduledPost[] = (scheduleData || []).map((p: ScheduledPostDbRow) => {
-                const draft = (rawDraftData || []).find((d: ContentDraft) => d.id === p.content_draft_id);
+                const draft = processedDrafts.find((d: ContentDraft) => d.id === p.content_draft_id);
                 const platformInfo = CONTENT_PLATFORMS.find(plat => plat.key === p.platform_key);
                 let titleContent = "Untitled";
                 if (draft) {
@@ -140,16 +156,33 @@ export const useAppData = (currentUser: UserProfile | null) => {
     // --- Other Handlers ---
     const handleAddContentDraft = useCallback(async (draftData: Omit<ContentDraft, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
         if(!currentUser) return;
-        const dataToInsert: Database['public']['Tables']['content_drafts']['Insert'] = {
-            id: `draft_${Date.now()}`, user_id: currentUser.id, operator_id: draftData.operator_id,
-            persona_id: draftData.persona_id, key_message: draftData.key_message || null, custom_prompt: draftData.custom_prompt,
-            platform_contents: draftData.platform_contents as Json,
-            platform_media_overrides: draftData.platform_media_overrides as Json || null
+
+        const platformContentsForDb = {
+            ...draftData.platform_contents,
+            _media_overrides: draftData.platform_media_overrides || {},
         };
+
+        const dataToInsert: Database['public']['Tables']['content_drafts']['Insert'] = {
+            user_id: currentUser.id, 
+            operator_id: draftData.operator_id,
+            persona_id: draftData.persona_id, 
+            key_message: draftData.key_message || null, 
+            custom_prompt: draftData.custom_prompt,
+            platform_contents: platformContentsForDb as Json,
+        };
+        
         const { data, error } = await supabase.from('content_drafts').insert(dataToInsert).select().single();
-        if (error) { showToast(`Failed to save draft: ${error.message}`, 'error');
+        if (error) { 
+            showToast(`Failed to save draft: ${error.message}`, 'error');
         } else if (data) {
-            setContentDrafts(prev => [...prev, data as ContentDraft]);
+            const newDraft: any = { ...data };
+            if (newDraft.platform_contents && (newDraft.platform_contents as any)._media_overrides) {
+                newDraft.platform_media_overrides = (newDraft.platform_contents as any)._media_overrides;
+                delete (newDraft.platform_contents as any)._media_overrides;
+            } else {
+                newDraft.platform_media_overrides = null;
+            }
+            setContentDrafts(prev => [...prev, newDraft as ContentDraft]);
             showToast("Draft saved successfully!", "success");
         }
     }, [currentUser, showToast]);
@@ -165,16 +198,38 @@ export const useAppData = (currentUser: UserProfile | null) => {
     const handleDeletePlatformContent = useCallback(async (draftId: string, platformKey: string) => {
         const draft = contentDrafts.find(d => d.id === draftId);
         if (!draft) return;
+
         const newPlatformContents = { ...draft.platform_contents };
         delete newPlatformContents[platformKey];
-        if (Object.keys(newPlatformContents).filter(k => k !== '_media_overrides').length === 0) {
-            handleDeleteContentDraft(draftId); return;
+        
+        const contentKeys = Object.keys(newPlatformContents);
+        if (contentKeys.length === 0) {
+            handleDeleteContentDraft(draftId);
+            return;
         }
-        const { error } = await supabase.from('content_drafts').update({ platform_contents: newPlatformContents as Json }).eq('id', draftId);
-        if (error) { showToast(`Failed to update draft: ${error.message}`, 'error');
+
+        const platformContentsForDb = {
+            ...newPlatformContents,
+            _media_overrides: draft.platform_media_overrides || {},
+        };
+        if (platformContentsForDb._media_overrides) {
+            delete platformContentsForDb._media_overrides[platformKey];
+        }
+
+        const { error } = await supabase
+            .from('content_drafts')
+            .update({ platform_contents: platformContentsForDb as Json })
+            .eq('id', draftId);
+        
+        if (error) {
+            showToast(`Failed to update draft: ${error.message}`, 'error');
         } else {
-            setContentDrafts(prev => prev.map(d => d.id === draftId ? { ...d, platform_contents: newPlatformContents } : d ));
-            showToast(`Removed platform content.`, 'success');
+            setContentDrafts(prev => prev.map(d => 
+                d.id === draftId 
+                ? { ...d, platform_contents: newPlatformContents } 
+                : d 
+            ));
+            showToast(`Removed platform content from draft.`, 'success');
         }
     }, [contentDrafts, showToast, handleDeleteContentDraft]);
   

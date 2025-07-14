@@ -79,95 +79,96 @@ const ContentPlannerConfigComponent: React.FC<ContentPlannerConfigProps> = ({
   const showFontColorOptions = globalMediaType === 'image';
 
   return (
-    <Card title="Configuration" className="md:col-span-1">
-      <Select label="Target Persona" options={personaOptions} value={selectedPersonaId} onChange={e => onSelectedPersonaIdChange(e.target.value)} required />
-      <Select label="Campaign Operator" options={operatorOptions} value={selectedOperatorId} onChange={e => onSelectedOperatorIdChange(e.target.value)} required />
-      
-      <Textarea 
-        label="Key Message / Core Idea (Optional)" 
-        value={keyMessage} 
-        onChange={e => onKeyMessageChange(e.target.value)} 
-        placeholder="e.g., Our new product is revolutionary because..." 
-        rows={2} 
-        containerClassName="mt-4" 
-      />
-      
-      <Select label="Global Media Type (for non-Email/Poster unless overridden)" options={MEDIA_TYPE_OPTIONS} value={globalMediaType} onChange={e => onGlobalMediaTypeChange(e.target.value as MediaType)} containerClassName="mt-4" required />
-      
-      {showFontColorOptions && (
-        <>
-          <Select 
-            label="Default Font Style (for Image Meme Text)" 
-            options={CURATED_FONT_OPTIONS} 
-            value={defaultFontFamily} 
-            onChange={e => onDefaultFontFamilyChange(e.target.value)} 
-            containerClassName="mt-4"
-            title="Select default font for text on images"
-          />
-          <Select 
-            label="Default Font Color (for Image Meme Text)" 
-            options={MEME_TEXT_COLOR_OPTIONS} 
-            value={defaultFontColor} 
-            onChange={e => onDefaultFontColorChange(e.target.value)} 
-            containerClassName="mt-4"
-            title="Select default color for text on images"
-          />
-        </>
-      )}
-
-      <Select label="Desired Tone of Voice" options={TONE_OF_VOICE_OPTIONS} value={selectedTone} onChange={e => onSelectedToneChange(e.target.value)} containerClassName="mt-4" required />
-      <Textarea label="Custom Prompt / Additional Instructions (Optional)" value={customPrompt} onChange={e => onCustomPromptChange(e.target.value)} placeholder="e.g., Make it sound urgent..." rows={3} containerClassName="mt-4" />
-      
-      <div className="mt-4">
-        <label className="block text-sm font-medium text-textSecondary mb-2">Select Platforms for Generation & Media Overrides:</label>
-        <div className="space-y-3 max-h-60 overflow-y-auto pr-2"> {/* Increased max-h */}
-          {CONTENT_PLATFORMS.map(platform => (
-            <div key={platform.key} className="p-2 border border-lightBorder rounded-md bg-background">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                        <input
-                            id={`platform-checkbox-${platform.key}`}
-                            type="checkbox"
-                            checked={selectedPlatformsForGeneration[platform.key] || false}
-                            onChange={() => onSelectedPlatformChange(platform.key)}
-                            className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded mr-2"
-                            aria-labelledby={`platform-label-${platform.key}`}
-                        />
-                        <label id={`platform-label-${platform.key}`} htmlFor={`platform-checkbox-${platform.key}`} className="text-sm text-textPrimary flex items-center">
-                            {getPlatformIconDisplay(platform.icon)} {platform.label}
-                        </label>
-                    </div>
+    <div className="md:col-span-1 space-y-6">
+        <Card title="1. Configuration">
+            <Select label="Target Persona" options={personaOptions} value={selectedPersonaId} onChange={e => onSelectedPersonaIdChange(e.target.value)} required />
+            <Select label="Campaign Operator" options={operatorOptions} value={selectedOperatorId} onChange={e => onSelectedOperatorIdChange(e.target.value)} required />
+            <Textarea 
+                label="Key Message / Core Idea" 
+                value={keyMessage} 
+                onChange={e => onKeyMessageChange(e.target.value)} 
+                placeholder="e.g., Our new product is revolutionary..." 
+                rows={2} 
+                containerClassName="mt-4" 
+            />
+            <Select label="Global Media Type" options={MEDIA_TYPE_OPTIONS} value={globalMediaType} onChange={e => onGlobalMediaTypeChange(e.target.value as MediaType)} containerClassName="mt-4" required />
+            
+            {showFontColorOptions && (
+                <div className="grid grid-cols-2 gap-4 mt-4">
+                <Select 
+                    label="Default Font" 
+                    options={CURATED_FONT_OPTIONS} 
+                    value={defaultFontFamily} 
+                    onChange={e => onDefaultFontFamilyChange(e.target.value)} 
+                    containerClassName="mb-0"
+                    title="Select default font for text on images"
+                />
+                <Select 
+                    label="Default Color" 
+                    options={MEME_TEXT_COLOR_OPTIONS} 
+                    value={defaultFontColor} 
+                    onChange={e => onDefaultFontColorChange(e.target.value)} 
+                    containerClassName="mb-0"
+                    title="Select default color for text on images"
+                />
                 </div>
-                {selectedPlatformsForGeneration[platform.key] && !platform.isPoster && platform.key !== 'Email' && (
-                    <div className="mt-1.5 pl-6">
-                         <Select 
-                            label="" /* No label for compact view */
-                            options={platformMediaTypeOptions} 
-                            value={platformMediaOverrides[platform.key] || 'global'} 
-                            onChange={e => handlePlatformMediaTypeOverride(platform.key, e.target.value as MediaType | 'global')} 
-                            className="text-xs py-1"
-                            containerClassName="mb-0"
-                            title={`Media type override for ${platform.label}`}
-                         />
+            )}
+            <Select label="Desired Tone of Voice" options={TONE_OF_VOICE_OPTIONS} value={selectedTone} onChange={e => onSelectedToneChange(e.target.value)} containerClassName="mt-4" required />
+            <Textarea label="Additional Instructions (Optional)" value={customPrompt} onChange={e => onCustomPromptChange(e.target.value)} placeholder="e.g., Make it sound urgent..." rows={3} containerClassName="mt-4" />
+        </Card>
+
+        <Card title="2. Platforms & Media">
+            <label className="block text-sm font-medium text-textSecondary mb-2">Select platforms for generation & set media overrides:</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {CONTENT_PLATFORMS.map(platform => (
+                    <div key={platform.key} className="p-2 border border-lightBorder rounded-md bg-background transition-colors hover:border-mediumBorder">
+                        <div className="flex items-center">
+                            <input
+                                id={`platform-checkbox-${platform.key}`}
+                                type="checkbox"
+                                checked={selectedPlatformsForGeneration[platform.key] || false}
+                                onChange={() => onSelectedPlatformChange(platform.key)}
+                                className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded mr-2"
+                                aria-labelledby={`platform-label-${platform.key}`}
+                            />
+                            <label id={`platform-label-${platform.key}`} htmlFor={`platform-checkbox-${platform.key}`} className="text-sm text-textPrimary flex items-center cursor-pointer">
+                                {getPlatformIconDisplay(platform.icon)} {platform.label}
+                            </label>
+                        </div>
+                        {selectedPlatformsForGeneration[platform.key] && !platform.isPoster && platform.key !== 'Email' && (
+                            <div className="mt-1.5 pl-6">
+                                <Select 
+                                    label="" /* No label for compact view */
+                                    options={platformMediaTypeOptions} 
+                                    value={platformMediaOverrides[platform.key] || 'global'} 
+                                    onChange={e => handlePlatformMediaTypeOverride(platform.key, e.target.value as MediaType | 'global')} 
+                                    className="text-xs py-1"
+                                    containerClassName="mb-0"
+                                    title={`Media type override for ${platform.label}`}
+                                />
+                            </div>
+                        )}
                     </div>
-                )}
+                ))}
             </div>
-          ))}
+        </Card>
+      
+        <div>
+            {hasNoCredits && <p className="mt-2 text-sm text-yellow-400 text-center">You have used all your AI credits for this month.</p>}
+            <Button 
+                variant="primary" 
+                size="lg"
+                onClick={onGenerateAll} 
+                isLoading={isLoading} 
+                className="w-full mt-2" 
+                disabled={!selectedPersonaId || !selectedOperatorId || isLoading || !isAnyPlatformSelected || hasNoCredits}
+                title={hasNoCredits ? "You have no AI credits remaining." : 'Generate content for selected platforms'}
+                aria-label={isLoading ? 'Generating content, please wait' : 'Generate content for selected platforms'}
+            >
+                {isLoading ? 'Generating Suggestions...' : 'Generate All Platform Content'}
+            </Button>
         </div>
-      </div>
-      {hasNoCredits && <p className="mt-4 text-sm text-yellow-400 text-center">You have used all your AI credits for this month.</p>}
-      <Button 
-        variant="primary" 
-        onClick={onGenerateAll} 
-        isLoading={isLoading} 
-        className="w-full mt-2" 
-        disabled={!selectedPersonaId || !selectedOperatorId || isLoading || !isAnyPlatformSelected || hasNoCredits}
-        title={hasNoCredits ? "You have no AI credits remaining." : 'Generate content for selected platforms'}
-        aria-label={isLoading ? 'Generating content, please wait' : 'Generate content for selected platforms'}
-      >
-        {isLoading ? 'Generating Suggestions...' : 'Generate All Platform Content'}
-      </Button>
-    </Card>
+    </div>
   );
 };
 

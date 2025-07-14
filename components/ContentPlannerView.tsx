@@ -1,10 +1,10 @@
 
 import React from 'react';
-import { ContentDraft, PlatformContentDetail, ViewName, UserProfile, Persona, Operator, ScheduledPost } from '../types';
+import { ContentDraft, PlatformContentDetail, ViewName, UserProfile, Persona, Operator, ScheduledPost, MediaType } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { LoadingSpinner } from './ui/LoadingSpinner';
-import { CalendarDaysIcon, TrashIcon, ArrowDownOnSquareIcon } from './ui/Icons';
+import { ArrowDownOnSquareIcon } from './ui/Icons';
 import { ScheduleModal } from './content-planner/ScheduleModal';
 import ContentPlannerConfig from './content-planner/ContentPlannerConfig';
 import { PrerequisiteMessageCard } from './ui/PrerequisiteMessageCard'; 
@@ -14,6 +14,7 @@ import { PlatformContentCard } from './content-planner/PlatformContentCard';
 import { CONTENT_PLATFORMS } from '../constants';
 import { useContentPlanner } from '../hooks/useContentPlanner';
 import { useToast } from './ui/ToastProvider';
+import { SavedContentDrafts } from './content-planner/SavedContentDrafts';
 
 interface ContentPlannerViewProps {
   currentUser: UserProfile;
@@ -39,6 +40,38 @@ export const ContentPlannerView: React.FC<ContentPlannerViewProps> = (props) => 
   let prerequisiteAction;
   if (personas.length === 0) prerequisiteAction = onNavigate ? { label: 'Go to Audience Modeling', onClick: () => navigateTo(ViewName.AudienceModeling) } : undefined;
   else if (operators.length === 0) prerequisiteAction = onNavigate ? { label: 'Go to Operator Builder', onClick: () => navigateTo(ViewName.OperatorBuilder) } : undefined;
+
+  const handleLoadDraft = (draft: ContentDraft) => {
+    handlers.setSelectedPersonaId(draft.persona_id);
+    handlers.setSelectedOperatorId(draft.operator_id);
+    handlers.setKeyMessage(draft.key_message || '');
+    handlers.setCustomPrompt(draft.custom_prompt || '');
+    handlers.setPlatformContents(draft.platform_contents);
+    
+    // Set selected platforms based on the draft's content
+    const draftPlatforms = Object.keys(draft.platform_contents);
+    const newSelectedPlatforms = Object.fromEntries(
+      CONTENT_PLATFORMS.map(p => [p.key, draftPlatforms.includes(p.key)])
+    );
+    handlers.setSelectedPlatformsForGeneration(newSelectedPlatforms);
+
+    // Set media overrides if they exist
+    if (draft.platform_media_overrides) {
+        handlers.setPlatformMediaOverrides(draft.platform_media_overrides);
+        // Find the most common media type to set as global, or default to 'none'
+        const mediaTypes = Object.values(draft.platform_media_overrides).filter(
+            (m): m is MediaType => m !== 'global'
+        );
+        const mostCommon = mediaTypes.sort((a,b) =>
+              mediaTypes.filter(v => v===a).length
+            - mediaTypes.filter(v => v===b).length
+        ).pop();
+        handlers.setGlobalMediaType(mostCommon || 'none');
+    }
+
+    showToast("Draft loaded into the configuration panel.", "success");
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   if (personas.length === 0 && operators.length === 0) return <ContentPlannerSkeleton />;
 
@@ -128,46 +161,16 @@ export const ContentPlannerView: React.FC<ContentPlannerViewProps> = (props) => 
         </Card>
       )}
 
-      <Card title="Saved Content Drafts" className="mt-8">
-        {contentDrafts.length === 0 ? (<p className="text-textSecondary">No content drafts saved yet.</p>) : (
-          <div className="space-y-6">
-            {contentDrafts.slice().sort((a,b) => new Date(b.created_at!).getTime() - new Date(a.created_at!).getTime()).map(draft => { 
-              const persona = personas.find(p => p.id === draft.persona_id);
-              const operator = operators.find(o => o.id === draft.operator_id);
-              return (
-                <Card key={draft.id} className="bg-white/5 p-4" shadow="soft-md">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="font-semibold text-textPrimary text-lg">To: {persona?.name || 'N/A'} | Using: {operator?.name || 'N/A'}</h4>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                        <Button variant="outline" size="sm" onClick={() => {}} className="text-xs">Load Draft</Button>
-                        <Button variant="destructive" size="sm" onClick={() => onDeleteContentDraft(draft.id)} className="text-xs" title="Delete Entire Draft">Delete</Button>
-                    </div>
-                  </div>
-                  <div className="space-y-4 mt-3">
-                    {Object.entries(draft.platform_contents).map(([platformKey, platformData]: [string, PlatformContentDetail]) => {
-                      const platformInfo = CONTENT_PLATFORMS.find(p => p.key === platformKey);
-                      if (!platformData || (!platformData.content && !platformData.processedImageUrl)) return null;
-                      return (
-                        <div key={platformKey} className="p-3 border border-lightBorder rounded bg-card shadow-sm group">
-                          <div className="flex justify-between items-start mb-2">
-                            <h5 className="font-medium text-textPrimary flex items-center">{platformInfo?.label || platformKey}:</h5>
-                            <div className="flex items-center space-x-1">
-                                <Button size="sm" variant="primary" onClick={() => handlers.setSchedulingPostInfo({ draft, platformKey, platformDetail: platformData })} className="ml-2 text-xs" leftIcon={<CalendarDaysIcon className="w-3.5 h-3.5" />}>Schedule</Button>
-                                <Button variant="destructive" size="sm" onClick={() => onDeletePlatformContent(draft.id, platformKey)} className="p-1 opacity-50 group-hover:opacity-100"><TrashIcon className="w-4 h-4" /></Button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-      </Card>
+      <SavedContentDrafts
+        contentDrafts={contentDrafts}
+        personas={personas}
+        operators={operators}
+        onLoadDraft={handleLoadDraft}
+        onDeleteDraft={onDeleteContentDraft}
+        onDeletePlatformContent={onDeletePlatformContent}
+        onScheduleClick={(draft, platformKey, platformDetail) => handlers.setSchedulingPostInfo({ draft, platformKey, platformDetail })}
+      />
+      
       {state.schedulingPostInfo && ( <ScheduleModal draft={state.schedulingPostInfo.draft} platformKey={state.schedulingPostInfo.platformKey} platformDetail={state.schedulingPostInfo.platformDetail} onClose={() => handlers.setSchedulingPostInfo(null)} onSchedule={handlers.handleConfirmSchedule} showToast={showToast} /> )}
     </div>
   );

@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
@@ -14,6 +13,7 @@ import { supabase } from '../services/supabaseClient';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { Textarea } from './ui/Textarea';
 import { SeoSettingsTab } from './admin/SeoSettingsTab';
+import { AI_PROVIDERS_CONFIG_TEMPLATE } from '../constants';
 
 // --- AI Provider Config Tab ---
 const AiProviderConfigTab: React.FC = () => {
@@ -66,9 +66,22 @@ const AiProviderConfigTab: React.FC = () => {
 
     const toggleShowApiKey = (id: AiProviderType) => setShowApiKeys(prev => ({ ...prev, [id]: !prev[id] }));
 
+    const handleModelListChange = (providerId: AiProviderType, modelType: 'text' | 'image' | 'chat', value: string) => {
+        setProviderConfigs(prev => 
+            prev.map(p => {
+                if (p.id === providerId) {
+                    const newModels = { ...p.models };
+                    newModels[modelType] = value.split('\n').map(line => line.trim()).filter(line => line);
+                    return { ...p, models: newModels };
+                }
+                return p;
+            })
+        );
+    };
+
     const handleSaveConfigs = async () => {
         try {
-            // Save provider-specific configs (API keys, enabled status)
+            // Save provider-specific configs (API keys, enabled status, models)
             const upsertData: Database['public']['Tables']['ai_provider_global_configs']['Insert'][] = providerConfigs.map(({ id, name, api_key, is_enabled, models, notes, base_url }) => ({
                 id, name, 
                 api_key: api_key || null, 
@@ -93,7 +106,6 @@ const AiProviderConfigTab: React.FC = () => {
             const { error: globalSettingsError } = await supabase.from('app_global_settings').upsert(globalSettingsPayload, { onConflict: 'id' });
             if (globalSettingsError) throw globalSettingsError;
 
-            // Check if the saved active provider is enabled and show a warning if not.
             const activeConfig = providerConfigs.find(p => p.id === activeProvider);
             if (!activeConfig || !activeConfig.is_enabled) {
                 showToast(`Warning: The selected provider '${activeConfig?.name || activeProvider}' is currently disabled. The app will fall back to another enabled provider.`, 'error', 6000);
@@ -134,10 +146,10 @@ const AiProviderConfigTab: React.FC = () => {
         <div className="mt-4">
             <Card className="mb-6 bg-yellow-500/10 border-l-4 border-yellow-400 p-4">
                 <div className="flex items-start">
-                    <ExclamationTriangleIcon className="h-6 w-6 text-yellow-600 mr-3 shrink-0 mt-1" />
+                    <ExclamationTriangleIcon className="h-6 w-6 text-yellow-400 mr-3 shrink-0 mt-1" />
                     <div>
-                        <h3 className="text-lg font-semibold text-yellow-700">API Key Management</h3>
-                        <p className="text-yellow-600 text-sm">API keys entered here are stored in the Supabase database. Ensure your database has appropriate security rules (RLS policies) to protect this data. These keys will be used for all users.</p>
+                        <h3 className="text-lg font-semibold text-yellow-300">API Key & Model Management</h3>
+                        <p className="text-yellow-400 text-sm">API keys are stored in the database. Ensure RLS policies protect this data. Model lists are now managed here and saved to the database, overriding hardcoded defaults.</p>
                     </div>
                 </div>
             </Card>
@@ -150,7 +162,7 @@ const AiProviderConfigTab: React.FC = () => {
                     onChange={(e) => setActiveProvider(e.target.value as AiProviderType)}
                     containerClassName="max-w-md"
                 />
-                 <p className="text-xs text-textSecondary mt-1 italic">Sets the default provider if no global model or user-specific model is assigned.</p>
+                 <p className="text-xs text-muted-foreground mt-1 italic">Sets the default provider if no global model or user-specific model is assigned.</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                     <Select
                         label="Default Text Model (Overrides Active Provider)"
@@ -167,11 +179,13 @@ const AiProviderConfigTab: React.FC = () => {
                         containerClassName="mb-0"
                     />
                 </div>
-                 <p className="text-xs text-textSecondary mt-1 italic">This sets a specific default model for all users, overriding the general 'Active Provider' setting. User-specific assignments still take highest priority.</p>
+                 <p className="text-xs text-muted-foreground mt-1 italic">This sets a specific default model for all users, overriding the general 'Active Provider' setting. User-specific assignments still take highest priority.</p>
             </Card>
 
             <div className="space-y-6">
-                {providerConfigs.map(provider => (
+                {providerConfigs.map(provider => {
+                    const providerTemplate = AI_PROVIDERS_CONFIG_TEMPLATE.find(t => t.id === provider.id);
+                    return (
                     <Card key={provider.id} title={provider.name}>
                         <div className="space-y-4">
                             <div className="flex items-center space-x-3">
@@ -186,12 +200,47 @@ const AiProviderConfigTab: React.FC = () => {
                                             {showApiKeys[provider.id] ? <EyeSlashIcon className="w-5 h-5"/> : <EyeIcon className="w-5 h-5"/>}
                                         </button>
                                     </div>
-                                    {provider.notes && <p className="text-xs text-textSecondary italic mt-1">{provider.notes}</p>}
+                                    {provider.notes && <p className="text-xs text-muted-foreground italic mt-1">{provider.notes}</p>}
+                                    <div className="mt-4 pt-4 border-t border-border">
+                                        <h4 className="text-sm font-semibold text-muted-foreground mb-2">Editable Model Lists</h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            {providerTemplate?.models.text && (
+                                                <Textarea 
+                                                    label="Text Models (one per line)"
+                                                    value={(provider.models.text || []).join('\n')}
+                                                    onChange={(e) => handleModelListChange(provider.id, 'text', e.target.value)}
+                                                    rows={5}
+                                                    className="font-mono text-xs"
+                                                    containerClassName="mb-0"
+                                                />
+                                            )}
+                                            {providerTemplate?.models.image && (
+                                                <Textarea 
+                                                    label="Image Models (one per line)"
+                                                    value={(provider.models.image || []).join('\n')}
+                                                    onChange={(e) => handleModelListChange(provider.id, 'image', e.target.value)}
+                                                    rows={5}
+                                                    className="font-mono text-xs"
+                                                    containerClassName="mb-0"
+                                                />
+                                            )}
+                                            {providerTemplate?.models.chat && (
+                                                <Textarea 
+                                                    label="Chat Models (one per line)"
+                                                    value={(provider.models.chat || []).join('\n')}
+                                                    onChange={(e) => handleModelListChange(provider.id, 'chat', e.target.value)}
+                                                    rows={5}
+                                                    className="font-mono text-xs"
+                                                    containerClassName="mb-0"
+                                                />
+                                            )}
+                                        </div>
+                                    </div>
                                 </>
                             )}
                         </div>
                     </Card>
-                ))}
+                )})}
             </div>
             <div className="mt-8 flex justify-center"><Button variant="primary" size="lg" onClick={handleSaveConfigs}>Save All AI Configurations</Button></div>
         </div>
@@ -203,14 +252,14 @@ const UserManagementTab: React.FC = () => {
     const { showToast } = useToast();
     const [users, setUsers] = useState<AdminUserView[]>([]);
     const [roles, setRoles] = useState<RoleType[]>([]);
-    const [aiModels, setAiModels] = useState<AiProviderConfig[]>([]);
+    const [aiConfigs, setAiConfigs] = useState<AiProviderConfig[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     
     const fetchAllData = useCallback(async () => {
         setIsLoading(true);
         const { data: usersData, error: usersError } = await supabase.from('admin_users_view').select('*');
         const { data: rolesData, error: rolesError } = await supabase.from('role_types').select('*');
-        const { data: modelsData, error: modelsError } = await supabase.from('ai_provider_global_configs').select('*');
+        const configs = await getStoredAiProviderConfigs(true);
 
         if (usersError) showToast(`Error fetching users: ${usersError.message}`, 'error');
         else setUsers(usersData as AdminUserView[] || []);
@@ -218,9 +267,7 @@ const UserManagementTab: React.FC = () => {
         if (rolesError) showToast(`Error fetching roles: ${rolesError.message}`, 'error');
         else setRoles(rolesData || []);
 
-        if (modelsError) showToast(`Error fetching AI models: ${modelsError.message}`, 'error');
-        else setAiModels(modelsData || []);
-
+        setAiConfigs(configs);
         setIsLoading(false);
     }, [showToast]);
 
@@ -270,23 +317,23 @@ const UserManagementTab: React.FC = () => {
     
     const textModelOptions = useMemo(() => {
         const options: SelectOption[] = [{ value: '', label: 'Global Default' }];
-        aiModels.forEach(provider => {
+        aiConfigs.forEach(provider => {
             provider.models?.text?.forEach(model => {
                 options.push({ value: model, label: `${provider.name}: ${model}`});
             });
         });
         return options;
-    }, [aiModels]);
+    }, [aiConfigs]);
 
     const imageModelOptions = useMemo(() => {
         const options: SelectOption[] = [{ value: '', label: 'Global Default' }];
-        aiModels.forEach(provider => {
+        aiConfigs.forEach(provider => {
             provider.models?.image?.forEach(model => {
                 options.push({ value: model, label: `${provider.name}: ${model}`});
             });
         });
         return options;
-    }, [aiModels]);
+    }, [aiConfigs]);
 
 
     if (isLoading) return <LoadingSpinner text="Loading users and roles..." className="mt-8" />;
@@ -294,21 +341,21 @@ const UserManagementTab: React.FC = () => {
     return (
         <Card title="Manage Users & Permissions" className="mt-4 bg-card text-textPrimary">
             <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-lightBorder">
-                    <thead className="bg-gray-700/50">
+                <table className="min-w-full divide-y divide-border">
+                    <thead className="bg-card/60">
                         <tr>
-                            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-textSecondary uppercase tracking-wider">User</th>
-                            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-textSecondary uppercase tracking-wider">Role</th>
-                            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-textSecondary uppercase tracking-wider">Assigned Text Model</th>
-                            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-textSecondary uppercase tracking-wider">Assigned Image Model</th>
+                            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">User</th>
+                            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Role</th>
+                            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Assigned Text Model</th>
+                            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Assigned Image Model</th>
                         </tr>
                     </thead>
-                    <tbody className="bg-card divide-y divide-lightBorder">
+                    <tbody className="bg-card divide-y divide-border">
                         {users.map(user => (
                             <tr key={user.id}>
                                 <td className="px-4 py-4 whitespace-nowrap">
-                                    <div className="text-sm font-medium text-textPrimary">{user.name || 'N/A'}</div>
-                                    <div className="text-sm text-textSecondary">{user.email}</div>
+                                    <div className="text-sm font-medium text-foreground">{user.name || 'N/A'}</div>
+                                    <div className="text-sm text-muted-foreground">{user.email}</div>
                                 </td>
                                 <td className="px-4 py-4 whitespace-nowrap">
                                     <Select 
@@ -411,9 +458,9 @@ const PricingManagementTab: React.FC = () => {
                             <Input label="Max Personas" type="number" value={editedRole.max_personas} onChange={e => handleFieldChange(role.id, 'max_personas', parseInt(e.target.value) || 0)} containerClassName="mb-0" />
                             <Input label="Monthly AI Uses" type="number" value={editedRole.max_ai_uses_monthly} onChange={e => handleFieldChange(role.id, 'max_ai_uses_monthly', parseInt(e.target.value) || 0)} containerClassName="mb-0" />
                             <Input label="Monthly Price ($)" type="number" value={editedRole.price_monthly} onChange={e => handleFieldChange(role.id, 'price_monthly', parseFloat(e.target.value) || 0)} containerClassName="mb-0" />
-                            <Textarea label="Features (one per line)" value={(editedRole.features || []).join('\\n')} onChange={e => handleFieldChange(role.id, 'features', e.target.value.split('\\n'))} rows={4} containerClassName="mb-0" />
+                            <Textarea label="Features (one per line)" value={(editedRole.features || []).join('\n')} onChange={e => handleFieldChange(role.id, 'features', e.target.value.split('\n'))} rows={4} containerClassName="mb-0" />
                         </div>
-                        <div className="mt-4 pt-4 border-t border-lightBorder">
+                        <div className="mt-4 pt-4 border-t border-border">
                              <Button variant="primary" onClick={() => handleSaveRole(role.id)} className="w-full" disabled={!editingRoles[role.id]}>Save Changes</Button>
                         </div>
                     </Card>

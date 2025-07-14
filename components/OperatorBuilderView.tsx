@@ -1,6 +1,4 @@
 
-
-
 import React, { useState, useCallback, useMemo } from 'react';
 import { Operator, Persona, RSTProfile, ViewName, UserProfile } from '../types';
 import { Card } from './ui/Card';
@@ -32,7 +30,7 @@ interface OperatorBuilderViewProps {
 
 const operatorFormSchema = z.object({
   name: z.string().min(1, "Operator name is required"),
-  target_audience_id: z.number({invalid_type_error: "A target audience must be selected"}).min(1, "A target audience must be selected."),
+  target_audience_id: z.coerce.number().min(1, "A target audience must be selected."),
   type: z.enum(OPERATOR_TYPES),
   desired_conditioned_response: z.string().min(1, "Desired conditioned response is required"),
   conditioned_stimulus: z.string().min(1, "Conditioned stimulus is required"),

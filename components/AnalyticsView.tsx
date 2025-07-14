@@ -135,7 +135,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ currentUser, perso
         if (p2Error) errors.push(p2Error);
 
         if (errors.length > 0) {
-            setError(errors.join('\n'));
+            setError(errors.join('\\n'));
         } else {
             setOceanScores(result.data.persona1Scores);
             setOceanScores2(result.data.persona2Scores);
@@ -355,7 +355,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ currentUser, perso
           
           {analysisMode === 'single' && textAnalysis && (
             <div className="space-y-6 mt-4">
-                <Card title="AI-Powered Analysis & Strategy" className="bg-background">
+                <Card title="Persona Analysis & Strategy" className="bg-background">
                     <div className="relative group">
                         <h5 className="text-lg font-semibold text-textPrimary mb-1">Psychological Explanation</h5>
                         <p className="text-textSecondary leading-relaxed">{textAnalysis.explanation}</p>

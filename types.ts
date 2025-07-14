@@ -181,6 +181,7 @@ export enum AiProviderType {
   Qwen = 'Qwen',
   Openrouter = 'Openrouter',
   MistralAI = 'MistralAI',
+  NovitaAI = 'NovitaAI',
   Placeholder = 'Placeholder (Not Implemented)',
 }
 
@@ -542,19 +543,17 @@ export interface Database {
           key_message: string | null;
           custom_prompt: string;
           platform_contents: Json;
-          platform_media_overrides: Json | null;
           created_at: string;
           updated_at: string | null;
         };
         Insert: {
-          id: string;
+          id?: string;
           user_id: string;
           operator_id: number;
           persona_id: number;
           key_message?: string | null;
           custom_prompt: string;
           platform_contents: Json;
-          platform_media_overrides?: Json | null;
           created_at?: string;
           updated_at?: string | null;
         };
@@ -566,7 +565,6 @@ export interface Database {
           key_message?: string | null;
           custom_prompt?: string;
           platform_contents?: Json;
-          platform_media_overrides?: Json | null;
           created_at?: string;
           updated_at?: string | null;
         };

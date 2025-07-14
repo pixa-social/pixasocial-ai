@@ -1,11 +1,10 @@
 
-
 import { 
     AI_PROVIDERS_CONFIG_TEMPLATE, 
     GEMINI_TEXT_MODEL_NAME, 
     GEMINI_IMAGE_MODEL_NAME
 } from '../../constants';
-import { AIParsedJsonResponse, AiProviderType, AiProviderConfig, UserProfile } from "../../types";
+import { AIParsedJsonResponse, AiProviderType, AiProviderConfig, UserProfile, AiProviderModelSet } from "../../types";
 import { supabase } from '../supabaseClient';
 
 // --- Helper functions to manage AI provider configurations ---
@@ -20,35 +19,42 @@ export const getStoredAiProviderConfigs = async (forceRefetch = false): Promise<
     return globalAiConfigCache;
   }
 
-  const { data, error } = await supabase.from('ai_provider_global_configs').select('*');
+  const { data: dbConfigs, error } = await supabase.from('ai_provider_global_configs').select('*');
+  
   if (error) {
     console.error("Error fetching global AI configs, returning template:", error);
     // Return template but don't cache it
     return AI_PROVIDERS_CONFIG_TEMPLATE;
   }
   
-  const fetchedConfigs = data as AiProviderConfig[];
-  
-  // Merge with template to ensure all providers are present and model lists are up-to-date.
-  const configsWithDefaults = AI_PROVIDERS_CONFIG_TEMPLATE.map(templateConfig => {
-    const storedConfig = fetchedConfigs.find(sc => sc.id === templateConfig.id);
-    if (storedConfig) {
-      // The template is the source of truth for name, notes, base_url and available models.
-      // The stored config is the source of truth for user settings (API key, enabled status).
-      return {
-        ...storedConfig, // Start with all user settings from the database
-        name: templateConfig.name, // Overwrite with latest from template
-        notes: templateConfig.notes, // Overwrite with latest from template
-        base_url: templateConfig.base_url, // Overwrite with latest from template
-        models: templateConfig.models, // CRITICAL: Always use the model list from the code
-      };
+  const finalConfigs = AI_PROVIDERS_CONFIG_TEMPLATE.map(templateConfig => {
+    const dbConfig = (dbConfigs || []).find(dbc => dbc.id === templateConfig.id);
+    
+    // Start with the template as the base
+    const mergedConfig = { ...templateConfig };
+
+    // If there's a config in the DB, overwrite applicable fields
+    if (dbConfig) {
+      mergedConfig.api_key = dbConfig.api_key;
+      mergedConfig.is_enabled = dbConfig.is_enabled;
+      
+      // If the DB has a non-empty model list, use it. Otherwise, stick with the template's.
+      const dbModels = dbConfig.models as AiProviderModelSet;
+      if (dbModels && (dbModels.text?.length || dbModels.image?.length || dbModels.chat?.length)) {
+        mergedConfig.models = {
+          text: dbModels.text || [],
+          image: dbModels.image || [],
+          chat: dbModels.chat || [],
+        };
+      }
     }
-    return templateConfig; // No stored config, so use the template as-is.
+    
+    return mergedConfig;
   });
 
-  globalAiConfigCache = configsWithDefaults;
+  globalAiConfigCache = finalConfigs;
   lastCacheFetchTime = now;
-  return configsWithDefaults;
+  return finalConfigs;
 };
 
 let globalSettingsCache: { active_ai_provider: string; global_default_text_model: string | null; global_default_image_model: string | null; } | null = null;
@@ -136,9 +142,9 @@ export const getExecutionConfig = async (
   
     // 1. Check for user-specific assigned model
     if (modelType === 'text' || modelType === 'chat') {
-      targetModel = user.assigned_ai_model_text;
+      targetModel = user.assigned_ai_model_text || undefined;
     } else if (modelType === 'image') {
-      targetModel = user.assigned_ai_model_image;
+      targetModel = user.assigned_ai_model_image || undefined;
     }
   
     if (targetModel) {

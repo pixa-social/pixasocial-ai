@@ -139,7 +139,12 @@ export const useContentPlanner = ({
     try {
         const result = await generateJson<PlatformContentMap>(prompt, currentUser, systemInstruction);
         if (result.data) {
-            const processedData = Object.entries(result.data).reduce((acc, [key, value]) => {
+            const requestedPlatformKeys = platformsToGenerateFor.map(p => p.key);
+            const filteredResultData = Object.fromEntries(
+                Object.entries(result.data).filter(([key]) => requestedPlatformKeys.includes(key))
+            );
+
+            const processedData = Object.entries(filteredResultData).reduce((acc, [key, value]) => {
                 const effectiveMediaType = getEffectiveMediaType(key);
                 const valueWithDefaults: PlatformContentDetail = {
                     ...value,
@@ -350,7 +355,8 @@ export const useContentPlanner = ({
       setSelectedPlatformsForGeneration, setPlatformMediaOverrides, handleGenerateOrRegenerate,
       handleSaveDraft, setSchedulingPostInfo, handleConfirmSchedule,
       handleFieldChange, handleHashtagsChange, handleImageSourceTypeChange,
-      handleCustomImageUpload, handleProcessImage, handleDownloadImage, handlePushToLibrary
+      handleCustomImageUpload, handleProcessImage, handleDownloadImage, handlePushToLibrary,
+      setPlatformContents
     },
     refs: {
       imageUploadRefs
