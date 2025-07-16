@@ -48,6 +48,7 @@ export const useContentPlanner = ({
 
   const [platformContents, setPlatformContents] = useState<PlatformContentMap>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [isAmplifying, setIsAmplifying] = useState(false);
   const [isProcessingMedia, setIsProcessingMedia] = useState<Record<string, boolean>>({});
   const [isRegeneratingPlatform, setIsRegeneratingPlatform] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
@@ -62,12 +63,150 @@ export const useContentPlanner = ({
   
   const isAnyPlatformSelectedForGeneration = useMemo(() => Object.values(selectedPlatformsForGeneration).some(isSelected => isSelected), [selectedPlatformsForGeneration]);
 
+  const handleSelectAllPlatforms = useCallback(() => {
+    const allSelected = Object.fromEntries(
+      CONTENT_PLATFORMS.map(p => [p.key, true])
+    );
+    setSelectedPlatformsForGeneration(allSelected);
+  }, []);
+
+  const handleDeselectAllPlatforms = useCallback(() => {
+    const allDeselected = Object.fromEntries(
+      CONTENT_PLATFORMS.map(p => [p.key, false])
+    );
+    setSelectedPlatformsForGeneration(allDeselected);
+  }, []);
+
   const getEffectiveMediaType = useCallback((platformKey: string): MediaType => {
       const platformOverride = platformMediaOverrides[platformKey];
       const isPoster = CONTENT_PLATFORMS.find(p => p.key === platformKey)?.isPoster;
       if (isPoster) return 'image';
       return platformOverride && platformOverride !== 'global' ? platformOverride : globalMediaType;
   }, [platformMediaOverrides, globalMediaType]);
+
+  const handleFieldChange = useCallback((platformKey: string, field: keyof PlatformContentDetail, value: any) => {
+    setPlatformContents(prev => {
+        if (!prev[platformKey]) return prev;
+        return {
+            ...prev,
+            [platformKey]: {
+                ...prev[platformKey],
+                [field]: value
+            }
+        };
+    });
+  }, []);
+  
+  const handleHashtagsChange = useCallback((platformKey: string, newHashtagsString: string) => {
+    const hashtags = newHashtagsString.split(',').map(h => h.trim());
+    handleFieldChange(platformKey, 'hashtags', hashtags);
+  }, [handleFieldChange]);
+  
+  const handleImageSourceTypeChange = useCallback((platformKey: string, sourceType: ImageSourceType) => {
+    handleFieldChange(platformKey, 'imageSourceType', sourceType);
+  }, [handleFieldChange]);
+
+  const handleCustomImageUpload = useCallback((platformKey: string, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+        showToast(`Unsupported file type: ${file.type}. Please upload images (JPEG, PNG, GIF, WEBP).`, 'error');
+        return;
+      }
+      if (file.size > MAX_FILE_UPLOAD_SIZE_BYTES) {
+        showToast(`File is too large (${(file.size / (1024*1024)).toFixed(2)}MB). Maximum size is ${MAX_FILE_UPLOAD_SIZE_MB}MB.`, 'error');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        handleFieldChange(platformKey, 'uploadedImageBase64', reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  }, [showToast, handleFieldChange]);
+  
+  const handleProcessImage = useCallback(async (platformKey: string) => {
+    const content = platformContents[platformKey];
+    if (!content || !content.imageSourceType) return;
+    
+    setIsProcessingMedia(prev => ({ ...prev, [platformKey]: true }));
+    let finalBase64Image: string | null = null;
+    let errorMsg: string | undefined = undefined;
+
+    if (content.imageSourceType === 'generate' && content.imagePrompt) {
+      const result = await generateImages(content.imagePrompt, currentUser, 1);
+      if (result.images && result.images.length > 0) {
+        finalBase64Image = result.images[0];
+      } else {
+        errorMsg = result.error || "AI image generation failed.";
+      }
+    } else if (content.imageSourceType === 'upload' && content.uploadedImageBase64) {
+      finalBase64Image = content.uploadedImageBase64.split(',')[1];
+    }
+    
+    if (finalBase64Image) {
+      // Create a canvas to draw the image and text
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      
+      img.onload = () => {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx!.drawImage(img, 0, 0);
+
+        if (content.memeText && content.memeText.trim() !== '') {
+            const fontSize = Math.floor(img.width / 14);
+            ctx!.font = `bold ${fontSize}px ${(content.fontFamily || DEFAULT_FONT_FAMILY).split("'").join('')}`;
+            ctx!.fillStyle = content.fontColor || DEFAULT_FONT_COLOR;
+            ctx!.textAlign = 'center';
+            ctx!.textBaseline = 'middle';
+            ctx!.strokeStyle = 'black';
+            ctx!.lineWidth = fontSize / 12;
+
+            const text = content.memeText!.toUpperCase();
+            const x = canvas.width / 2;
+            const y = canvas.height * 0.85; // Lower part of the image
+            ctx!.strokeText(text, x, y);
+            ctx!.fillText(text, x, y);
+        }
+        handleFieldChange(platformKey, 'processedImageUrl', canvas.toDataURL('image/png'));
+        setIsProcessingMedia(prev => ({ ...prev, [platformKey]: false }));
+      };
+      img.onerror = () => {
+          showToast("Failed to load image for processing.", 'error');
+          setIsProcessingMedia(prev => ({ ...prev, [platformKey]: false }));
+      };
+      img.src = `data:image/jpeg;base64,${finalBase64Image}`;
+    } else {
+        showToast(errorMsg || "No image source available to process.", 'error');
+        if (errorMsg) handleFieldChange(platformKey, 'imagePrompt', `${content.imagePrompt} (Error: ${errorMsg})`);
+        setIsProcessingMedia(prev => ({ ...prev, [platformKey]: false }));
+    }
+  }, [platformContents, currentUser, handleFieldChange, showToast]);
+  
+  const handleGenerateVariant = useCallback(async (platformKey: string) => {
+    const originalContent = platformContents[platformKey];
+    if (!originalContent || !selectedPersonaId || !selectedOperatorId) {
+        showToast("Cannot generate variant without original content and strategy.", "error"); return;
+    }
+    const persona = personas.find(p => p.id === selectedPersonaId);
+    const operator = operators.find(o => o.id === selectedOperatorId);
+    if (!persona || !operator) return;
+
+    handleFieldChange(platformKey, 'is_variant_generating', true);
+
+    const prompt = `You are an A/B testing expert. Given the following social media post for ${platformKey} targeting persona ${persona.name} with operator ${operator.name}, generate an alternative version (Variant B). The original post is: "${originalContent.content}". Make the variant distinct in its approach (e.g., different hook, tone, or call to action) but with the same core goal. Return a JSON object with a single key "variant_content".`;
+    const result = await generateJson<{ variant_content: string }>(prompt, currentUser);
+    
+    if (result.data?.variant_content) {
+        handleFieldChange(platformKey, 'variant_content', result.data.variant_content);
+    } else {
+        showToast(result.error || "Failed to generate variant.", "error");
+    }
+    handleFieldChange(platformKey, 'is_variant_generating', false);
+  }, [platformContents, selectedPersonaId, selectedOperatorId, personas, operators, currentUser, showToast, handleFieldChange]);
 
   const handleGenerateOrRegenerate = useCallback(async (forSpecificPlatformKey?: string) => {
     if (!selectedPersonaId || !selectedOperatorId) {
@@ -176,108 +315,26 @@ export const useContentPlanner = ({
     }
   }, [selectedPersonaId, selectedOperatorId, personas, operators, selectedPlatformsForGeneration, getEffectiveMediaType, keyMessage, selectedTone, customPrompt, defaultFontFamily, currentUser, showToast]);
   
-  const handleFieldChange = useCallback((platformKey: string, field: keyof PlatformContentDetail, value: any) => {
-    setPlatformContents(prev => {
-        if (!prev[platformKey]) return prev;
-        return {
-            ...prev,
-            [platformKey]: {
-                ...prev[platformKey],
-                [field]: value
-            }
-        };
-    });
-  }, []);
-  
-  const handleHashtagsChange = useCallback((platformKey: string, newHashtagsString: string) => {
-    const hashtags = newHashtagsString.split(',').map(h => h.trim());
-    handleFieldChange(platformKey, 'hashtags', hashtags);
-  }, [handleFieldChange]);
-  
-  const handleImageSourceTypeChange = useCallback((platformKey: string, sourceType: ImageSourceType) => {
-    handleFieldChange(platformKey, 'imageSourceType', sourceType);
-  }, [handleFieldChange]);
-
-  const handleCustomImageUpload = useCallback((platformKey: string, event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
-        showToast(`Unsupported file type: ${file.type}. Please upload images (JPEG, PNG, GIF, WEBP).`, 'error');
-        return;
-      }
-      if (file.size > MAX_FILE_UPLOAD_SIZE_BYTES) {
-        showToast(`File is too large (${(file.size / (1024*1024)).toFixed(2)}MB). Maximum size is ${MAX_FILE_UPLOAD_SIZE_MB}MB.`, 'error');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        handleFieldChange(platformKey, 'uploadedImageBase64', reader.result as string);
-      };
-      reader.readAsDataURL(file);
+  const handleAmplifyKeyMessage = useCallback(async () => {
+    if (!selectedPersonaId || !selectedOperatorId || !keyMessage) {
+        showToast("Select Persona, Operator, and enter a message to amplify.", "error"); return;
     }
-  }, [showToast, handleFieldChange]);
-  
-  const handleProcessImage = useCallback(async (platformKey: string) => {
-    const content = platformContents[platformKey];
-    if (!content || !content.imageSourceType) return;
-    
-    setIsProcessingMedia(prev => ({ ...prev, [platformKey]: true }));
-    let finalBase64Image: string | null = null;
-    let errorMsg: string | undefined = undefined;
+    const persona = personas.find(p => p.id === selectedPersonaId);
+    const operator = operators.find(o => o.id === selectedOperatorId);
+    if (!persona || !operator) return;
 
-    if (content.imageSourceType === 'generate' && content.imagePrompt) {
-      const result = await generateImages(content.imagePrompt, currentUser, 1);
-      if (result.images && result.images.length > 0) {
-        finalBase64Image = result.images[0];
-      } else {
-        errorMsg = result.error || "AI image generation failed.";
-      }
-    } else if (content.imageSourceType === 'upload' && content.uploadedImageBase64) {
-      finalBase64Image = content.uploadedImageBase64.split(',')[1];
-    }
-    
-    if (finalBase64Image) {
-      // Create a canvas to draw the image and text
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      
-      img.onload = () => {
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx!.drawImage(img, 0, 0);
-
-        if (content.memeText && content.memeText.trim() !== '') {
-            const fontSize = Math.floor(img.width / 14);
-            ctx!.font = `bold ${fontSize}px ${(content.fontFamily || DEFAULT_FONT_FAMILY).split("'").join('')}`;
-            ctx!.fillStyle = content.fontColor || DEFAULT_FONT_COLOR;
-            ctx!.textAlign = 'center';
-            ctx!.textBaseline = 'middle';
-            ctx!.strokeStyle = 'black';
-            ctx!.lineWidth = fontSize / 12;
-
-            const text = content.memeText!.toUpperCase();
-            const x = canvas.width / 2;
-            const y = canvas.height * 0.85; // Lower part of the image
-            ctx!.strokeText(text, x, y);
-            ctx!.fillText(text, x, y);
-        }
-        handleFieldChange(platformKey, 'processedImageUrl', canvas.toDataURL('image/png'));
-        setIsProcessingMedia(prev => ({ ...prev, [platformKey]: false }));
-      };
-      img.onerror = () => {
-          showToast("Failed to load image for processing.", 'error');
-          setIsProcessingMedia(prev => ({ ...prev, [platformKey]: false }));
-      };
-      img.src = `data:image/jpeg;base64,${finalBase64Image}`;
+    setIsAmplifying(true);
+    const prompt = `Based on this persona: ${JSON.stringify(persona)} and this operator: ${JSON.stringify(operator)}, rewrite the following key message to be more impactful and resonant: "${keyMessage}". Return only the rewritten message as a JSON object with a single key "amplified_message".`;
+    const result = await generateJson<{ amplified_message: string }>(prompt, currentUser);
+    if (result.data?.amplified_message) {
+        setKeyMessage(result.data.amplified_message);
+        showToast("Message amplified!", "success");
     } else {
-        showToast(errorMsg || "No image source available to process.", 'error');
-        if (errorMsg) handleFieldChange(platformKey, 'imagePrompt', `${content.imagePrompt} (Error: ${errorMsg})`);
-        setIsProcessingMedia(prev => ({ ...prev, [platformKey]: false }));
+        showToast(result.error || "Failed to amplify message.", "error");
     }
-  }, [platformContents, currentUser, handleFieldChange, showToast]);
-  
+    setIsAmplifying(false);
+  }, [keyMessage, selectedPersonaId, selectedOperatorId, personas, operators, currentUser, showToast]);
+
   const handleDownloadImage = useCallback((platformKey: string) => {
     const url = platformContents[platformKey]?.processedImageUrl;
     const name = platformContents[platformKey]?.imagePrompt?.substring(0, 20) || 'processed-image';
@@ -346,17 +403,19 @@ export const useContentPlanner = ({
     state: {
       selectedPersonaId, selectedOperatorId, keyMessage, customPrompt, globalMediaType,
       selectedTone, defaultFontFamily, defaultFontColor, selectedPlatformsForGeneration,
-      platformMediaOverrides, platformContents, isLoading, isProcessingMedia,
+      platformMediaOverrides, platformContents, isLoading, isAmplifying, isProcessingMedia,
       isRegeneratingPlatform, error, schedulingPostInfo, isAnyPlatformSelectedForGeneration
     },
     handlers: {
       setSelectedPersonaId, setSelectedOperatorId, setKeyMessage, setCustomPrompt,
       setGlobalMediaType, setSelectedTone, setDefaultFontFamily, setDefaultFontColor,
       setSelectedPlatformsForGeneration, setPlatformMediaOverrides, handleGenerateOrRegenerate,
+      handleAmplifyKeyMessage, handleGenerateVariant,
       handleSaveDraft, setSchedulingPostInfo, handleConfirmSchedule,
       handleFieldChange, handleHashtagsChange, handleImageSourceTypeChange,
       handleCustomImageUpload, handleProcessImage, handleDownloadImage, handlePushToLibrary,
-      setPlatformContents
+      setPlatformContents,
+      handleSelectAllPlatforms, handleDeselectAllPlatforms
     },
     refs: {
       imageUploadRefs

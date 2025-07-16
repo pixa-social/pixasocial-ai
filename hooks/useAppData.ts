@@ -10,6 +10,22 @@ import {
 } from '../types';
 import { CONTENT_PLATFORMS } from '../constants';
 
+const dataURLtoBlob = (dataurl: string) => {
+    const arr = dataurl.split(',');
+    if (arr.length < 2) return null;
+    const mimeMatch = arr[0].match(/:(.*?);/);
+    if (!mimeMatch) return null;
+    const mime = mimeMatch[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while(n--){
+        u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], {type:mime});
+}
+
+
 export const useAppData = (currentUser: UserProfile | null) => {
     const { showToast } = useToast();
   
@@ -108,23 +124,72 @@ export const useAppData = (currentUser: UserProfile | null) => {
     }, [currentUser, fetchContentLibraryAssets, fetchConnectedAccounts, fetchPersonas, fetchOperators]);
 
     // --- Persona Handlers ---
-    const handleAddPersona = useCallback(async (personaData: Omit<Persona, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
-        if(!currentUser) return;
+    const handleAddPersona = useCallback(async (personaData: Partial<Omit<Persona, 'id' | 'user_id' | 'created_at' | 'updated_at'>> & { avatar_base64?: string }) => {
+        if(!currentUser || !personaData.name) return;
+
+        let avatarUrl = personaData.avatar_url;
+        if (personaData.avatar_base64) {
+            const blob = dataURLtoBlob(personaData.avatar_base64);
+            if (blob) {
+                const fileName = `avatar_${currentUser.id}_${Date.now()}.png`;
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('avatars')
+                    .upload(fileName, blob, { contentType: 'image/png', upsert: true });
+
+                if (uploadError) {
+                    showToast(`Avatar upload failed: ${uploadError.message}`, 'error');
+                } else {
+                    const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(uploadData.path);
+                    avatarUrl = urlData.publicUrl;
+                }
+            }
+        } else if (!avatarUrl) {
+            avatarUrl = `https://picsum.photos/seed/${personaData.name.trim().toLowerCase().replace(/[^a-z0-9]/gi, '')}/100/100`;
+        }
+
         const newPersonaData: Database['public']['Tables']['personas']['Insert'] = {
-            ...personaData,
+            name: personaData.name,
+            demographics: personaData.demographics || null,
+            psychographics: personaData.psychographics || null,
+            initial_beliefs: personaData.initial_beliefs || null,
+            vulnerabilities: personaData.vulnerabilities || null,
+            goals: personaData.goals || null,
+            fears: personaData.fears || null,
+            rst_profile: personaData.rst_profile || null,
             user_id: currentUser.id,
-            avatar_url: `https://picsum.photos/seed/${personaData.name.trim().toLowerCase().replace(/[^a-z0-9]/gi, '')}/100/100`
+            avatar_url: avatarUrl,
         };
         const { data, error } = await supabase.from('personas').insert(newPersonaData).select().single();
         if (error) { showToast(`Failed to create persona: ${error.message}`, 'error'); } 
         else { setPersonas(prev => [data, ...prev]); showToast("Persona created.", "success"); }
     }, [currentUser, showToast]);
 
-    const handleUpdatePersona = useCallback(async (personaId: number, personaData: Partial<Omit<Persona, 'id' | 'user_id' | 'created_at'>>) => {
-        const { data, error } = await supabase.from('personas').update({ ...personaData, updated_at: new Date().toISOString() }).eq('id', personaId).select().single();
+    const handleUpdatePersona = useCallback(async (personaId: number, personaData: Partial<Omit<Persona, 'id' | 'user_id' | 'created_at'>> & { avatar_base64?: string }) => {
+        let updatePayload = { ...personaData };
+        delete updatePayload.avatar_base64; // Remove base64 before it goes to db
+
+        if (personaData.avatar_base64 && currentUser) {
+            const blob = dataURLtoBlob(personaData.avatar_base64);
+            if (blob) {
+                const fileName = `avatar_${currentUser.id}_${personaId}_${Date.now()}.png`;
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('avatars')
+                    .upload(fileName, blob, { contentType: 'image/png', upsert: true });
+
+                if (uploadError) {
+                    showToast(`Avatar upload failed: ${uploadError.message}`, 'error');
+                } else {
+                    const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(uploadData.path);
+                    updatePayload.avatar_url = urlData.publicUrl;
+                }
+            }
+        }
+
+        const { data, error } = await supabase.from('personas').update({ ...updatePayload, updated_at: new Date().toISOString() }).eq('id', personaId).select().single();
         if (error) { showToast(`Failed to update persona: ${error.message}`, 'error'); } 
         else { setPersonas(prev => prev.map(p => p.id === data.id ? data : p)); showToast("Persona updated.", "success"); }
-    }, [showToast]);
+    }, [currentUser, showToast]);
+
 
     const handleDeletePersona = useCallback(async (personaId: number) => {
         const { error } = await supabase.from('personas').delete().eq('id', personaId);

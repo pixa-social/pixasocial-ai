@@ -18,6 +18,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ConnectionFlowModal } from './settings/ConnectionFlowModal';
 import { supabase } from '../services/supabaseClient';
+import { LoadingSpinner } from './ui/LoadingSpinner';
 
 interface SettingsViewProps {
   currentUser: UserProfile;
@@ -44,6 +45,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 }) => {
   const { showToast } = useToast();
   const [platformToConnect, setPlatformToConnect] = useState<SocialPlatformConnectionDetails | null>(null);
+  const [isHandlingCallback, setIsHandlingCallback] = useState(false);
   
   // State for Telegram Connection Form
   const [telegramBotToken, setTelegramBotToken] = useState('');
@@ -71,19 +73,46 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   // Effect to handle OAuth callbacks
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const success = params.get('connect_success');
-    const error = params.get('connect_error');
+    const code = params.get('code');
+    const state = params.get('state');
+    const error = params.get('error');
+    const connectSuccess = params.get('connect_success');
 
-    if (success) {
-      showToast(`Successfully connected to ${success}! Refreshing accounts...`, 'success');
-      onAccountConnectOrDelete(); // This prop is passed down to refetch accounts
-    }
-    if (error) {
+    const handleRedditCallback = async (authCode: string, authState: string) => {
+        setIsHandlingCallback(true);
+        showToast('Finalizing Reddit connection...', 'info');
+        try {
+            const { error: funcError } = await supabase.functions.invoke('connect-reddit-callback', {
+                body: { code: authCode, state: authState }
+            });
+
+            if (funcError) {
+                let detailedError = funcError.message;
+                if ('context' in funcError && funcError.context && typeof funcError.context.responseText === 'string') {
+                    try { const parsed = JSON.parse(funcError.context.responseText); if (parsed.error) detailedError = parsed.error; } catch(e) { /* ignore */ }
+                }
+                throw new Error(detailedError);
+            }
+            showToast('Successfully connected to Reddit! Refreshing accounts...', 'success');
+            onAccountConnectOrDelete();
+        } catch (e) {
+            showToast(`Connection failed: ${(e as Error).message}`, 'error');
+        } finally {
+            const newUrl = window.location.pathname;
+            window.history.replaceState({}, document.title, newUrl);
+            setIsHandlingCallback(false);
+        }
+    };
+
+    if (code && state) {
+      handleRedditCallback(code, state);
+    } else if (error) {
       showToast(`Connection failed: ${error}`, 'error');
-    }
-
-    if (success || error) {
-      // Clean up URL to avoid re-triggering on refresh
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    } else if (connectSuccess) {
+      showToast(`Successfully connected to ${connectSuccess}! Refreshing...`, 'success');
+      onAccountConnectOrDelete();
       const newUrl = window.location.pathname;
       window.history.replaceState({}, document.title, newUrl);
     }
@@ -125,23 +154,35 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   }, [connectedAccounts]);
 
   const handleConnectPlatform = useCallback(async (platform: SocialPlatformType, connectionType: string) => {
-      if (platform === SocialPlatformType.Reddit) {
-        try {
-            const { data, error } = await supabase.functions.invoke('connect-reddit');
-            if (error) throw error;
-            if (data.redirectUrl) {
-                window.location.href = data.redirectUrl;
-            } else {
-                throw new Error("No redirect URL returned from function.");
-            }
-        } catch(error) {
-            showToast(`Could not start Reddit connection: ${(error as Error).message}`, 'error');
-        }
-      } else {
-          // Fallback to simulated connect for other platforms for now
-          const displayName = `${currentUser.name}'s ${connectionType} ${platform}`;
-          const accountId = `${platform.toLowerCase()}-${currentUser.id.substring(0,8)}`;
-          onAddConnectedAccount(platform, accountId, displayName);
+      let functionName: string | null = null;
+      switch (platform) {
+          case SocialPlatformType.Reddit:
+              functionName = 'connect-reddit';
+              break;
+          case SocialPlatformType.GoogleBusiness:
+              functionName = 'connect-google-business';
+              break;
+          default:
+              // Fallback for simulated connections
+              const displayName = `${currentUser.name}'s ${connectionType} ${platform}`;
+              const accountId = `${platform.toLowerCase()}-${currentUser.id.substring(0,8)}`;
+              onAddConnectedAccount(platform, accountId, displayName);
+              setPlatformToConnect(null);
+              return;
+      }
+
+      if (functionName) {
+          try {
+              const { data, error } = await supabase.functions.invoke(functionName);
+              if (error) throw error;
+              if (data.redirectUrl) {
+                  window.location.href = data.redirectUrl;
+              } else {
+                  throw new Error("No redirect URL returned from function.");
+              }
+          } catch(error) {
+              showToast(`Could not start ${platform} connection: ${(error as Error).message}`, 'error');
+          }
       }
       setPlatformToConnect(null);
   }, [currentUser, onAddConnectedAccount, showToast]);
@@ -176,10 +217,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     if (error) {
         let errorMessage = error.message;
         if ((error as any).context && typeof (error as any).context.json === 'function') {
-            try {
-                const functionError = await (error as any).context.json();
-                if (functionError.error) errorMessage = functionError.error;
-            } catch (e) {}
+            try { const functionError = await (error as any).context.json(); if (functionError.error) errorMessage = functionError.error; } catch (e) {}
         }
         showToast(`Telegram connection failed: ${errorMessage}`, 'error');
     } else {
@@ -198,10 +236,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       if (error) {
           let errorMessage = error.message;
           if ((error as any).context && typeof (error as any).context.json === 'function') {
-            try {
-                const functionError = await (error as any).context.json();
-                if (functionError.error) errorMessage = functionError.error;
-            } catch (e) { /* Ignore parsing errors */ }
+            try { const functionError = await (error as any).context.json(); if (functionError.error) errorMessage = functionError.error; } catch (e) { /* Ignore */ }
           }
           showToast(`Test failed: ${errorMessage}`, 'error');
       } else if (data.error) {
@@ -211,6 +246,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       }
       setIsTestingConnection(false);
   };
+
+  if (isHandlingCallback) {
+    return (
+        <div className="flex items-center justify-center h-64">
+            <LoadingSpinner text="Finalizing connection, please wait..." />
+        </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-8">

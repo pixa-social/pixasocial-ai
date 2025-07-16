@@ -12,7 +12,8 @@ import {
     PaperAirplaneIcon,
     TelegramIcon, BlueskyIcon, GoogleBusinessIcon, 
     ThreadsIcon, DiscordIcon, RedditIcon, SnapchatIcon,
-    ChartPieIcon
+    ChartPieIcon,
+    EnvelopeIcon
 } from './components/ui/Icons';
 
 export const APP_TITLE = "PixaSocial Ai";
@@ -56,6 +57,49 @@ export const OPERATOR_TYPES = [
     'Convenience', 
     'Custom'
 ] as const;
+
+export const OPERATOR_TEMPLATES: Array<{
+  title: string;
+  description: string;
+  data: Partial<Omit<Operator, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'target_audience_id'>>
+}> = [
+  {
+    title: "FOMO (Fear of Missing Out)",
+    description: "Create urgency by highlighting scarcity or limited-time opportunities.",
+    data: {
+      name: "FOMO Campaign - ",
+      type: "Fear",
+      desired_conditioned_response: "User feels urgent need to act now to avoid missing out on a valuable opportunity.",
+      conditioned_stimulus: "Countdown timers, 'Limited Stock' labels, exclusive early-access announcements.",
+      unconditioned_stimulus: "The inherent human aversion to loss and desire to be part of an 'in-group'.",
+      reinforcement_loop: "User sees others participating, reinforcing their fear of being left behind. Subsequent 'sold out' or 'access closed' messages validate their decision to act quickly.",
+    }
+  },
+  {
+    title: "Social Proof (Belonging)",
+    description: "Leverage testimonials and user counts to build trust and community.",
+    data: {
+      name: "Social Proof Campaign - ",
+      type: "Belonging",
+      desired_conditioned_response: "User feels trust and a desire to join a popular, validated community or movement.",
+      conditioned_stimulus: "Displaying user testimonials, 5-star ratings, 'Join 10,000 others' messaging, user-generated content.",
+      unconditioned_stimulus: "The natural human tendency to follow the actions of the majority (herd behavior).",
+      reinforcement_loop: "New user joins, their action is added to the total count, which is then shown to the next prospective user, strengthening the signal.",
+    }
+  },
+  {
+    title: "Authority Signal",
+    description: "Build credibility by associating your message with experts or data.",
+    data: {
+      name: "Authority Campaign - ",
+      type: "Authority",
+      desired_conditioned_response: "User perceives the message/product as credible, trustworthy, and expert-approved.",
+      conditioned_stimulus: "Featuring an expert endorsement (e.g., 'Dr. Smith recommends...'), citing data from a reputable study, using official-looking branding and logos.",
+      unconditioned_stimulus: "The cognitive shortcut where people defer to credible experts and authoritative figures.",
+      reinforcement_loop: "Media outlets and other influencers cite the 'expert-approved' message, amplifying the signal of authority to a wider audience.",
+    }
+  }
+];
 
 export const AUDIT_TOOL_STEPS_DATA: Array<Pick<AuditStep, 'id' | 'title' | 'description'>> = [
     { id: 'D0', title: 'D0: Plan', description: 'Define the campaign objectives and scope.' },
@@ -104,11 +148,14 @@ export const CONTENT_PLATFORMS: Array<{
     targetWidth?: number;
     targetHeight?: number;
 }> = [
-  { key: 'X', label: 'X (Twitter)', characterLimit: 280, styleGuideline: "Generate a concise and impactful post, ideally under 280 characters. Include 2-3 highly relevant hashtags. Emojis are encouraged if appropriate for the tone.", icon: "🐦" },
-  { key: 'Facebook', label: 'Facebook', styleGuideline: "Craft an engaging post that can be longer and more detailed. Aim to spark discussion or provide valuable information. Include 3-5 relevant hashtags. Emojis can enhance engagement.", icon: "👍" },
-  { key: 'Instagram', label: 'Instagram Caption', styleGuideline: "Create a visually descriptive or compellingly narrative caption. Start with a strong hook to capture attention. Include 5-10 relevant hashtags, mixing popular with niche. Emojis are highly recommended to match the visual nature of the platform.", icon: "📸" },
+  { key: 'X', label: 'X (Twitter)', characterLimit: 280, styleGuideline: "Generate a concise and impactful post, ideally under 280 characters. Include 2-3 highly relevant hashtags. Emojis are encouraged if appropriate for the tone.", icon: React.createElement(XIcon, { className: "w-4 h-4 inline-block" }) },
+  { key: 'Facebook', label: 'Facebook', styleGuideline: "Craft an engaging post that can be longer and more detailed. Aim to spark discussion or provide valuable information. Include 3-5 relevant hashtags. Emojis can enhance engagement.", icon: React.createElement(FacebookIcon, { className: "w-4 h-4 inline-block" }) },
+  { key: 'Instagram', label: 'Instagram Caption', styleGuideline: "Create a visually descriptive or compellingly narrative caption. Start with a strong hook to capture attention. Include 5-10 relevant hashtags, mixing popular with niche. Emojis are highly recommended to match the visual nature of the platform.", icon: React.createElement(InstagramIcon, { className: "w-4 h-4 inline-block" }) },
   { key: 'LinkedIn', label: 'LinkedIn', styleGuideline: "Develop a professional and insightful post suitable for a business audience. Focus on industry trends, thought leadership, or career development. Include 2-4 relevant professional hashtags. Avoid overly casual emojis.", icon: React.createElement(LinkedInIcon, { className: "w-4 h-4 inline-block" }) },
-  { key: 'Email', label: 'Email', styleGuideline: "Craft a professional and engaging email. Provide a clear 'subject' line and compelling 'content' for the email body. Ensure the tone is appropriate for email communication. Do not include hashtags unless specifically requested in custom prompt.", icon: "✉️" },
+  { key: 'Telegram', label: 'Telegram', styleGuideline: "Craft a message suitable for a Telegram channel or group. Can be longer and more detailed. Supports markdown formatting. No hashtags needed.", icon: React.createElement(TelegramIcon, { className: "w-4 h-4 inline-block" }) },
+  { key: 'GoogleBusiness', label: 'Google Business Profile', styleGuideline: "Create a concise and informative update for a Google Business Profile. Focus on events, offers, or news. No hashtags needed.", icon: React.createElement(GoogleBusinessIcon, { className: "w-4 h-4 inline-block" }) },
+  { key: 'Reddit', label: 'Reddit', styleGuideline: "Generate a post title and body suitable for a specific subreddit. The tone should match the community's style. No hashtags needed. You must provide a subject line which will be used as the post title.", icon: React.createElement(RedditIcon, { className: "w-4 h-4 inline-block" }) },
+  { key: 'Email', label: 'Email', styleGuideline: "Craft a professional and engaging email. Provide a clear 'subject' line and compelling 'content' for the email body. Ensure the tone is appropriate for email communication. Do not include hashtags unless specifically requested in custom prompt.", icon: React.createElement(EnvelopeIcon, { className: "w-4 h-4 inline-block" }) },
   { 
     key: 'Poster11', 
     label: 'Poster (1:1 Square)', 

@@ -10,31 +10,30 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // This is needed for the Supabase client library to work correctly
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const redditClientId = Deno.env.get('REDDIT_CLIENT_ID');
-    const appUrl = Deno.env.get('APP_URL');
-    if (!redditClientId) throw new Error('REDDIT_CLIENT_ID is not set in environment variables.');
-    if (!appUrl) throw new Error('APP_URL is not set in environment variables.');
+    const googleClientId = Deno.env.get('GOOGLE_CLIENT_ID');
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    if (!googleClientId) throw new Error('GOOGLE_CLIENT_ID is not set in environment variables.');
+    if (!supabaseUrl) throw new Error('SUPABASE_URL is not set in environment variables.');
+    
+    const projectRef = new URL(supabaseUrl).hostname.split('.')[0];
+    const redirectUri = `https://${projectRef}.supabase.co/functions/v1/connect-google-business-callback`;
 
-    // Initialize Supabase admin client to create a state record
     const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL')!,
+      supabaseUrl,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
       { auth: { persistSession: false } }
     );
     
-    // Get the authenticated user from the request's Authorization header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) throw new Error("Missing Authorization header.");
     const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
     if (userError || !user) throw new Error(userError?.message || "User not authenticated.");
 
-    // Create a new state record in the database to link this request to the user
     const { data: stateData, error: stateError } = await supabaseAdmin
       .from('oauth_states')
       .insert({ user_id: user.id })
@@ -44,24 +43,26 @@ serve(async (req) => {
     if (stateError) throw stateError;
     const state = stateData.state;
 
-    // Construct the Reddit authorization URL with the frontend redirect URI
-    const redirectUri = new URL('/dashboard/settings/', appUrl).toString();
-    const scopes = 'identity submit read'.split(' ').join(',');
+    const scopes = [
+      'openid',
+      'profile',
+      'email',
+      'https://www.googleapis.com/auth/business.manage'
+    ].join(' ');
 
-    const authUrl = new URL('https://www.reddit.com/api/v1/authorize');
-    authUrl.searchParams.set('client_id', redditClientId);
-    authUrl.searchParams.set('response_type', 'code');
-    authUrl.searchParams.set('state', state);
+    const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+    authUrl.searchParams.set('client_id', googleClientId);
     authUrl.searchParams.set('redirect_uri', redirectUri);
-    authUrl.searchParams.set('duration', 'permanent'); // To get a refresh token
+    authUrl.searchParams.set('response_type', 'code');
     authUrl.searchParams.set('scope', scopes);
+    authUrl.searchParams.set('state', state);
+    authUrl.searchParams.set('access_type', 'offline');
+    authUrl.searchParams.set('prompt', 'consent');
 
-    // Return the URL to the client to perform the redirect
     return new Response(JSON.stringify({ redirectUrl: authUrl.toString() }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
-
   } catch (error) {
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

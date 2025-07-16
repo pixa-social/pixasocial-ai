@@ -1,3 +1,4 @@
+
 // SocialPosterView.tsx  – improved design, same contract
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
@@ -19,12 +20,12 @@ import { SocialPostPreview } from './SocialPostPreview';
 
 interface SocialPosterViewProps {
   currentUser: UserProfile;
+  scheduledPosts: ScheduledPost[];
   contentDrafts: ContentDraft[];
   personas: Persona[];
   operators: Operator[];
-  onAddScheduledPost: (post: ScheduledPost) => void;
-  scheduledPosts: ScheduledPost[];
   connectedAccounts: ConnectedAccount[];
+  onAddScheduledPost: (post: ScheduledPost) => void;
   onUpdateScheduledPost: (post: ScheduledPost) => void;
   onDeleteScheduledPost: (postId: string) => void;
   onNavigate?: (view: ViewName) => void;
@@ -39,7 +40,8 @@ const fileToDataURL = (file: File): Promise<string> =>
   });
 
 export const SocialPosterView: React.FC<SocialPosterViewProps> = ({
-  currentUser, contentDrafts, personas, operators, onAddScheduledPost, onNavigate
+  currentUser, contentDrafts, personas, operators, onAddScheduledPost, onNavigate,
+  scheduledPosts, connectedAccounts, onUpdateScheduledPost, onDeleteScheduledPost
 }) => {
   const { showToast } = useToast();
   const [selectedNetworks, setSelectedNetworks] = useState<Set<SocialPlatformType>>(new Set([SocialPlatformType.Instagram]));

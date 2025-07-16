@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { ContentDraft, PlatformContentDetail, ViewName, UserProfile, Persona, Operator, ScheduledPost, MediaType } from '../types';
 import { Card } from './ui/Card';
@@ -82,37 +83,18 @@ export const ContentPlannerView: React.FC<ContentPlannerViewProps> = (props) => 
       {showPrerequisiteMessage && <PrerequisiteMessageCard title="Prerequisites Missing" message="Please create at least one Persona and one Operator before planning content." action={prerequisiteAction} />}
       {state.error && <Card className="mb-4 bg-red-500/10 border-l-4 border-danger text-danger p-4"><p>{state.error}</p></Card>}
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <ContentPlannerConfig 
-          currentUser={currentUser} 
-          personas={personas} 
-          operators={operators} 
-          selectedPersonaId={state.selectedPersonaId?.toString() || ''} 
-          onSelectedPersonaIdChange={(id) => handlers.setSelectedPersonaId(Number(id))} 
-          selectedOperatorId={state.selectedOperatorId?.toString() || ''}
-          onSelectedOperatorIdChange={(id) => handlers.setSelectedOperatorId(Number(id))}
-          keyMessage={state.keyMessage}
-          onKeyMessageChange={handlers.setKeyMessage}
-          globalMediaType={state.globalMediaType}
-          onGlobalMediaTypeChange={handlers.setGlobalMediaType}
-          platformMediaOverrides={state.platformMediaOverrides}
-          onPlatformMediaOverridesChange={handlers.setPlatformMediaOverrides}
-          selectedTone={state.selectedTone}
-          onSelectedToneChange={handlers.setSelectedTone}
-          customPrompt={state.customPrompt}
-          onCustomPromptChange={handlers.setCustomPrompt}
-          selectedPlatformsForGeneration={state.selectedPlatformsForGeneration}
-          onSelectedPlatformChange={(key) => handlers.setSelectedPlatformsForGeneration(prev => ({ ...prev, [key]: !prev[key] }))}
-          onGenerateAll={() => handlers.handleGenerateOrRegenerate()}
-          isLoading={state.isLoading}
-          isAnyPlatformSelected={state.isAnyPlatformSelectedForGeneration}
-          defaultFontFamily={state.defaultFontFamily}
-          onDefaultFontFamilyChange={handlers.setDefaultFontFamily}
-          defaultFontColor={state.defaultFontColor}
-          onDefaultFontColorChange={handlers.setDefaultFontColor}
-        />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-1">
+          <ContentPlannerConfig 
+            currentUser={currentUser} 
+            personas={personas} 
+            operators={operators} 
+            state={state}
+            handlers={handlers}
+          />
+        </div>
         
-        <div className="md:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-6">
           {state.isLoading && Object.keys(state.platformContents).length === 0 && <LoadingSpinner text="AI is drafting content..." />}
           
           {Object.entries(state.platformContents).map(([key, data]) => {
@@ -127,6 +109,7 @@ export const ContentPlannerView: React.FC<ContentPlannerViewProps> = (props) => 
                     isRegenerating={state.isRegeneratingPlatform[key] || false}
                     isProcessingMedia={state.isProcessingMedia[key] || false}
                     onRegenerate={() => handlers.handleGenerateOrRegenerate(key)}
+                    onGenerateVariant={() => handlers.handleGenerateVariant(key)}
                     onFieldChange={handlers.handleFieldChange}
                     onHashtagsChange={handlers.handleHashtagsChange}
                     onImageSourceTypeChange={handlers.handleImageSourceTypeChange}

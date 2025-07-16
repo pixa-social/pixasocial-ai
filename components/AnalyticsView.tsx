@@ -1,8 +1,9 @@
 
 
+
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import html2canvas from 'html2canvas';
-import { Persona, OceanScores, UserProfile, ViewName, RSTProfile, AIPersonaAnalysis, AIOceanResponse, AIComparisonResponse } from '../types';
+import { Persona, OceanScores, UserProfile, ViewName, RSTProfile, AIPersonaAnalysis, AIOceanResponse, AIComparisonResponse, AIAudienceSnapshotResponse } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Select } from './ui/Select';
@@ -12,7 +13,7 @@ import { PrerequisiteMessageCard } from './ui/PrerequisiteMessageCard';
 import { useNavigateToView } from '../hooks/useNavigateToView';
 import OceanRadarChart from './analytics/OceanRadarChart';
 import OceanIntroductionGraphic from './analytics/OceanIntroductionGraphic';
-import { ArrowDownTrayIcon } from './ui/Icons';
+import { ArrowDownTrayIcon, UsersIcon, LightBulbIcon, TargetIcon } from './ui/Icons';
 import { Tabs, Tab } from './ui/Tabs';
 import { CopyButton } from './ui/CopyButton';
 
@@ -24,7 +25,7 @@ interface AnalyticsViewProps {
 }
 
 export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ currentUser, personas, onNavigate }) => {
-  const [analysisMode, setAnalysisMode] = useState<'compare' | 'single'>('compare');
+  const [analysisMode, setAnalysisMode] = useState<'compare' | 'single' | 'snapshot'>('snapshot');
   
   const [selectedPersonaId, setSelectedPersonaId] = useState<number | null>(null);
   const [selectedPersonaId2, setSelectedPersonaId2] = useState<number | null>(null);
@@ -33,7 +34,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ currentUser, perso
   const [oceanScores2, setOceanScores2] = useState<OceanScores | null>(null);
   const [textAnalysis, setTextAnalysis] = useState<AIPersonaAnalysis | null>(null);
   const [comparisonAnalysis, setComparisonAnalysis] = useState<string | null>(null);
-
+  const [audienceSnapshot, setAudienceSnapshot] = useState<AIAudienceSnapshotResponse | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,20 +57,62 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ currentUser, perso
       setOceanScores2(null);
       setTextAnalysis(null);
       setComparisonAnalysis(null);
+      setAudienceSnapshot(null);
       setError(null);
   }, []);
   
-  const handleModeChange = useCallback((newMode: 'compare' | 'single') => {
-      setAnalysisMode(newMode);
-      setSelectedPersonaId(null);
-      setSelectedPersonaId2(null);
-      clearResults();
-  }, [clearResults]);
-  
   const handleTabChange = useCallback((index: number) => {
-    const newMode = index === 0 ? 'compare' : 'single';
-    handleModeChange(newMode);
-  }, [handleModeChange]);
+    const modes: ('snapshot' | 'compare' | 'single')[] = ['snapshot', 'compare', 'single'];
+    const newMode = modes[index];
+    setAnalysisMode(newMode);
+    setSelectedPersonaId(null);
+    setSelectedPersonaId2(null);
+    clearResults();
+  }, [clearResults]);
+
+  const handleGenerateSnapshot = useCallback(async () => {
+    if (personas.length < 2) {
+      setError("Please create at least two personas to generate an audience snapshot.");
+      return;
+    }
+    
+    setIsLoading(true);
+    clearResults();
+
+    const personaSummaries = personas.map(p => ({
+        name: p.name,
+        demographics: p.demographics,
+        psychographics: p.psychographics,
+        rst_profile: p.rst_profile,
+    }));
+    
+    const prompt = `
+        Analyze the following array of audience personas to create a high-level "Audience Snapshot".
+        
+        Personas Array:
+        ${JSON.stringify(personaSummaries, null, 2)}
+
+        Your task is to respond with a single, valid JSON object with three keys: "averageOceanScores", "strategicSummary", and "archetypes".
+        
+        1. "averageOceanScores": An object with the AVERAGE scores (from 0.0 to 1.0) for the ENTIRE audience across the five OCEAN traits: "creativity", "organization", "sociability", "kindness", "emotionalStability".
+        2. "strategicSummary": A concise, insightful paragraph summarizing the overall audience personality. What does this profile tell a strategist about how to communicate with this group as a whole?
+        3. "archetypes": An array of 2-3 distinct audience archetypes you've identified within the group. For each archetype object in the array, include:
+           - "name": A catchy name for the archetype (e.g., "Cautious Optimists", "Creative Visionaries").
+           - "description": A sentence describing this sub-group.
+           - "recommendedStrategy": A brief, actionable strategy for engaging this specific archetype.
+    `;
+    const systemInstruction = "You are a senior market research analyst specializing in psychographics. Aggregate persona data to provide a portfolio-level strategic overview. Ensure all scores are numbers between 0.0 and 1.0. Your entire output must be a single, valid JSON object as requested.";
+
+    const result = await generateJson<AIAudienceSnapshotResponse>(prompt, currentUser, systemInstruction);
+
+    if (result.data?.averageOceanScores && result.data.strategicSummary && result.data.archetypes) {
+        setAudienceSnapshot(result.data);
+    } else {
+        setError(result.error || "Failed to generate audience snapshot. The AI returned incomplete or invalid data.");
+    }
+
+    setIsLoading(false);
+  }, [personas, currentUser, clearResults]);
 
   const handleComparePersonas = useCallback(async () => {
     if (!selectedPersonaId || !selectedPersonaId2) {
@@ -122,25 +165,9 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ currentUser, perso
     const result = await generateJson<AIComparisonResponse>(createComparisonPrompt(persona1, persona2), currentUser, systemInstruction);
 
     if (result.data) {
-        const validateScores = (scores: OceanScores | null, personaName: string) => {
-             if (!scores) return `AI did not return data for ${personaName}.`;
-             const isValid = Object.values(scores).every(val => typeof val === 'number' && val >= 0 && val <= 1);
-            return isValid ? null : `AI returned invalid data for ${personaName}.`;
-        };
-        let errors: string[] = [];
-
-        const p1Error = validateScores(result.data.persona1Scores, persona1.name);
-        const p2Error = validateScores(result.data.persona2Scores, persona2.name);
-        if (p1Error) errors.push(p1Error);
-        if (p2Error) errors.push(p2Error);
-
-        if (errors.length > 0) {
-            setError(errors.join('\\n'));
-        } else {
-            setOceanScores(result.data.persona1Scores);
-            setOceanScores2(result.data.persona2Scores);
-            setComparisonAnalysis(result.data.comparisonText);
-        }
+        setOceanScores(result.data.persona1Scores);
+        setOceanScores2(result.data.persona2Scores);
+        setComparisonAnalysis(result.data.comparisonText);
     } else {
         setError(result.error || "Failed to generate comparison.");
     }
@@ -199,17 +226,21 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ currentUser, perso
 
   const handleDownloadImage = useCallback(async () => {
     const element = comparisonRef.current;
-    if (!element || !oceanScores) return;
+    if (!element || (!oceanScores && !audienceSnapshot)) return;
 
-    const persona1 = personas.find(p => p.id === selectedPersonaId);
-    let downloadName = `persona_analysis_${persona1?.name || 'persona'}.png`;
-
-    if (analysisMode === 'compare' && oceanScores2) {
+    let downloadName = 'persona_analysis.png';
+    if (analysisMode === 'snapshot' && audienceSnapshot) {
+        downloadName = 'audience_snapshot.png';
+    } else if (analysisMode === 'single' && oceanScores) {
+        const persona = personas.find(p => p.id === selectedPersonaId);
+        downloadName = `persona_analysis_${persona?.name || 'persona'}.png`;
+    } else if (analysisMode === 'compare' && oceanScores && oceanScores2) {
+        const persona1 = personas.find(p => p.id === selectedPersonaId);
         const persona2 = personas.find(p => p.id === selectedPersonaId2);
-        downloadName = `persona_comparison_${persona1?.name}_vs_${persona2?.name}.png`;
+        downloadName = `comparison_${persona1?.name}_vs_${persona2?.name}.png`;
     }
 
-    const canvas = await html2canvas(element, { backgroundColor: '#1f2937', useCORS: true });
+    const canvas = await html2canvas(element, { backgroundColor: '#111827', useCORS: true });
     const data = canvas.toDataURL('image/png');
     const link = document.createElement('a');
     link.href = data;
@@ -217,7 +248,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ currentUser, perso
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  }, [oceanScores, oceanScores2, personas, selectedPersonaId, selectedPersonaId2, analysisMode]);
+  }, [oceanScores, oceanScores2, audienceSnapshot, personas, selectedPersonaId, selectedPersonaId2, analysisMode]);
 
   const showPrerequisiteMessage = personas.length === 0;
 
@@ -238,68 +269,69 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ currentUser, perso
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card title="Configuration" className="md:col-span-1">
-            <Tabs onTabChange={handleTabChange}>
-                <Tab label="Compare Personas">
+            <Tabs onTabChange={handleTabChange} defaultActiveTab={0}>
+                <Tab label="Snapshot" icon={<UsersIcon className="w-4 h-4"/>}>
+                    <div className="pt-4 space-y-4 text-center">
+                        <p className="text-sm text-textSecondary">Get a high-level overview of your entire audience. The AI will analyze all your personas to find average traits, a strategic summary, and key archetypes.</p>
+                        {hasNoCredits && <p className="mt-4 text-sm text-yellow-400">You have used all your AI credits for this month.</p>}
+                        <Button 
+                            variant="primary" 
+                            onClick={handleGenerateSnapshot} 
+                            isLoading={isLoading && analysisMode === 'snapshot'}
+                            className="w-full mt-2"
+                            disabled={personas.length < 2 || isLoading || hasNoCredits}
+                            title={hasNoCredits ? "You have no AI credits remaining." : (personas.length < 2 ? "Requires at least 2 personas" : "Generate Audience Snapshot")}
+                        >
+                             {isLoading && analysisMode === 'snapshot' ? 'Analyzing...' : 'Generate Audience Snapshot'}
+                        </Button>
+                    </div>
+                </Tab>
+                <Tab label="Compare">
                     <div className="pt-4 space-y-4">
                         <Select 
                             label="Select Persona 1" 
                             options={personaOptions} 
                             value={selectedPersonaId || ''} 
-                            onChange={e => { 
-                                setSelectedPersonaId(Number(e.target.value)); 
-                                setSelectedPersonaId2(null); 
-                                clearResults();
-                            }}
+                            onChange={e => { setSelectedPersonaId(Number(e.target.value)); setSelectedPersonaId2(null); clearResults(); }}
                             required disabled={showPrerequisiteMessage || isLoading} 
                         />
                         <Select 
                             label="Compare With" 
                             options={personaOptions2} 
                             value={selectedPersonaId2 || ''} 
-                            onChange={e => {
-                                setSelectedPersonaId2(Number(e.target.value)); 
-                                clearResults();
-                            }}
+                            onChange={e => { setSelectedPersonaId2(Number(e.target.value)); clearResults(); }}
                             required disabled={showPrerequisiteMessage || isLoading || !selectedPersonaId} 
                         />
-                        {hasNoCredits && (
-                             <p className="mt-4 text-sm text-yellow-400 text-center">You have used all your AI credits for this month.</p>
-                        )}
+                        {hasNoCredits && <p className="mt-4 text-sm text-yellow-400 text-center">You have used all your AI credits.</p>}
                         <Button 
                             variant="primary" 
                             onClick={handleComparePersonas} 
                             isLoading={isLoading && analysisMode === 'compare'}
                             className="w-full mt-2"
                             disabled={!selectedPersonaId || !selectedPersonaId2 || isLoading || showPrerequisiteMessage || hasNoCredits}
-                            title={hasNoCredits ? "You have no AI credits remaining." : "Compare personas"}
+                            title={hasNoCredits ? "No AI credits remaining." : "Compare personas"}
                         >
                             {isLoading && analysisMode === 'compare' ? 'Comparing...' : 'Compare Personas'}
                         </Button>
                     </div>
                 </Tab>
-                <Tab label="Single Analysis">
+                <Tab label="Single">
                     <div className="pt-4 space-y-4">
                         <Select 
                             label="Select Persona" 
                             options={personaOptions} 
                             value={selectedPersonaId || ''} 
-                            onChange={e => {
-                                setSelectedPersonaId(Number(e.target.value));
-                                setSelectedPersonaId2(null);
-                                clearResults();
-                            }}
+                            onChange={e => { setSelectedPersonaId(Number(e.target.value)); setSelectedPersonaId2(null); clearResults(); }}
                             required disabled={showPrerequisiteMessage || isLoading} 
                         />
-                        {hasNoCredits && (
-                             <p className="mt-4 text-sm text-yellow-400 text-center">You have used all your AI credits for this month.</p>
-                        )}
+                        {hasNoCredits && <p className="mt-4 text-sm text-yellow-400 text-center">You have used all your AI credits.</p>}
                         <Button 
                             variant="primary" 
                             onClick={handleSinglePersonaAnalysis} 
                             isLoading={isLoading && analysisMode === 'single'}
                             className="w-full mt-2"
                             disabled={!selectedPersonaId || isLoading || showPrerequisiteMessage || hasNoCredits}
-                            title={hasNoCredits ? "You have no AI credits remaining." : "Analyze persona"}
+                            title={hasNoCredits ? "No AI credits remaining." : "Analyze persona"}
                         >
                              {isLoading && analysisMode === 'single' ? 'Analyzing...' : 'Analyze Persona'}
                         </Button>
@@ -309,13 +341,20 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ currentUser, perso
         </Card>
 
         <Card title="Analysis Results" className="md:col-span-2 min-h-[400px]">
-          {isLoading && <LoadingSpinner text="AI is analyzing the persona(s)..." />}
-          
-          {!isLoading && !oceanScores && !error && (
-            <p className="text-textSecondary text-center py-10">Select persona(s) and click the button to see the analysis.</p>
+          {isLoading && <LoadingSpinner text="AI is analyzing..." />}
+          {!isLoading && !oceanScores && !error && !audienceSnapshot && (
+            <p className="text-textSecondary text-center py-10">Select an analysis type and persona(s) to see the results.</p>
           )}
           
           <div ref={comparisonRef} className="bg-card">
+            {analysisMode === 'snapshot' && audienceSnapshot && (
+              <div className="p-4">
+                  <h4 className="text-2xl font-bold text-primary text-center mb-2">Audience Snapshot</h4>
+                  <div className="w-full h-96 max-w-lg mx-auto">
+                      <OceanRadarChart scores={audienceSnapshot.averageOceanScores} color="#38bdf8" gradientId="snapshot-gradient" />
+                  </div>
+              </div>
+            )}
             {analysisMode === 'compare' && oceanScores && oceanScores2 && (
               <div className="p-4">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -332,14 +371,6 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ currentUser, perso
                       </div>
                   </div>
                 </div>
-                {comparisonAnalysis && (
-                    <Card title="AI-Powered Comparison" className="bg-background mt-6">
-                        <div className="relative group">
-                            <p className="text-textSecondary leading-relaxed">{comparisonAnalysis}</p>
-                            <CopyButton textToCopy={comparisonAnalysis} size="sm" className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </div>
-                    </Card>
-                )}
               </div>
             )}
 
@@ -353,6 +384,37 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ currentUser, perso
             )}
           </div>
           
+          {analysisMode === 'snapshot' && audienceSnapshot && (
+              <div className="space-y-6 mt-4">
+                  <Card title="Strategic Summary" className="bg-background">
+                      <div className="relative group">
+                          <p className="text-textSecondary leading-relaxed">{audienceSnapshot.strategicSummary}</p>
+                          <CopyButton textToCopy={audienceSnapshot.strategicSummary} size="sm" className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                  </Card>
+                  <Card title="Key Audience Archetypes" className="bg-background">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                          {audienceSnapshot.archetypes.map((archetype, index) => (
+                              <div key={index} className="p-4 rounded-lg bg-card/50 border border-border">
+                                  <h5 className="font-semibold text-primary flex items-center mb-1"><TargetIcon className="w-4 h-4 mr-2"/> {archetype.name}</h5>
+                                  <p className="text-sm text-textSecondary italic mb-2">"{archetype.description}"</p>
+                                  <p className="text-sm text-textSecondary"><strong className="text-textPrimary font-medium">Strategy:</strong> {archetype.recommendedStrategy}</p>
+                              </div>
+                          ))}
+                      </div>
+                  </Card>
+              </div>
+          )}
+
+          {analysisMode === 'compare' && comparisonAnalysis && (
+              <Card title="AI-Powered Comparison" className="bg-background mt-6">
+                <div className="relative group">
+                    <p className="text-textSecondary leading-relaxed">{comparisonAnalysis}</p>
+                    <CopyButton textToCopy={comparisonAnalysis} size="sm" className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+              </Card>
+          )}
+
           {analysisMode === 'single' && textAnalysis && (
             <div className="space-y-6 mt-4">
                 <Card title="Persona Analysis & Strategy" className="bg-background">
@@ -370,7 +432,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ currentUser, perso
             </div>
           )}
           
-          {!isLoading && oceanScores && (
+          {!isLoading && (oceanScores || audienceSnapshot) && (
             <div className="mt-6 text-center">
                 <Button onClick={handleDownloadImage} variant="secondary" leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}>
                     Download Chart as PNG

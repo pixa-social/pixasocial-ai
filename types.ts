@@ -1,5 +1,6 @@
 
 
+
 import React from 'react';
 
 export enum ViewName {
@@ -112,6 +113,10 @@ export interface PlatformContentDetail {
   fontFamily?: string;
   fontColor?: string; 
   aiSuggestedFontCategory?: string;
+
+  // New properties for A/B variants
+  variant_content?: string;
+  is_variant_generating?: boolean;
 }
 
 export type PlatformContentMap = Record<string, PlatformContentDetail>;
@@ -161,6 +166,31 @@ export interface AIComparisonResponse {
   persona1Scores: OceanScores;
   persona2Scores: OceanScores;
   comparisonText: string;
+}
+
+export interface AudienceArchetype {
+    name: string;
+    description: string;
+    recommendedStrategy: string;
+}
+
+export interface AIAudienceSnapshotResponse {
+    averageOceanScores: OceanScores;
+    strategicSummary: string;
+    archetypes: AudienceArchetype[];
+}
+
+export interface AIPersonaDeepDive {
+  communicationStyle: string;
+  mediaHabits: string;
+  motivations: string;
+  marketingHooks: string[];
+}
+
+export interface AIOperatorEffectivenessAnalysis {
+    effectivenessScore: number;
+    alignmentAnalysis: string;
+    improvementSuggestions: string[];
 }
 
 export interface AuditStep {
@@ -299,10 +329,10 @@ export interface ChatMessage {
   channel_id: string;
   user_id: string;
   sender_name: string; 
-  created_at: string; 
-  updated_at?: string; // For message edits
   text?: string;
   attachment?: ChatMessageAttachment;
+  created_at: string; 
+  updated_at?: string; // For message edits
   isEditing?: boolean; // Client-side flag
 }
 
@@ -420,6 +450,23 @@ export interface Database {
           assigned_at?: string;
         };
       };
+      oauth_states: {
+        Row: {
+          state: string;
+          user_id: string;
+          created_at: string;
+        };
+        Insert: {
+          state?: string;
+          user_id: string;
+          created_at?: string;
+        };
+        Update: {
+          state?: string;
+          user_id?: string;
+          created_at?: string;
+        };
+      };
       ai_provider_global_configs: {
         Row: {
           id: AiProviderType;
@@ -461,6 +508,8 @@ export interface Database {
           psychographics: string | null;
           initial_beliefs: string | null;
           vulnerabilities: string[] | null;
+          goals: string[] | null;
+          fears: string[] | null;
           avatar_url: string | null;
           rst_profile: Json | null;
           created_at: string;
@@ -474,6 +523,8 @@ export interface Database {
           psychographics?: string | null;
           initial_beliefs?: string | null;
           vulnerabilities?: string[] | null;
+          goals?: string[] | null;
+          fears?: string[] | null;
           avatar_url?: string | null;
           rst_profile?: Json | null;
           created_at?: string;
@@ -487,10 +538,47 @@ export interface Database {
           psychographics?: string | null;
           initial_beliefs?: string | null;
           vulnerabilities?: string[] | null;
+          goals?: string[] | null;
+          fears?: string[] | null;
           avatar_url?: string | null;
           rst_profile?: Json | null;
           created_at?: string;
           updated_at?: string | null;
+        };
+      };
+      persona_deep_dives: {
+        Row: {
+          id: string;
+          persona_id: number;
+          user_id: string;
+          communication_style: string;
+          media_habits: string;
+          motivations: string;
+          marketing_hooks: string[];
+          created_at: string;
+          ai_model_used: string | null;
+        };
+        Insert: {
+          id?: string;
+          persona_id: number;
+          user_id: string;
+          communication_style: string;
+          media_habits: string;
+          motivations: string;
+          marketing_hooks: string[];
+          created_at?: string;
+          ai_model_used?: string | null;
+        };
+        Update: {
+          id?: string;
+          persona_id?: number;
+          user_id?: string;
+          communication_style?: string;
+          media_habits?: string;
+          motivations?: string;
+          marketing_hooks?: string[];
+          created_at?: string;
+          ai_model_used?: string | null;
         };
       };
       operators: {
@@ -506,6 +594,9 @@ export interface Database {
           reinforcement_loop: string;
           created_at: string;
           updated_at: string | null;
+          effectiveness_score: number | null;
+          alignment_analysis: string | null;
+          improvement_suggestions: string[] | null;
         };
         Insert: {
           id?: number;
@@ -519,6 +610,9 @@ export interface Database {
           reinforcement_loop: string;
           created_at?: string;
           updated_at?: string | null;
+          effectiveness_score?: number | null;
+          alignment_analysis?: string | null;
+          improvement_suggestions?: string[] | null;
         };
         Update: {
           id?: number;
@@ -532,6 +626,9 @@ export interface Database {
           reinforcement_loop?: string;
           created_at?: string;
           updated_at?: string | null;
+          effectiveness_score?: number | null;
+          alignment_analysis?: string | null;
+          improvement_suggestions?: string[] | null;
         };
       };
       content_drafts: {

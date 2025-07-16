@@ -1,17 +1,21 @@
 
+
 import React, { useState, useCallback, useRef, useMemo } from 'react';
-import { Persona, RSTProfile, ViewName, RSTTraitLevel, UserProfile, LibraryPersona, Json } from '../types'; 
+import { Persona, RSTProfile, ViewName, RSTTraitLevel, UserProfile, LibraryPersona, Json, AIPersonaDeepDive } from '../types'; 
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Select, SelectOption } from './ui/Select';
 import { LoadingSpinner } from './ui/LoadingSpinner';
-import { generateJson } from '../services/aiService';
+import { generateJson, generateImages } from '../services/aiService';
+import { getExecutionConfig } from '../services/ai/aiUtils';
+import { supabase } from '../services/supabaseClient';
 import { RST_TRAITS, DEFAULT_PERSONA_AVATAR, RST_FILTER_OPTIONS, ITEMS_PER_PAGE, RST_TRAIT_LEVELS } from '../constants'; 
 import RstIntroductionGraphic from './RstIntroductionGraphic';
 import { useToast } from './ui/ToastProvider'; 
 import { PersonaForm } from './audience-modeling/PersonaForm';
 import { PersonaCard } from './audience-modeling/PersonaCard';
+import { PersonaDeepDiveModal } from './audience-modeling/PersonaDeepDiveModal';
 import { ArrowPathIcon, AdjustmentsHorizontalIcon, ChevronUpIcon, ChevronDownIcon, ArrowDownOnSquareIcon } from './ui/Icons';
 import { PrerequisiteMessageCard } from './ui/PrerequisiteMessageCard';
 import { PersonaLibraryModal } from './audience-modeling/PersonaLibraryModal';
@@ -26,8 +30,8 @@ const ITEMS_PER_PAGE_OPTIONS = [
 interface AudienceModelingViewProps { 
   currentUser: UserProfile;
   personas: Persona[];
-  onAddPersona: (personaData: Omit<Persona, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'avatar_url'>) => void;
-  onUpdatePersona: (personaId: number, personaData: Partial<Omit<Persona, 'id' | 'user_id' | 'created_at'>>) => void;
+  onAddPersona: (personaData: Partial<Omit<Persona, 'id' | 'user_id' | 'created_at' | 'updated_at'>> & { name: string, avatar_base64?: string }) => void;
+  onUpdatePersona: (personaId: number, personaData: Partial<Omit<Persona, 'id' | 'user_id' | 'created_at'>> & { avatar_base64?: string }) => void;
   onDeletePersona: (personaId: number) => void;
   onNavigate?: (view: ViewName) => void; 
 }
@@ -37,6 +41,8 @@ interface AIPersonaSuggestion {
   psychographics: string;
   initial_beliefs: string;
   suggestedVulnerabilities?: string[];
+  goals?: string[];
+  fears?: string[];
   rst_profile?: { bas: string; bis: string; fffs: string; };
 }
 
@@ -49,6 +55,10 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ curr
   const [individualLoading, setIndividualLoading] = useState<Record<string, boolean>>({});
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [isMappingPersona, setIsMappingPersona] = useState(false);
+
+  // New state for Deep Dive
+  const [deepDiveData, setDeepDiveData] = useState<{ persona: Persona; analysis: AIPersonaDeepDive } | null>(null);
+  const [isDiving, setIsDiving] = useState<Record<string, boolean>>({});
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState<number>(ITEMS_PER_PAGE);
@@ -69,7 +79,7 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ curr
     }
     setIsMappingPersona(true);
     showToast("AI is analyzing...", "info");
-    const prompt = `Based on this persona data: ${JSON.stringify(libraryPersona, null, 2)}, generate a profile with "demographics", "psychographics", "initial_beliefs", "rst_profile", and "suggestedVulnerabilities".`;
+    const prompt = `Based on this persona data: ${JSON.stringify(libraryPersona, null, 2)}, generate a profile with "demographics", "psychographics", "initial_beliefs", "rst_profile", "suggestedVulnerabilities", "goals", and "fears".`;
     const result = await generateJson<AIPersonaSuggestion>(prompt, currentUser);
 
     if (result.data) {
@@ -79,6 +89,8 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ curr
             psychographics: result.data.psychographics || '',
             initial_beliefs: result.data.initial_beliefs || '',
             vulnerabilities: result.data.suggestedVulnerabilities || [],
+            goals: result.data.goals || [],
+            fears: result.data.fears || [],
             rst_profile: result.data.rst_profile as Json,
         };
         setEditingPersona(seededPersona as Persona);
@@ -89,7 +101,7 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ curr
     setIsMappingPersona(false);
   }, [currentUser, showToast, personas, currentUser.role.max_personas]);
 
-  const handleCreateOrUpdatePersona = async (personaData: Omit<Persona, 'id' | 'avatar_url' | 'user_id' | 'created_at' | 'updated_at'>) => {
+  const handleCreateOrUpdatePersona = async (personaData: Partial<Omit<Persona, 'id' | 'user_id' | 'created_at' | 'updated_at'>> & { name: string, avatar_base64?: string }) => {
     setIsSubmitting(true); setError(null);
     try {
       if (editingPersona && 'id' in editingPersona) {
@@ -116,7 +128,6 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ curr
   }, [onDeletePersona]);
 
   const handleSimulateVulnerabilitiesOnCard = useCallback(async (persona: Persona) => {
-    // This logic stays as it's a specific action on a card, but uses the central update function
     setIndividualLoading(prev => ({ ...prev, [String(persona.id)]: true }));
     const prompt = `Persona: ${persona.name}, Demo: ${persona.demographics}. Identify 3-5 key vulnerabilities. Return comma-separated list.`;
     const result = await generateJson<{ vulnerabilities: string[] }>(prompt, currentUser);
@@ -128,6 +139,70 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ curr
     }
     setIndividualLoading(prev => ({ ...prev, [String(persona.id)]: false }));
   }, [currentUser, onUpdatePersona, showToast]);
+
+  const handleDeepDiveRequest = async (persona: Persona) => {
+    setIsDiving(prev => ({...prev, [String(persona.id)]: true }));
+    
+    // 1. Check for existing deep dive
+    const { data: existingDive, error: fetchError } = await supabase
+        .from('persona_deep_dives')
+        .select('*')
+        .eq('persona_id', persona.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+        
+    if (fetchError && fetchError.code !== 'PGRST116') { // Ignore "no rows found"
+        showToast(`Error fetching deep dive: ${fetchError.message}`, 'error');
+        setIsDiving(prev => ({...prev, [String(persona.id)]: false }));
+        return;
+    }
+    
+    if (existingDive) {
+        setDeepDiveData({ persona, analysis: { ...existingDive, marketingHooks: existingDive.marketing_hooks || [] } });
+        showToast("Loaded existing deep dive analysis.", "info");
+        setIsDiving(prev => ({...prev, [String(persona.id)]: false }));
+        return;
+    }
+
+    // 2. If not found, generate a new one
+    const rstProfile = persona.rst_profile as unknown as RSTProfile;
+    const prompt = `
+        Provide a deep dive analysis of the following persona. Return a valid JSON object.
+        Persona: ${JSON.stringify({name: persona.name, demographics: persona.demographics, psychographics: persona.psychographics, goals: persona.goals, fears: persona.fears, rst_profile: rstProfile })}
+        JSON structure: { "communicationStyle": "...", "mediaHabits": "...", "motivations": "...", "marketingHooks": ["...", "..."] }
+    `;
+    
+    const execConfig = await getExecutionConfig('text', currentUser);
+    const result = await generateJson<AIPersonaDeepDive>(prompt, currentUser);
+
+    if (result.data) {
+        // 3. Save the new dive to the database
+        const { error: insertError } = await supabase
+            .from('persona_deep_dives')
+            .insert({
+                persona_id: persona.id,
+                user_id: currentUser.id,
+                communication_style: result.data.communicationStyle,
+                media_habits: result.data.mediaHabits,
+                motivations: result.data.motivations,
+                marketing_hooks: result.data.marketingHooks,
+                ai_model_used: execConfig?.model || 'unknown',
+            });
+            
+        if (insertError) {
+            showToast(`Failed to save new deep dive: ${insertError.message}`, 'error');
+        }
+
+        setDeepDiveData({ persona, analysis: result.data });
+
+    } else {
+        showToast(result.error || "Failed to generate deep dive analysis.", 'error');
+    }
+
+    setIsDiving(prev => ({...prev, [String(persona.id)]: false }));
+  };
+
 
   const handleEdit = (persona: Persona) => { setEditingPersona(persona); setShowForm(true); setError(null); };
   
@@ -156,6 +231,7 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ curr
   return (
     <div className="p-6">
        {isLibraryOpen && <PersonaLibraryModal isOpen={isLibraryOpen} onClose={() => setIsLibraryOpen(false)} onImport={handleImportAndMapPersona} isMapping={isMappingPersona} />}
+       {deepDiveData && <PersonaDeepDiveModal data={deepDiveData} onClose={() => setDeepDiveData(null)} />}
       <RstIntroductionGraphic />
       <div className="flex justify-between items-center mb-6 mt-2 flex-wrap gap-2">
         <h2 className="text-3xl font-bold text-textPrimary">Audience Persona Management</h2>
@@ -189,7 +265,16 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ curr
         {paginatedPersonas.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {paginatedPersonas.map((persona) => (
-              <PersonaCard key={persona.id} persona={persona} onEdit={handleEdit} onDelete={handleDeletePersona} onRefreshVulnerabilities={handleSimulateVulnerabilitiesOnCard} isRefreshingVulnerabilities={individualLoading[String(persona.id)] || false} currentUser={currentUser} />
+              <PersonaCard 
+                key={persona.id} 
+                persona={persona} 
+                onEdit={handleEdit} 
+                onDelete={handleDeletePersona} 
+                onRefreshVulnerabilities={handleSimulateVulnerabilitiesOnCard} 
+                isRefreshingVulnerabilities={individualLoading[String(persona.id)] || false} 
+                currentUser={currentUser}
+                onDeepDiveRequest={handleDeepDiveRequest}
+              />
               ))}
           </div>
         ) : (
