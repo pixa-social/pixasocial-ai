@@ -1,12 +1,3 @@
-import { useCallback } from 'react';
-import { ViewName } from '../types';
-
-export const useNavigateToView = (onNavigate?: (view: ViewName) => void) => {
-  return useCallback((view: ViewName) => {
-    if (onNavigate) {
-      onNavigate(view);
-    } else {
-      console.warn("useNavigateToView: onNavigate prop is not provided. Navigation will not occur.");
-    }
-  }, [onNavigate]);
-};
+// This custom hook is obsolete and has been replaced by react-router-dom's useNavigate hook.
+// This file can be safely deleted.
+export {};

@@ -1,32 +1,30 @@
 import React from 'react';
+import { useLocation, Link } from 'react-router-dom';
 import { ViewName, NavItem } from '../../types';
-import { NAVIGATION_ITEMS } from '../../constants';
+import { NAVIGATION_ITEMS, VIEW_PATH_MAP } from '../../constants';
 import { ChevronRightIcon } from './Icons';
-
-interface BreadcrumbsProps {
-  currentView: ViewName;
-  onNavigate: (view: ViewName) => void;
-}
 
 interface BreadcrumbItem {
   label: string;
-  viewName?: ViewName;
+  path?: string;
   isCurrent: boolean;
 }
 
 const findBreadcrumbPath = (
   items: NavItem[],
-  currentView: ViewName,
+  pathname: string,
   currentPath: BreadcrumbItem[] = []
 ): BreadcrumbItem[] | null => {
   for (const item of items) {
-    const newPath = [...currentPath, { label: item.label, viewName: item.viewName, isCurrent: false }];
-    if (item.viewName === currentView) {
+    const itemPath = item.viewName ? VIEW_PATH_MAP[item.viewName] : undefined;
+    const newPath = [...currentPath, { label: item.label, path: itemPath, isCurrent: false }];
+    
+    if (itemPath === pathname) {
       newPath[newPath.length - 1].isCurrent = true;
       return newPath;
     }
     if (item.children) {
-      const childPath = findBreadcrumbPath(item.children, currentView, newPath);
+      const childPath = findBreadcrumbPath(item.children, pathname, newPath);
       if (childPath) {
         return childPath;
       }
@@ -35,22 +33,19 @@ const findBreadcrumbPath = (
   return null;
 };
 
-export const Breadcrumbs: React.FC<BreadcrumbsProps> = React.memo(({ currentView, onNavigate }) => {
-  const path = findBreadcrumbPath(NAVIGATION_ITEMS, currentView);
+export const Breadcrumbs: React.FC = React.memo(() => {
+  const location = useLocation();
+  const path = findBreadcrumbPath(NAVIGATION_ITEMS, location.pathname);
 
-  // If we are on the dashboard, don't show any breadcrumbs as it's the root.
-  // This simplifies the UI.
-  if (currentView === ViewName.Dashboard || !path) {
+  if (location.pathname === VIEW_PATH_MAP.Dashboard || !path) {
     return null; 
   }
 
-  // Always add Dashboard as the first, clickable home link.
   const breadcrumbItems: BreadcrumbItem[] = [
-    { label: ViewName.Dashboard, viewName: ViewName.Dashboard, isCurrent: false },
+    { label: ViewName.Dashboard, path: VIEW_PATH_MAP.Dashboard, isCurrent: false },
     ...path,
   ];
   
-  // Clean up potential duplicate 'Dashboard' entries if it's the first item in the path.
   if (breadcrumbItems.length > 1 && breadcrumbItems[1].label === ViewName.Dashboard) {
     breadcrumbItems.shift(); 
   }
@@ -63,18 +58,18 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = React.memo(({ currentView
             {index > 0 && (
               <ChevronRightIcon className="w-4 h-4 text-gray-400 mx-1" />
             )}
-            {item.isCurrent || !item.viewName ? (
+            {item.isCurrent || !item.path ? (
               <span className="font-medium text-textPrimary" aria-current={item.isCurrent ? 'page' : undefined}>
                 {item.label}
               </span>
             ) : (
-              <button
-                onClick={() => item.viewName && onNavigate(item.viewName)}
+              <Link
+                to={item.path}
                 className="hover:text-primary hover:underline focus:outline-none focus:ring-1 focus:ring-primary rounded"
                 aria-label={`Go to ${item.label}`}
               >
                 {item.label}
-              </button>
+              </Link>
             )}
           </li>
         ))}

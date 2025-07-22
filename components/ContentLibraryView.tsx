@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { ContentLibraryAsset } from '../../types';
 import { Card } from './ui/Card';
@@ -13,15 +12,12 @@ import { MAX_FILE_UPLOAD_SIZE_BYTES, MAX_FILE_UPLOAD_SIZE_MB, ACCEPTED_MEDIA_TYP
 import { AssetCard } from './content-library/AssetCard'; 
 import { ContentLibrarySkeleton } from './skeletons/ContentLibrarySkeleton';
 import { ImageLightbox } from './content-library/ImageLightbox';
+import { useAppDataContext } from './MainAppLayout';
 
-interface ContentLibraryViewProps {
-  assets: ContentLibraryAsset[];
-  onAddAsset: (file: File, name: string, tags: string[]) => Promise<void>;
-  onUpdateAsset: (assetId: string, updates: Partial<Pick<ContentLibraryAsset, 'name' | 'tags'>>) => Promise<void>;
-  onRemoveAsset: (assetId: string) => Promise<void>;
-}
+export const ContentLibraryView: React.FC = () => {
+  const { contentLibraryAssets: assets, handlers } = useAppDataContext();
+  const { addAsset: onAddAsset, updateAsset: onUpdateAsset, removeAsset: onRemoveAsset } = handlers;
 
-export const ContentLibraryView: React.FC<ContentLibraryViewProps> = ({ assets, onAddAsset, onUpdateAsset, onRemoveAsset }) => {
   const { showToast } = useToast();
   const [assetName, setAssetName] = useState('');
   const [assetTags, setAssetTags] = useState(''); 
@@ -84,10 +80,10 @@ export const ContentLibraryView: React.FC<ContentLibraryViewProps> = ({ assets, 
     setIsLoading(false);
   }, [selectedFile, assetName, assetTags, onAddAsset, showToast]);
 
-  const handleDeleteAsset = useCallback(async (assetId: string) => {
+  const handleDeleteAsset = useCallback(async (asset: ContentLibraryAsset) => {
     if (window.confirm('Are you sure you want to delete this asset? This action is permanent.')) {
-      await onRemoveAsset(assetId);
-      setSelectedAssetIds(prev => prev.filter(id => id !== assetId)); 
+      await onRemoveAsset(asset.id, asset.storage_path);
+      setSelectedAssetIds(prev => prev.filter(id => id !== asset.id)); 
     }
   }, [onRemoveAsset]);
   
@@ -150,10 +146,11 @@ export const ContentLibraryView: React.FC<ContentLibraryViewProps> = ({ assets, 
         return;
     }
     if (window.confirm(`Are you sure you want to delete ${selectedAssetIds.length} selected asset(s)? This action is permanent.`)) {
-        await Promise.all(selectedAssetIds.map(id => onRemoveAsset(id)));
+        const assetsToDelete = assets.filter(a => selectedAssetIds.includes(a.id));
+        await Promise.all(assetsToDelete.map(asset => onRemoveAsset(asset.id, asset.storage_path)));
         setSelectedAssetIds([]);
     }
-  }, [selectedAssetIds, onRemoveAsset, showToast]);
+  }, [selectedAssetIds, assets, onRemoveAsset, showToast]);
   
   const handleCurrentEditingTagsChange = useCallback((tags: string) => {
     setCurrentEditingTags(tags);

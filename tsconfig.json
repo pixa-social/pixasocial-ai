@@ -1,4 +1,5 @@
 
+
 {
   "compilerOptions": {
     "lib": ["DOM", "DOM.Iterable", "ESNext"],
@@ -11,11 +12,7 @@
     "strict": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
-    "types": ["bun-types"],
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./*"]
-    }
+    "types": ["bun-types"]
   },
   "include": ["**/*.ts", "**/*.tsx"],
   "exclude": ["node_modules", "supabase/functions"]

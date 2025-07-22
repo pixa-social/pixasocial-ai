@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { useForm, Controller, SubmitHandler, FieldValues } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -19,7 +20,7 @@ import { TrashIcon, LightBulbIcon } from '../ui/Icons';
 
 const operatorFormSchema = z.object({
   name: z.string().min(1, "Operator name is required"),
-  target_audience_id: z.coerce.number().min(1, "A target audience must be selected."),
+  target_audience_id: z.number().min(1, "A target audience must be selected."),
   type: z.enum(OPERATOR_TYPES),
   desired_conditioned_response: z.string().min(1, "Desired conditioned response is required"),
   conditioned_stimulus: z.string().min(1, "Conditioned stimulus is required"),

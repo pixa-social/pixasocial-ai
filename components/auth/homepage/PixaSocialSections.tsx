@@ -1,6 +1,7 @@
+
 import React from 'react';
-import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
+import { Card } from '../../ui/Card';
+import { Badge } from '../../ui/Badge';
 import { Brain, Target, Zap, Users, TrendingUp, Clock } from 'lucide-react';
 
 interface SectionProps {

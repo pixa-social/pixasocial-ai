@@ -1,5 +1,3 @@
-
-
 import React, { useState, useCallback } from 'react';
 import { Persona, RSTProfile, RSTTraitLevel, UserProfile, Json } from '../../types';
 import { Card } from '../ui/Card';
@@ -88,7 +86,7 @@ const PersonaFormComponent: React.FC<PersonaFormProps> = ({ initialPersona, onSu
     setSuggestionError(null);
     const rstProfileInstructions = RST_TRAITS.map(trait => `      "${trait.key}": "<Low|Medium|High>"`).join(",\\n");
     const prompt = `Generate persona details for Region: ${selectedRegion}, Interests: ${keyInterests || "General"}. JSON: {"demographics": "...", "psychographics": "...", "initialBeliefs": "...", "goals": ["...", "..."], "fears": ["...", "..."], "suggestedVulnerabilities": ["...", "..."], "rstProfile": {${rstProfileInstructions}}}`;
-    const systemInstruction = "You create audience personas with RST profiles. Ensure all JSON fields are populated and RST traits are 'Low', 'Medium', or 'High'.";
+    const systemInstruction = "You are an AI assistant that creates audience personas. Your entire response must be a single, valid JSON object and nothing else. Do not include any explanatory text, comments, markdown formatting, or any characters outside of the JSON structure.";
     const result = await generateJson<AIPersonaSuggestion>(prompt, currentUser, systemInstruction);
     if (result.data) {
       setDemographics(result.data.demographics || '');

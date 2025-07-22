@@ -7,8 +7,9 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '../ui/Accordion';
-import { CalendarDaysIcon, TrashIcon, SearchIcon, XMarkIcon, AdjustmentsHorizontalIcon } from '../ui/Icons';
+import { CalendarDaysIcon, TrashIcon, SearchIcon, XMarkIcon, EyeIcon } from '../ui/Icons';
 import { CONTENT_PLATFORMS } from '../../constants';
+import { DraftPreviewModal } from './DraftPreviewModal';
 
 interface SavedContentDraftsProps {
   contentDrafts: ContentDraft[];
@@ -42,6 +43,11 @@ export const SavedContentDrafts: React.FC<SavedContentDraftsProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPersonaId, setFilterPersonaId] = useState('');
   const [filterOperatorId, setFilterOperatorId] = useState('');
+  const [previewingItem, setPreviewingItem] = useState<{
+    draft: ContentDraft;
+    platformKey: string;
+    platformDetail: PlatformContentDetail;
+  } | null>(null);
 
   const personaOptions = useMemo(() => [{ value: '', label: 'All Personas' }, ...personas.map(p => ({ value: p.id.toString(), label: p.name }))], [personas]);
   const operatorOptions = useMemo(() => [{ value: '', label: 'All Operators' }, ...operators.map(o => ({ value: o.id.toString(), label: o.name }))], [operators]);
@@ -115,12 +121,22 @@ export const SavedContentDrafts: React.FC<SavedContentDraftsProps> = ({
                                     const platformInfo = CONTENT_PLATFORMS.find(p => p.key === platformKey);
                                     const content = platformData.subject ? `Subject: ${platformData.subject}` : (platformData.content || platformData.imagePrompt);
                                     return (
-                                        <div key={platformKey} className="p-3 border border-border/50 rounded-lg bg-background group flex items-start justify-between gap-4">
-                                            <div className="flex-grow">
-                                                <h5 className="font-medium text-foreground flex items-center">{getPlatformIcon(platformKey)} {platformInfo?.label || platformKey}</h5>
-                                                <p className="text-sm text-muted-foreground pl-6 pr-2 truncate" title={content}>{content || "No text content."}</p>
+                                        <div key={platformKey} className="p-3 border border-border/50 rounded-lg bg-background group flex items-center justify-between gap-4">
+                                            <div
+                                                className="flex-grow flex items-center gap-3 cursor-pointer"
+                                                onClick={() => setPreviewingItem({ draft, platformKey, platformDetail: platformData })}
+                                                role="button"
+                                                tabIndex={0}
+                                                onKeyPress={(e) => { if (e.key === 'Enter') setPreviewingItem({ draft, platformKey, platformDetail: platformData }) }}
+                                            >
+                                                <div className="flex-shrink-0">{getPlatformIcon(platformKey)}</div>
+                                                <div className="flex-grow truncate">
+                                                    <h5 className="font-medium text-foreground truncate">{platformInfo?.label || platformKey}</h5>
+                                                    <p className="text-sm text-muted-foreground truncate" title={content}>{content || "No text content."}</p>
+                                                </div>
                                             </div>
-                                            <div className="flex items-center space-x-2 flex-shrink-0">
+                                            <div className="flex items-center space-x-1 flex-shrink-0">
+                                                <Button size="sm" variant="ghost" onClick={() => setPreviewingItem({ draft, platformKey, platformDetail: platformData })} className="text-xs" leftIcon={<EyeIcon className="w-3.5 h-3.5" />}>Preview</Button>
                                                 <Button size="sm" variant="secondary" onClick={() => onScheduleClick(draft, platformKey, platformData)} className="text-xs" leftIcon={<CalendarDaysIcon className="w-3.5 h-3.5" />}>Schedule</Button>
                                                 <Button variant="ghost" size="icon" onClick={() => onDeletePlatformContent(draft.id, platformKey)} className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10" title="Delete this platform's content"><TrashIcon className="w-4 h-4" /></Button>
                                             </div>
@@ -128,7 +144,7 @@ export const SavedContentDrafts: React.FC<SavedContentDraftsProps> = ({
                                     );
                                 })}
                                  <div className="flex items-center space-x-2 mt-4 pt-4 border-t border-border">
-                                    <Button variant="outline" size="sm" onClick={() => onLoadDraft(draft)}>Edit Draft</Button>
+                                    <Button variant="outline" size="sm" onClick={() => onLoadDraft(draft)}>Load & Edit Draft</Button>
                                     <Button variant="destructive" size="sm" onClick={() => onDeleteDraft(draft.id)} leftIcon={<TrashIcon className="w-4 h-4"/>}>Delete Entire Draft</Button>
                                 </div>
                             </div>
@@ -142,6 +158,25 @@ export const SavedContentDrafts: React.FC<SavedContentDraftsProps> = ({
             <p>No drafts found matching your criteria.</p>
         </div>
       )}
+      
+      {previewingItem && (
+        <DraftPreviewModal
+            draft={previewingItem.draft}
+            platformKey={previewingItem.platformKey}
+            platformDetail={previewingItem.platformDetail}
+            persona={personas.find(p => p.id === previewingItem.draft.persona_id)}
+            operator={operators.find(o => o.id === previewingItem.draft.operator_id)}
+            onClose={() => setPreviewingItem(null)}
+            onEdit={() => {
+                onLoadDraft(previewingItem.draft);
+                setPreviewingItem(null);
+            }}
+            onSchedule={() => {
+                onScheduleClick(previewingItem.draft, previewingItem.platformKey, previewingItem.platformDetail);
+                setPreviewingItem(null);
+            }}
+        />
+    )}
     </Card>
   );
 };

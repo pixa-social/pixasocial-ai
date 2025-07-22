@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
 import { Card } from './ui/Card';
@@ -19,15 +18,7 @@ import { z } from 'zod';
 import { ConnectionFlowModal } from './settings/ConnectionFlowModal';
 import { supabase } from '../services/supabaseClient';
 import { LoadingSpinner } from './ui/LoadingSpinner';
-
-interface SettingsViewProps {
-  currentUser: UserProfile;
-  onUpdateUser: (updatedUserData: Partial<User>) => void;
-  connectedAccounts: ConnectedAccount[];
-  onAddConnectedAccount: (platform: SocialPlatformType, accountId: string, displayName: string, profileImageUrl?: string) => void;
-  onDeleteConnectedAccount: (accountId: string, platformName: string) => void;
-  onAccountConnectOrDelete: () => void;
-}
+import { useAppDataContext } from './MainAppLayout';
 
 const userProfileSchema = z.object({
   walletAddress: z.string().optional(), 
@@ -40,9 +31,11 @@ const teamInviteSchema = z.object({
 type TeamInviteFormData = z.infer<typeof teamInviteSchema>;
 
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ 
-  currentUser, onUpdateUser, connectedAccounts, onAddConnectedAccount, onDeleteConnectedAccount, onAccountConnectOrDelete
-}) => {
+export const SettingsView: React.FC = () => { 
+  const { currentUser, onUpdateUser, connectedAccounts, handlers, fetchers } = useAppDataContext();
+  const { addConnectedAccount: onAddConnectedAccount, deleteConnectedAccount: onDeleteConnectedAccount } = handlers;
+  const { fetchConnectedAccounts: onAccountConnectOrDelete } = fetchers;
+  
   const { showToast } = useToast();
   const [platformToConnect, setPlatformToConnect] = useState<SocialPlatformConnectionDetails | null>(null);
   const [isHandlingCallback, setIsHandlingCallback] = useState(false);
@@ -259,17 +252,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     <div className="p-6 space-y-8">
       <div>
         <h2 className="text-3xl font-bold text-textPrimary mb-6">Settings</h2>
-        <Card className="mb-6 bg-yellow-500/10 border-l-4 border-yellow-500 p-4">
-          <div className="flex items-start">
-            <ExclamationTriangleIcon className="h-6 w-6 text-yellow-400 mr-3 shrink-0 mt-0.5" />
-            <div>
-              <h3 className="text-lg font-semibold text-yellow-300">Simulation Notice</h3>
-              <p className="text-yellow-400 text-sm">
-                User profile changes and team management are now saved to your Supabase backend. Social account connections are simulated with a detailed UI flow.
-              </p>
-            </div>
-          </div>
-        </Card>
       </div>
 
       <Tabs tabListClassName="border-gray-700" tabButtonClassName="hover:border-gray-500 text-textSecondary" activeTabButtonClassName="border-primary text-primary">

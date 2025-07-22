@@ -1,5 +1,3 @@
-
-
 import React, { useState, useCallback, useMemo } from 'react';
 import { Persona, Operator, FeedbackSimulationResult, ContentDraft, ViewName, UserProfile, RSTProfile } from '../types';
 import { Card } from './ui/Card';
@@ -10,18 +8,11 @@ import { LoadingSpinner } from './ui/LoadingSpinner';
 import { generateJson } from '../services/aiService';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { PrerequisiteMessageCard } from './ui/PrerequisiteMessageCard';
-import { useNavigateToView } from '../hooks/useNavigateToView';
+import { useNavigate } from 'react-router-dom';
+import { useAppDataContext } from './MainAppLayout';
 
 
 const COLORS = ['#10B981', '#F59E0B', '#EF4444']; // Positive, Neutral, Negative
-
-interface FeedbackSimulatorViewProps {
-  currentUser: UserProfile;
-  personas: Persona[];
-  operators: Operator[];
-  contentDrafts: ContentDraft[];
-  onNavigate?: (view: ViewName) => void;
-}
 
 const getDraftPreviewContent = (draft: ContentDraft): string => {
   for (const key in draft.platform_contents) {
@@ -33,11 +24,11 @@ const getDraftPreviewContent = (draft: ContentDraft): string => {
   return 'No content preview';
 };
 
-export const FeedbackSimulatorView: React.FC<FeedbackSimulatorViewProps> = ({ currentUser, personas, operators, contentDrafts, onNavigate }) => {
+export const FeedbackSimulatorView: React.FC = () => {
+  const { currentUser, personas, operators, contentDrafts, onNavigate } = useAppDataContext();
   const [selectedPersonaId, setSelectedPersonaId] = useState<number | null>(null);
   const [contentToSimulate, setContentToSimulate] = useState<string>('');
   const [simulationResult, setSimulationResult] = useState<FeedbackSimulationResult | null>(null);
-  const navigateTo = useNavigateToView(onNavigate);
   
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -146,7 +137,7 @@ export const FeedbackSimulatorView: React.FC<FeedbackSimulatorViewProps> = ({ cu
         <PrerequisiteMessageCard
           title="Prerequisite Missing"
           message="Please create at least one Persona in 'Audience Modeling' before simulating feedback. The 'Target Persona' dropdown will populate once personas are available."
-          action={onNavigate ? { label: 'Go to Audience Modeling', onClick: () => navigateTo(ViewName.AudienceModeling) } : undefined }
+          action={onNavigate ? { label: 'Go to Audience Modeling', onClick: () => onNavigate(ViewName.AudienceModeling) } : undefined }
         />
       )}
       {error && <Card className="mb-4 bg-red-500/10 border-l-4 border-danger text-danger p-4"><p>{error}</p></Card>}

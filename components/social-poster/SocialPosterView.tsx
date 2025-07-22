@@ -1,4 +1,5 @@
 
+
 // SocialPosterView.tsx  – improved design, same contract
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
@@ -17,19 +18,7 @@ import { UploadCloudIcon } from '../ui/Icons';
 import { generateText } from '../../services/aiService';
 import { supabase } from '../../services/supabaseClient';
 import { SocialPostPreview } from './SocialPostPreview';
-
-interface SocialPosterViewProps {
-  currentUser: UserProfile;
-  scheduledPosts: ScheduledPost[];
-  contentDrafts: ContentDraft[];
-  personas: Persona[];
-  operators: Operator[];
-  connectedAccounts: ConnectedAccount[];
-  onAddScheduledPost: (post: ScheduledPost) => void;
-  onUpdateScheduledPost: (post: ScheduledPost) => void;
-  onDeleteScheduledPost: (postId: string) => void;
-  onNavigate?: (view: ViewName) => void;
-}
+import { useAppDataContext } from '../MainAppLayout';
 
 const fileToDataURL = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -39,10 +28,16 @@ const fileToDataURL = (file: File): Promise<string> =>
     reader.readAsDataURL(file);
   });
 
-export const SocialPosterView: React.FC<SocialPosterViewProps> = ({
-  currentUser, contentDrafts, personas, operators, onAddScheduledPost, onNavigate,
-  scheduledPosts, connectedAccounts, onUpdateScheduledPost, onDeleteScheduledPost
-}) => {
+export const SocialPosterView: React.FC = () => {
+  const { 
+    currentUser, 
+    contentDrafts, 
+    personas, 
+    operators, 
+    handlers, 
+  } = useAppDataContext();
+  const { addScheduledPost } = handlers;
+
   const { showToast } = useToast();
   const [selectedNetworks, setSelectedNetworks] = useState<Set<SocialPlatformType>>(new Set([SocialPlatformType.Instagram]));
   const [postText, setPostText] = useState('');

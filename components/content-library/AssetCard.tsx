@@ -12,7 +12,7 @@ interface AssetCardProps {
   editingTagsForAssetId: string | null;
   currentEditingTags: string;
   onSelectAsset: (assetId: string) => void;
-  onDeleteAsset: (assetId: string) => void;
+  onDeleteAsset: (asset: ContentLibraryAsset) => void;
   onStartEditTags: (asset: ContentLibraryAsset) => void;
   onSaveTags: (assetId: string) => void;
   onCancelEditTags: () => void;
@@ -119,7 +119,7 @@ const AssetCardComponent: React.FC<AssetCardProps> = ({
         <Button
           variant="destructive"
           size="sm"
-          onClick={() => onDeleteAsset(asset.id)}
+          onClick={() => onDeleteAsset(asset)}
           leftIcon={<TrashIcon className="w-4 h-4" />}
           className="w-full mt-3"
           title={`Delete ${asset.name}`}

@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import { Persona, RSTProfile, UserProfile } from '../../types';
 import { Card } from '../ui/Card';
@@ -16,6 +15,7 @@ interface PersonaCardProps {
   onRefreshVulnerabilities: (persona: Persona) => void;
   onDeepDiveRequest: (persona: Persona) => void;
   isRefreshingVulnerabilities: boolean;
+  isDiving: boolean;
   currentUser: UserProfile;
 }
 
@@ -39,7 +39,7 @@ const InfoSection: React.FC<{ title: string; items: string[] | null | undefined;
 
 const PersonaCardComponent: React.FC<PersonaCardProps> = ({ 
   persona, onEdit, onDelete, onRefreshVulnerabilities, onDeepDiveRequest, 
-  isRefreshingVulnerabilities, currentUser 
+  isRefreshingVulnerabilities, isDiving, currentUser 
 }) => {
   const { showToast } = useToast();
   const hasNoCredits = currentUser.ai_usage_count_monthly >= currentUser.role.max_ai_uses_monthly;
@@ -51,10 +51,6 @@ const PersonaCardComponent: React.FC<PersonaCardProps> = ({
   
   const handleDeepDiveClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if(hasNoCredits) {
-      showToast("You have used all your AI credits for this month.", "error");
-      return;
-    }
     onDeepDiveRequest(persona);
   };
 
@@ -103,6 +99,7 @@ const PersonaCardComponent: React.FC<PersonaCardProps> = ({
             size="sm" 
             variant="secondary" 
             onClick={handleDeepDiveClick}
+            isLoading={isDiving}
             disabled={hasNoCredits}
             title={hasNoCredits ? "You have no AI credits remaining." : "Get a deep dive analysis"}
             leftIcon={<EyeIcon className="w-4 h-4"/>}

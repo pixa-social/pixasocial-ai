@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AuthViewType } from '../../types';
-import { HomePageView } from './HomePageView';
+import { HomePageView } from './homepage/HomePageView';
 import { LoginPageView } from './LoginPageView';
 import { RegisterPageView } from './RegisterPageView';
 import { FeaturesPageView } from './pages/FeaturesPageView';
@@ -13,12 +13,9 @@ import { TermsOfServicePageView } from './pages/TermsOfServicePageView';
 import { AuthHeader } from './AuthHeader';
 import { AuthFooter } from './AuthFooter';
 
-interface AuthLayoutProps {
-  authView: AuthViewType;
-  setAuthView: (view: AuthViewType) => void;
-}
+export const AuthLayout: React.FC = () => {
+  const [authView, setAuthView] = useState<AuthViewType>('home');
 
-export const AuthLayout: React.FC<AuthLayoutProps> = ({ authView, setAuthView }) => {
   const renderAuthView = () => {
     switch (authView) {
       case 'login':

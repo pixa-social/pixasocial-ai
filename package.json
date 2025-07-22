@@ -3,13 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "bun run --hot index.tsx",
+    "dev": "bun --hot",
     "build": "bun build ./index.html --outdir ./dist",
     "start": "bun run ./dist/index.html",
     "lint": "bunx @biomejs/biome lint ./",
     "format": "bunx @biomejs/biome format --write ./"
   },
   "dependencies": {
+    "@ai-sdk/react": "^0.0.12",
     "@google/genai": "^1.9.0",
     "@hookform/resolvers": "^5.1.1",
     "@radix-ui/react-slot": "^1.1.0",
@@ -20,12 +21,14 @@
     "framer-motion": "^11.2.12",
     "gun": "^0.2020.1241",
     "html2canvas": "^1.4.1",
+    "jspdf": "^3.0.1",
     "lucide-react": "^0.395.0",
     "openai": "^5.9.0",
     "react": "^19.1.0",
     "react-big-calendar": "^1.19.4",
     "react-dom": "^19.1.0",
     "react-hook-form": "^7.60.0",
+    "react-router-dom": "^6.25.1",
     "recharts": "^3.1.0",
     "tailwind-merge": "^2.3.0",
     "tailwindcss-animate": "^1.0.7",
@@ -33,7 +36,9 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.8.3",
+    "@vitejs/plugin-react": "^4.7.0",
     "bun-types": "latest",
-    "typescript": "^5.5.3"
+    "typescript": "^5.5.3",
+    "vite": "^7.0.5"
   }
 }

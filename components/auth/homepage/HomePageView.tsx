@@ -1,9 +1,9 @@
 import React from 'react';
 import { AuthViewType } from '../../../types';
-import { HeroSection } from './homepage/HeroSection';
-import { FeaturesSection } from './homepage/FeaturesSection';
-import { BannerFeatureSection } from './homepage/BannerFeatureSection';
-import PixaSocialSections from './homepage/PixaSocialSections';
+import { HeroSection } from './HeroSection';
+import { FeaturesSection } from './FeaturesSection';
+import { BannerFeatureSection } from './BannerFeatureSection';
+import PixaSocialSections from './PixaSocialSections';
 
 interface HomePageViewProps {
   setAuthView: (view: AuthViewType) => void;

@@ -1,7 +1,5 @@
-
-
 import React from 'react';
-import { ViewName, NavItem, AuditStep, Persona, MediaType, AiProviderType, AiProviderConfig, RSTTraitLevel, RSTProfile, SocialPlatformType, SocialPlatformConnectionDetails } from './types';
+import { ViewName, NavItem, AuditStep, Persona, MediaType, AiProviderType, AiProviderConfig, RSTTraitLevel, RSTProfile, SocialPlatformType, SocialPlatformConnectionDetails, ScheduledPostStatus } from './types';
 import type { Operator } from './types';
 import { 
     XIcon, FacebookIcon, InstagramIcon, LinkedInIcon, 
@@ -13,13 +11,15 @@ import {
     TelegramIcon, BlueskyIcon, GoogleBusinessIcon, 
     ThreadsIcon, DiscordIcon, RedditIcon, SnapchatIcon,
     ChartPieIcon,
-    EnvelopeIcon
+    EnvelopeIcon,
+    SparklesIcon
 } from './components/ui/Icons';
 
 export const APP_TITLE = "PixaSocial Ai";
 
 export const NAVIGATION_ITEMS: NavItem[] = [
   { label: ViewName.Dashboard, viewName: ViewName.Dashboard },
+  { label: ViewName.AIAgents, viewName: ViewName.AIAgents, icon: React.createElement(SparklesIcon, { className: 'w-4 h-4' }) },
   { label: ViewName.AudienceModeling, viewName: ViewName.AudienceModeling },
   { label: ViewName.Analytics, viewName: ViewName.Analytics, icon: React.createElement(ChartPieIcon, { className: 'w-4 h-4' }) },
   {
@@ -38,6 +38,26 @@ export const NAVIGATION_ITEMS: NavItem[] = [
   { label: ViewName.AdminPanel, viewName: ViewName.AdminPanel, isAdminOnly: true },
   { label: ViewName.Settings, viewName: ViewName.Settings }, 
 ];
+
+export const VIEW_PATH_MAP: Record<ViewName, string> = {
+    [ViewName.Dashboard]: '/dashboard',
+    [ViewName.AIAgents]: '/agents',
+    [ViewName.AudienceModeling]: '/audience-modeling',
+    [ViewName.Analytics]: '/analytics',
+    [ViewName.OperatorBuilder]: '/operator-builder',
+    [ViewName.ContentPlanner]: '/content-planner',
+    [ViewName.FeedbackSimulator]: '/feedback-simulator',
+    [ViewName.AuditTool]: '/audit-tool',
+    [ViewName.Methodology]: '/methodology',
+    [ViewName.AdminPanel]: '/admin',
+    [ViewName.Calendar]: '/calendar',
+    [ViewName.Settings]: '/settings',
+    [ViewName.DataAnalyzer]: '/data-analyzer',
+    [ViewName.ContentLibrary]: '/content-library',
+    [ViewName.TeamChat]: '/team-chat',
+    [ViewName.SocialPoster]: '/social-poster',
+};
+
 
 export const GEMINI_TEXT_MODEL_NAME = 'gemini-2.5-flash';
 export const GEMINI_IMAGE_MODEL_NAME = 'imagen-3.0-generate-002';
@@ -175,6 +195,29 @@ export const CONTENT_PLATFORMS: Array<{
     targetHeight: 720,
   },
 ];
+
+export const platformColors: Record<string, { bg: string; border: string }> = {
+  X: { bg: '#1DA1F2', border: '#0c85d0' },
+  Facebook: { bg: '#1877F2', border: '#0f5bbf' },
+  Instagram: { bg: '#E4405F', border: '#c32a47' },
+  LinkedIn: { bg: '#0A66C2', border: '#084b91' },
+  Telegram: { bg: '#24A1DE', border: '#1c80b3' },
+  GoogleBusiness: { bg: '#4285F4', border: '#2c6bde' },
+  Reddit: { bg: '#FF4500', border: '#cc3700' },
+  Email: { bg: '#718096', border: '#4a5568' },
+  Poster11: { bg: '#FBBF24', border: '#d99e0b' },
+  Poster169: { bg: '#FBBF24', border: '#d99e0b' },
+  Default: { bg: '#4A5568', border: '#2D3748' }
+};
+
+export const statusColors: Record<ScheduledPostStatus, { bg: string; text: string; border: string }> = {
+  Scheduled: { bg: 'bg-primary/20', text: 'text-primary', border: 'border-primary' },
+  Published: { bg: 'bg-success/20', text: 'text-success', border: 'border-success' },
+  Publishing: { bg: 'bg-yellow-400/20', text: 'text-yellow-400', border: 'border-yellow-400' },
+  Failed: { bg: 'bg-destructive/20', text: 'text-destructive', border: 'border-destructive' },
+  Missed: { bg: 'bg-destructive/20', text: 'text-destructive', border: 'border-destructive' },
+  Cancelled: { bg: 'bg-muted/50', text: 'text-muted-foreground', border: 'border-muted' },
+};
 
 export const RST_TRAIT_LEVELS: RSTTraitLevel[] = ['Not Assessed', 'Low', 'Medium', 'High'];
 

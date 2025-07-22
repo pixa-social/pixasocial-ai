@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Gun from 'gun/gun'; 
 import 'gun/lib/radix'; 
@@ -15,13 +13,10 @@ import { useToast } from './ui/ToastProvider';
 import { ACCEPTED_CHAT_FILE_TYPES, CHAT_IMAGE_PREVIEW_MAX_SIZE_BYTES, GENERAL_CHAT_CHANNEL_ID } from '../constants';
 import { ChatSidebar } from './chat/ChatSidebar';
 import { ChatMessages } from './chat/ChatMessages';
+import { useAppDataContext } from './MainAppLayout';
 
 interface ChatViewProps {
-  currentUser: User;
-  teamMembers: string[];
-  customChannels: CustomChannel[];
-  onAddCustomChannel: (name: string) => void;
-  onRemoveCustomChannel: (channelId: string) => void;
+  // Props are now received from context
 }
 
 const gun = Gun({ 
@@ -40,10 +35,11 @@ const formatBytes = (bytes: number, decimals = 2) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 };
 
-export const ChatView: React.FC<ChatViewProps> = ({ 
-    currentUser, teamMembers, customChannels, 
-    onAddCustomChannel, onRemoveCustomChannel 
-}) => {
+export const ChatView: React.FC<ChatViewProps> = () => { 
+  const { currentUser, customChannels, handlers } = useAppDataContext();
+  const { addCustomChannel, removeCustomChannel } = handlers;
+  const teamMembers = currentUser.teamMembers || [];
+
   const { showToast } = useToast();
   const [activeChannelId, setActiveChannelId] = useState<string>(GENERAL_CHAT_CHANNEL_ID);
   const [messageInput, setMessageInput] = useState('');
@@ -192,8 +188,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
         currentUser={currentUser}
         teamMembers={teamMembers}
         customChannels={customChannels}
-        onAddCustomChannel={onAddCustomChannel}
-        onRemoveCustomChannel={onRemoveCustomChannel}
+        onAddCustomChannel={addCustomChannel}
+        onRemoveCustomChannel={removeCustomChannel}
         activeChannelId={activeChannelId}
         setActiveChannelId={setActiveChannelId}
       />

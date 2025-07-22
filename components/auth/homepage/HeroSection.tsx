@@ -1,6 +1,6 @@
 import React from 'react';
-import { Button } from '@/components/ui/Button';
-import { AuthViewType } from '@/types';
+import { Button } from '../../ui/Button';
+import { AuthViewType } from '../../../types';
 import { ArrowRight, Sparkles, Zap, Target } from 'lucide-react';
 
 interface HeroSectionProps {

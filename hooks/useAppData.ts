@@ -1,12 +1,11 @@
-
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { useToast } from '../components/ui/ToastProvider';
+import * as dataService from '../services/dataService';
 import { 
     Persona, Operator, ContentDraft, ScheduledPost, ScheduledPostDbRow, 
     ContentLibraryAsset, CustomChannel, UserProfile, ConnectedAccount, 
-    SocialPlatformType, Database, Json
+    SocialPlatformType, Database, ScheduledPostStatus
 } from '../types';
 import { CONTENT_PLATFORMS } from '../constants';
 
@@ -101,13 +100,12 @@ export const useAppData = (currentUser: UserProfile | null) => {
             const { data: scheduleData } = await supabase.from('scheduled_posts').select('*').eq('user_id', currentUser.id);
             const scheduledPostsFromDb: ScheduledPost[] = (scheduleData || []).map((p: ScheduledPostDbRow) => {
                 const draft = processedDrafts.find((d: ContentDraft) => d.id === p.content_draft_id);
-                const platformInfo = CONTENT_PLATFORMS.find(plat => plat.key === p.platform_key);
                 let titleContent = "Untitled";
                 if (draft) {
                     const platformDetail = draft.platform_contents[p.platform_key];
                     titleContent = platformDetail?.subject || platformDetail?.content?.substring(0, 20) || draft.key_message?.substring(0,20) || 'Content Draft';
                 }
-                const title = `${typeof platformInfo?.icon === 'string' ? platformInfo.icon : ''} ${platformInfo?.label || p.platform_key}: ${titleContent}...`;
+                const title = `${titleContent}...`;
                 const startDate = new Date(p.scheduled_at);
                 return {
                     id: `sch_${p.id}_${p.platform_key}`, db_id: p.id, title: title, start: startDate,
@@ -124,8 +122,8 @@ export const useAppData = (currentUser: UserProfile | null) => {
     }, [currentUser, fetchContentLibraryAssets, fetchConnectedAccounts, fetchPersonas, fetchOperators]);
 
     // --- Persona Handlers ---
-    const handleAddPersona = useCallback(async (personaData: Partial<Omit<Persona, 'id' | 'user_id' | 'created_at' | 'updated_at'>> & { avatar_base64?: string }) => {
-        if(!currentUser || !personaData.name) return;
+    const handleAddPersona = useCallback(async (personaData: Partial<Omit<Persona, 'id' | 'user_id' | 'created_at' | 'updated_at'>> & { name: string, avatar_base64?: string }) => {
+        if(!currentUser) return;
 
         let avatarUrl = personaData.avatar_url;
         if (personaData.avatar_base64) {
@@ -146,7 +144,7 @@ export const useAppData = (currentUser: UserProfile | null) => {
         } else if (!avatarUrl) {
             avatarUrl = `https://picsum.photos/seed/${personaData.name.trim().toLowerCase().replace(/[^a-z0-9]/gi, '')}/100/100`;
         }
-
+        
         const newPersonaData: Database['public']['Tables']['personas']['Insert'] = {
             name: personaData.name,
             demographics: personaData.demographics || null,
@@ -165,10 +163,11 @@ export const useAppData = (currentUser: UserProfile | null) => {
     }, [currentUser, showToast]);
 
     const handleUpdatePersona = useCallback(async (personaId: number, personaData: Partial<Omit<Persona, 'id' | 'user_id' | 'created_at'>> & { avatar_base64?: string }) => {
+        if (!currentUser) return;
         let updatePayload = { ...personaData };
         delete updatePayload.avatar_base64; // Remove base64 before it goes to db
 
-        if (personaData.avatar_base64 && currentUser) {
+        if (personaData.avatar_base64) {
             const blob = dataURLtoBlob(personaData.avatar_base64);
             if (blob) {
                 const fileName = `avatar_${currentUser.id}_${personaId}_${Date.now()}.png`;
@@ -185,16 +184,19 @@ export const useAppData = (currentUser: UserProfile | null) => {
             }
         }
 
-        const { data, error } = await supabase.from('personas').update({ ...updatePayload, updated_at: new Date().toISOString() }).eq('id', personaId).select().single();
+        const { data, error } = await supabase.from('personas').update(updatePayload).eq('id', personaId).select().single();
         if (error) { showToast(`Failed to update persona: ${error.message}`, 'error'); } 
         else { setPersonas(prev => prev.map(p => p.id === data.id ? data : p)); showToast("Persona updated.", "success"); }
     }, [currentUser, showToast]);
 
-
     const handleDeletePersona = useCallback(async (personaId: number) => {
-        const { error } = await supabase.from('personas').delete().eq('id', personaId);
-        if (error) { showToast(`Failed to delete persona: ${error.message}`, 'error'); } 
-        else { setPersonas(prev => prev.filter(p => p.id !== personaId)); showToast("Persona deleted.", "info"); }
+        const { error } = await dataService.deletePersona(personaId);
+        if (error) {
+            showToast(`Failed to delete persona: ${error.message}`, "error");
+        } else {
+            setPersonas(prev => prev.filter(p => p.id !== personaId));
+            showToast("Persona deleted.", "info");
+        }
     }, [showToast]);
 
     // --- Operator Handlers ---
@@ -207,15 +209,20 @@ export const useAppData = (currentUser: UserProfile | null) => {
     }, [currentUser, showToast]);
 
     const handleUpdateOperator = useCallback(async (operatorId: number, operatorData: Partial<Omit<Operator, 'id' | 'user_id' | 'created_at'>>) => {
+        if (!currentUser) return;
         const { data, error } = await supabase.from('operators').update({ ...operatorData, updated_at: new Date().toISOString() }).eq('id', operatorId).select().single();
         if (error) { showToast(`Failed to update operator: ${error.message}`, 'error'); } 
         else { setOperators(prev => prev.map(o => o.id === data.id ? data : o)); showToast("Operator updated.", "success"); }
-    }, [showToast]);
+    }, [currentUser, showToast]);
 
     const handleDeleteOperator = useCallback(async (operatorId: number) => {
-        const { error } = await supabase.from('operators').delete().eq('id', operatorId);
-        if (error) { showToast(`Failed to delete operator: ${error.message}`, 'error'); } 
-        else { setOperators(prev => prev.filter(o => o.id !== operatorId)); showToast("Operator deleted.", "info"); }
+        const { error } = await dataService.deleteOperator(operatorId);
+        if (error) {
+            showToast(`Failed to delete operator: ${error.message}`, "error");
+        } else {
+            setOperators(prev => prev.filter(o => o.id !== operatorId));
+            showToast("Operator deleted.", "info");
+        }
     }, [showToast]);
 
     // --- Other Handlers ---
@@ -233,7 +240,7 @@ export const useAppData = (currentUser: UserProfile | null) => {
             persona_id: draftData.persona_id, 
             key_message: draftData.key_message || null, 
             custom_prompt: draftData.custom_prompt,
-            platform_contents: platformContentsForDb as Json,
+            platform_contents: platformContentsForDb,
         };
         
         const { data, error } = await supabase.from('content_drafts').insert(dataToInsert).select().single();
@@ -254,13 +261,18 @@ export const useAppData = (currentUser: UserProfile | null) => {
 
     const handleDeleteContentDraft = useCallback(async (draftId: string) => {
         if (window.confirm('Are you sure you want to delete this entire draft?')) {
-            const { error } = await supabase.from('content_drafts').delete().eq('id', draftId);
-            if (error) { showToast(`Failed to delete draft: ${error.message}`, 'error'); } 
-            else { setContentDrafts(prev => prev.filter(d => d.id !== draftId)); showToast('Draft deleted.', 'info'); }
+            const { error } = await dataService.deleteContentDraft(draftId);
+            if (error) {
+                showToast(`Failed to delete draft: ${error.message}`, 'error');
+            } else {
+                setContentDrafts(prev => prev.filter(d => d.id !== draftId));
+                showToast('Draft deleted.', 'info');
+            }
         }
     }, [showToast]);
   
     const handleDeletePlatformContent = useCallback(async (draftId: string, platformKey: string) => {
+        if (!currentUser) return;
         const draft = contentDrafts.find(d => d.id === draftId);
         if (!draft) return;
 
@@ -278,59 +290,127 @@ export const useAppData = (currentUser: UserProfile | null) => {
             _media_overrides: draft.platform_media_overrides || {},
         };
         if (platformContentsForDb._media_overrides) {
-            delete platformContentsForDb._media_overrides[platformKey];
+            delete (platformContentsForDb._media_overrides as any)[platformKey];
         }
 
-        const { error } = await supabase
-            .from('content_drafts')
-            .update({ platform_contents: platformContentsForDb as Json })
-            .eq('id', draftId);
-        
-        if (error) {
-            showToast(`Failed to update draft: ${error.message}`, 'error');
-        } else {
+        try {
+            await supabase
+                .from('content_drafts')
+                .update({ platform_contents: platformContentsForDb })
+                .eq('id', draftId)
+                .throwOnError();
+            
             setContentDrafts(prev => prev.map(d => 
                 d.id === draftId 
                 ? { ...d, platform_contents: newPlatformContents } 
                 : d 
             ));
             showToast(`Removed platform content from draft.`, 'success');
+        } catch (error) {
+            showToast(`Failed to update draft: ${(error as Error).message}`, 'error');
         }
-    }, [contentDrafts, showToast, handleDeleteContentDraft]);
+    }, [currentUser, contentDrafts, showToast, handleDeleteContentDraft]);
   
-    const handleAddScheduledPost = useCallback(async (post: ScheduledPost) => {
+    const handleAddScheduledPost = useCallback(async (post: Omit<ScheduledPost, 'id' | 'db_id' | 'title' | 'end'> & { title: string, end?: Date }) => {
         if(!currentUser) return;
+
+        const draft = contentDrafts.find(d => d.id === post.resource.contentDraftId);
+        if (!draft) {
+            showToast("Associated content draft not found.", "error");
+            return;
+        }
+
         const { data, error } = await supabase.from('scheduled_posts').insert({
             user_id: currentUser.id, content_draft_id: post.resource.contentDraftId, platform_key: post.resource.platformKey,
             status: post.resource.status, notes: post.resource.notes || null, scheduled_at: post.start.toISOString(),
         }).select().single();
         if(error) { showToast(`Failed to schedule: ${error.message}`, 'error');
         } else {
-            const newPostWithDbId = { ...post, db_id: data.id, id: `sch_${data.id}_${data.platform_key}` };
-            setScheduledPosts(prev => [...prev, newPostWithDbId]);
+            const platformInfo = CONTENT_PLATFORMS.find(plat => plat.key === data.platform_key);
+            const platformDetail = draft.platform_contents[data.platform_key];
+            const titleContent = platformDetail?.subject || platformDetail?.content?.substring(0, 20) || draft.key_message?.substring(0,20) || 'Content Draft';
+            const title = `${titleContent}...`;
+            
+            const newPostForState: ScheduledPost = {
+                id: `sch_${data.id}_${data.platform_key}`,
+                db_id: data.id,
+                title: title,
+                start: new Date(data.scheduled_at),
+                end: new Date(new Date(data.scheduled_at).getTime() + 60 * 60 * 1000), // Default 1 hr duration
+                resource: {
+                    ...post.resource,
+                    notes: data.notes,
+                    status: data.status,
+                }
+            };
+            setScheduledPosts(prev => [...prev, newPostForState]);
             showToast("Post scheduled!", "success");
+        }
+    }, [currentUser, showToast, contentDrafts]);
+
+    const handleUpdateScheduledPost = useCallback(async (post: ScheduledPost, updates: Partial<{start: Date, end: Date, notes: string, status: ScheduledPostStatus}>) => {
+        if (!currentUser) return;
+    
+        // Optimistic UI update
+        const updatedPostForState: ScheduledPost = {
+            ...post,
+            start: updates.start ?? post.start,
+            end: updates.end ?? post.end,
+            resource: {
+                ...post.resource,
+                notes: 'notes' in updates ? updates.notes : post.resource.notes,
+                status: updates.status ?? post.resource.status,
+            }
+        };
+        setScheduledPosts(prev => prev.map(p => p.id === post.id ? updatedPostForState : p));
+    
+        // Build database payload with only changed fields
+        const updatePayload: Database['public']['Tables']['scheduled_posts']['Update'] = {};
+        if (updates.start) {
+            updatePayload.scheduled_at = updates.start.toISOString();
+        }
+        if (Object.prototype.hasOwnProperty.call(updates, 'notes')) {
+            updatePayload.notes = updates.notes || null;
+        }
+        if (updates.status) {
+            updatePayload.status = updates.status;
+        }
+    
+        // If there's nothing to update in the DB, just return
+        if (Object.keys(updatePayload).length === 0) {
+            showToast("Schedule updated.", "success");
+            return;
+        }
+    
+        // Make the database call
+        const { error } = await supabase
+            .from('scheduled_posts')
+            .update(updatePayload)
+            .eq('id', post.db_id);
+    
+        if (error) { 
+            showToast(`Failed to update schedule: ${error.message}`, 'error'); 
+            // Revert optimistic update on error
+            setScheduledPosts(prev => prev.map(p => p.id === post.id ? post : p)); 
+        } else { 
+            showToast("Schedule updated.", "success");
         }
     }, [currentUser, showToast]);
 
-    const handleUpdateScheduledPost = useCallback(async (post: ScheduledPost) => {
-        const { error } = await supabase.from('scheduled_posts').update({
-            notes: post.resource.notes || null, status: post.resource.status, scheduled_at: post.start.toISOString(),
-            error_message: post.resource.error_message || null, last_attempted_at: post.resource.last_attempted_at || null,
-        }).eq('id', post.db_id);
-        if (error) { showToast(`Failed to update schedule: ${error.message}`, 'error'); } 
-        else { setScheduledPosts(prev => prev.map(p => p.id === post.id ? post : p)); }
-    }, [showToast]);
-
     const handleDeleteScheduledPost = useCallback(async (postId: string) => {
-        const postToDelete = scheduledPosts.find(p => p.id === postId);
-        if (!postToDelete) return;
-        const { error } = await supabase.from('scheduled_posts').delete().eq('id', postToDelete.db_id);
-        if(error) { showToast(`Failed to delete schedule: ${error.message}`, 'error');
+        const dbId = parseInt(postId.split('_')[1], 10);
+        if (isNaN(dbId)) {
+            showToast("Invalid post database ID.", "error"); return;
+        }
+        
+        const { error } = await dataService.deleteScheduledPost(dbId);
+        if (error) {
+            showToast(`Failed to delete schedule: ${error.message}`, 'error');
         } else {
             setScheduledPosts(prev => prev.filter(p => p.id !== postId));
             showToast("Schedule removed.", "info");
         }
-    }, [scheduledPosts, showToast]);
+    }, [showToast]);
   
     const handleAddConnectedAccount = useCallback(async (platform: SocialPlatformType, accountId: string, displayName: string) => {
         if(!currentUser) return;
@@ -345,13 +425,14 @@ export const useAppData = (currentUser: UserProfile | null) => {
     }, [currentUser, showToast]);
 
     const handleDeleteConnectedAccount = useCallback(async (accountId: string, platformName: string) => {
-        const { error } = await supabase.from('connected_accounts').delete().eq('id', accountId);
-        if(error) { showToast(`Failed to disconnect: ${error.message}`, 'error');
+        const { error } = await dataService.deleteConnectedAccount(accountId);
+        if (error) {
+            showToast(`Failed to disconnect: ${error.message}`, 'error');
         } else {
-            fetchConnectedAccounts();
+            setConnectedAccounts(prev => prev.filter(acc => acc.id !== accountId));
             showToast(`Account for ${platformName} disconnected.`, "info");
         }
-    }, [showToast, fetchConnectedAccounts]);
+    }, [showToast]);
 
     const handleAddAsset = useCallback(async (file: File, name: string, tags: string[]) => {
         if (!currentUser) return;
@@ -368,40 +449,54 @@ export const useAppData = (currentUser: UserProfile | null) => {
     }, [currentUser, showToast, fetchContentLibraryAssets]);
 
     const handleUpdateAsset = useCallback(async (assetId: string, updates: Partial<Pick<ContentLibraryAsset, 'name' | 'tags'>>) => {
+        if (!currentUser) return;
         const { error } = await supabase.from('content_library_assets').update(updates).eq('id', assetId);
         if (error) { showToast(`Failed to update asset: ${error.message}`, 'error');
         } else { showToast("Asset updated successfully!", "success"); fetchContentLibraryAssets(); }
-    }, [showToast, fetchContentLibraryAssets]);
+    }, [currentUser, showToast, fetchContentLibraryAssets]);
 
-    const handleRemoveAsset = useCallback(async (assetId: string) => {
-        const assetToDelete = contentLibraryAssets.find(a => a.id === assetId);
-        if (!assetToDelete) return;
-        await supabase.storage.from('content-library').remove([assetToDelete.storage_path]);
-        const { error } = await supabase.from('content_library_assets').delete().eq('id', assetId);
-        if (error) { showToast(`Failed to delete asset record: ${error.message}`, 'error');
-        } else { showToast("Asset deleted successfully.", "info"); fetchContentLibraryAssets(); }
-    }, [contentLibraryAssets, showToast, fetchContentLibraryAssets]);
-  
+    const handleRemoveAsset = useCallback(async (assetId: string, storagePath: string) => {
+        const { error } = await dataService.deleteContentLibraryAsset(assetId, storagePath);
+
+        if (error) {
+            showToast(`Failed to delete asset: ${error.message}`, 'error');
+        } else {
+            setContentLibraryAssets(prev => prev.filter(asset => asset.id !== assetId));
+            showToast("Asset deleted successfully.", "success");
+        }
+    }, [showToast]);
+
     const handleAddCustomChannel = useCallback((name: string) => {
-        if(!currentUser) return;
+        if (!currentUser) return;
         const newChannel: CustomChannel = { id: `custom_${Date.now()}`, uuid: `uuid_${Date.now()}`, name, created_by: currentUser.id, created_at: new Date().toISOString() };
         const updatedChannels = [...customChannels, newChannel];
         setCustomChannels(updatedChannels);
         localStorage.setItem(`pixasocial_channels_${currentUser.id}`, JSON.stringify(updatedChannels));
-        showToast(`Channel "${name}" created.`, "success");
-    }, [customChannels, currentUser, showToast]);
+        showToast(`Channel "${name}" created.`, 'success');
+    }, [currentUser, customChannels, showToast]);
 
     const handleRemoveCustomChannel = useCallback((channelId: string) => {
-        if(!currentUser) return;
+        if (!currentUser) return;
         const updatedChannels = customChannels.filter(c => c.id !== channelId);
         setCustomChannels(updatedChannels);
         localStorage.setItem(`pixasocial_channels_${currentUser.id}`, JSON.stringify(updatedChannels));
-        showToast(`Channel removed.`, "info");
-    }, [customChannels, currentUser, showToast]);
-
+        showToast(`Channel removed.`, 'info');
+    }, [currentUser, customChannels, showToast]);
+    
     return {
-        personas, operators, contentDrafts, scheduledPosts,
-        contentLibraryAssets, customChannels, connectedAccounts,
+        personas,
+        operators,
+        contentDrafts,
+        scheduledPosts,
+        contentLibraryAssets,
+        customChannels,
+        connectedAccounts,
+        fetchers: {
+            fetchPersonas,
+            fetchOperators,
+            fetchContentLibraryAssets,
+            fetchConnectedAccounts,
+        },
         handlers: {
             addPersona: handleAddPersona,
             updatePersona: handleUpdatePersona,
@@ -421,12 +516,7 @@ export const useAppData = (currentUser: UserProfile | null) => {
             updateAsset: handleUpdateAsset,
             removeAsset: handleRemoveAsset,
             addCustomChannel: handleAddCustomChannel,
-            removeCustomChannel: handleRemoveCustomChannel
-        },
-        fetchers: {
-            fetchConnectedAccounts,
-            fetchPersonas,
-            fetchOperators,
+            removeCustomChannel: handleRemoveCustomChannel,
         }
     };
 };

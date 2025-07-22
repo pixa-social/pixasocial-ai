@@ -1,23 +1,24 @@
 
 
+
 import React, { useState, useCallback, useRef, useMemo } from 'react';
-import { Persona, RSTProfile, ViewName, RSTTraitLevel, UserProfile, LibraryPersona, Json, AIPersonaDeepDive } from '../types'; 
-import { Card } from './ui/Card';
-import { Button } from './ui/Button';
-import { Input } from './ui/Input';
-import { Select, SelectOption } from './ui/Select';
-import { LoadingSpinner } from './ui/LoadingSpinner';
-import { generateJson, generateImages } from '../services/aiService';
-import { getExecutionConfig } from '../services/ai/aiUtils';
-import { supabase } from '../services/supabaseClient';
-import { RST_TRAITS, DEFAULT_PERSONA_AVATAR, RST_FILTER_OPTIONS, ITEMS_PER_PAGE, RST_TRAIT_LEVELS } from '../constants'; 
-import RstIntroductionGraphic from './RstIntroductionGraphic';
-import { useToast } from './ui/ToastProvider'; 
+import { Persona, RSTProfile, ViewName, UserProfile, LibraryPersona, Json, AIPersonaDeepDive } from '../../types'; 
+import { Card } from '../ui/Card';
+import { Button } from '../ui/Button';
+import { Input } from '../ui/Input';
+import { Select, SelectOption } from '../ui/Select';
+import { LoadingSpinner } from '../ui/LoadingSpinner';
+import { generateJson, generateImages } from '../../services/aiService';
+import { getExecutionConfig } from '../../services/ai/aiUtils';
+import { supabase } from '../../services/supabaseClient';
+import { RST_TRAITS, DEFAULT_PERSONA_AVATAR, RST_FILTER_OPTIONS, ITEMS_PER_PAGE, RST_TRAIT_LEVELS } from '../../constants'; 
+import RstIntroductionGraphic from '../RstIntroductionGraphic';
+import { useToast } from '../ui/ToastProvider'; 
 import { PersonaForm } from './audience-modeling/PersonaForm';
 import { PersonaCard } from './audience-modeling/PersonaCard';
 import { PersonaDeepDiveModal } from './audience-modeling/PersonaDeepDiveModal';
-import { ArrowPathIcon, AdjustmentsHorizontalIcon, ChevronUpIcon, ChevronDownIcon, ArrowDownOnSquareIcon } from './ui/Icons';
-import { PrerequisiteMessageCard } from './ui/PrerequisiteMessageCard';
+import { ArrowPathIcon, AdjustmentsHorizontalIcon, ChevronUpIcon, ChevronDownIcon, ArrowDownOnSquareIcon } from '../ui/Icons';
+import { PrerequisiteMessageCard } from '../ui/PrerequisiteMessageCard';
 import { PersonaLibraryModal } from './audience-modeling/PersonaLibraryModal';
 
 const ITEMS_PER_PAGE_OPTIONS = [
@@ -57,7 +58,7 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ curr
   const [isMappingPersona, setIsMappingPersona] = useState(false);
 
   // New state for Deep Dive
-  const [deepDiveData, setDeepDiveData] = useState<{ persona: Persona; analysis: AIPersonaDeepDive } | null>(null);
+  const [deepDiveData, setDeepDiveData] = useState<{ persona: Persona; analysis: AIPersonaDeepDive | null } | null>(null);
   const [isDiving, setIsDiving] = useState<Record<string, boolean>>({});
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -65,6 +66,8 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ curr
   const [filterName, setFilterName] = useState('');
   const [sortField, setSortField] = useState<'name' | 'id'>('id');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  const hasNoCredits = currentUser.ai_usage_count_monthly >= currentUser.role.max_ai_uses_monthly;
 
   const resetFiltersAndPagination = useCallback(() => {
     setFilterName('');
@@ -140,68 +143,49 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ curr
     setIndividualLoading(prev => ({ ...prev, [String(persona.id)]: false }));
   }, [currentUser, onUpdatePersona, showToast]);
 
-  const handleDeepDiveRequest = async (persona: Persona) => {
-    setIsDiving(prev => ({...prev, [String(persona.id)]: true }));
+  const handleDeepDiveRequest = useCallback(async (persona: Persona, isRefresh = false) => {
+    if (hasNoCredits) { showToast("You have used all your AI credits for this month.", "error"); return; }
     
-    // 1. Check for existing deep dive
-    const { data: existingDive, error: fetchError } = await supabase
-        .from('persona_deep_dives')
-        .select('*')
-        .eq('persona_id', persona.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-        
-    if (fetchError && fetchError.code !== 'PGRST116') { // Ignore "no rows found"
+    setIsDiving(prev => ({ ...prev, [String(persona.id)]: true }));
+    
+    if (!isRefresh) {
+      setDeepDiveData({ persona, analysis: null }); // Open modal in loading state
+      const { data: existingDive, error: fetchError } = await supabase
+        .from('persona_deep_dives').select('*').eq('persona_id', persona.id)
+        .order('created_at', { ascending: false }).limit(1).single();
+
+      if (fetchError && fetchError.code !== 'PGRST116') {
         showToast(`Error fetching deep dive: ${fetchError.message}`, 'error');
-        setIsDiving(prev => ({...prev, [String(persona.id)]: false }));
-        return;
-    }
-    
-    if (existingDive) {
-        setDeepDiveData({ persona, analysis: { ...existingDive, marketingHooks: existingDive.marketing_hooks || [] } });
-        showToast("Loaded existing deep dive analysis.", "info");
-        setIsDiving(prev => ({...prev, [String(persona.id)]: false }));
-        return;
+        setIsDiving(prev => ({ ...prev, [String(persona.id)]: false }));
+        setDeepDiveData(null); return;
+      }
+      if (existingDive) {
+        setDeepDiveData({ persona, analysis: { ...existingDive, marketingHooks: existingDive.marketing_hooks || [] } as AIPersonaDeepDive });
+        setIsDiving(prev => ({ ...prev, [String(persona.id)]: false })); return;
+      }
     }
 
-    // 2. If not found, generate a new one
-    const rstProfile = persona.rst_profile as unknown as RSTProfile;
-    const prompt = `
-        Provide a deep dive analysis of the following persona. Return a valid JSON object.
-        Persona: ${JSON.stringify({name: persona.name, demographics: persona.demographics, psychographics: persona.psychographics, goals: persona.goals, fears: persona.fears, rst_profile: rstProfile })}
-        JSON structure: { "communicationStyle": "...", "mediaHabits": "...", "motivations": "...", "marketingHooks": ["...", "..."] }
-    `;
-    
-    const execConfig = await getExecutionConfig('text', currentUser);
+    const rstProfile = persona.rst_profile as unknown as RSTProfile | null;
+    const prompt = `Provide a deep dive analysis of the following persona. Return a valid JSON object. Persona: ${JSON.stringify({name: persona.name, demographics: persona.demographics, psychographics: persona.psychographics, goals: persona.goals, fears: persona.fears, rst_profile: rstProfile })} JSON structure: { "communicationStyle": "...", "mediaHabits": "...", "motivations": "...", "marketingHooks": ["...", "..."] }`;
     const result = await generateJson<AIPersonaDeepDive>(prompt, currentUser);
 
     if (result.data) {
-        // 3. Save the new dive to the database
-        const { error: insertError } = await supabase
-            .from('persona_deep_dives')
-            .insert({
-                persona_id: persona.id,
-                user_id: currentUser.id,
-                communication_style: result.data.communicationStyle,
-                media_habits: result.data.mediaHabits,
-                motivations: result.data.motivations,
-                marketing_hooks: result.data.marketingHooks,
-                ai_model_used: execConfig?.model || 'unknown',
-            });
-            
-        if (insertError) {
-            showToast(`Failed to save new deep dive: ${insertError.message}`, 'error');
-        }
-
+        if (isRefresh) await supabase.from('persona_deep_dives').delete().eq('persona_id', persona.id);
+        await supabase.from('persona_deep_dives').insert({
+            persona_id: persona.id, user_id: currentUser.id,
+            communication_style: result.data.communicationStyle,
+            media_habits: result.data.mediaHabits,
+            motivations: result.data.motivations,
+            marketing_hooks: result.data.marketingHooks,
+        });
         setDeepDiveData({ persona, analysis: result.data });
-
+        if (isRefresh) showToast("Analysis refreshed!", "success");
     } else {
         showToast(result.error || "Failed to generate deep dive analysis.", 'error');
+        if (!isRefresh) setDeepDiveData(null);
     }
-
-    setIsDiving(prev => ({...prev, [String(persona.id)]: false }));
-  };
+    setIsDiving(prev => ({ ...prev, [String(persona.id)]: false }));
+  }, [currentUser, showToast, hasNoCredits]);
 
 
   const handleEdit = (persona: Persona) => { setEditingPersona(persona); setShowForm(true); setError(null); };
@@ -231,7 +215,12 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ curr
   return (
     <div className="p-6">
        {isLibraryOpen && <PersonaLibraryModal isOpen={isLibraryOpen} onClose={() => setIsLibraryOpen(false)} onImport={handleImportAndMapPersona} isMapping={isMappingPersona} />}
-       {deepDiveData && <PersonaDeepDiveModal data={deepDiveData} onClose={() => setDeepDiveData(null)} />}
+       {deepDiveData && <PersonaDeepDiveModal 
+          data={deepDiveData} 
+          onClose={() => setDeepDiveData(null)}
+          onRefresh={(p) => handleDeepDiveRequest(p, true)}
+          isRefreshing={isDiving[String(deepDiveData.persona.id)] || false}
+        />}
       <RstIntroductionGraphic />
       <div className="flex justify-between items-center mb-6 mt-2 flex-wrap gap-2">
         <h2 className="text-3xl font-bold text-textPrimary">Audience Persona Management</h2>
@@ -273,7 +262,8 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ curr
                 onRefreshVulnerabilities={handleSimulateVulnerabilitiesOnCard} 
                 isRefreshingVulnerabilities={individualLoading[String(persona.id)] || false} 
                 currentUser={currentUser}
-                onDeepDiveRequest={handleDeepDiveRequest}
+                onDeepDiveRequest={() => handleDeepDiveRequest(persona)}
+                isDiving={isDiving[String(persona.id)] || false}
               />
               ))}
           </div>

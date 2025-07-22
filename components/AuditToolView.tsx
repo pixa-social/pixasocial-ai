@@ -6,10 +6,7 @@ import { Textarea } from './ui/Textarea';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { generateJson } from '../services/aiService';
 import { AUDIT_TOOL_STEPS_DATA } from '../constants';
-
-interface AuditToolViewProps {
-  currentUser: UserProfile;
-}
+import { useAppDataContext } from './MainAppLayout';
 
 const downloadFile = (filename: string, content: string, mimeType: string) => {
   const element = document.createElement('a');
@@ -21,7 +18,8 @@ const downloadFile = (filename: string, content: string, mimeType: string) => {
   document.body.removeChild(element);
 };
 
-export const AuditToolView: React.FC<AuditToolViewProps> = ({ currentUser }) => {
+export const AuditToolView: React.FC = () => {
+  const { currentUser } = useAppDataContext();
   const initialSteps: AuditStep[] = AUDIT_TOOL_STEPS_DATA.map(s_item => ({
     id: s_item.id,
     title: s_item.title,

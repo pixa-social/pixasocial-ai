@@ -97,16 +97,34 @@ export const getApiKeyForProvider = async (providerType: AiProviderType): Promis
 
 export const parseJsonFromText = <T,>(text: string): AIParsedJsonResponse<T> => {
   let jsonStr = text.trim();
-  const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
+  
+  // Regex to find a JSON code block, allowing for surrounding text.
+  // It captures the content inside ```json ... ``` or ``` ... ```.
+  const fenceRegex = /```(?:json)?\s*([\s\S]*?)\s*```/;
   const match = jsonStr.match(fenceRegex);
-  if (match && match[2]) {
-    jsonStr = match[2].trim();
+
+  if (match && match[1]) {
+    // If a fenced code block is found, use its content.
+    jsonStr = match[1].trim();
+  } else {
+    // Fallback for cases where there might be no fence but it's just a JSON object.
+    const firstBrace = jsonStr.indexOf('{');
+    const lastBrace = jsonStr.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace > firstBrace) {
+      jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
+    }
   }
 
   try {
-    const parsedData = JSON.parse(jsonStr);
+    // Models sometimes include comments which are not valid JSON.
+    // This regex removes single-line JS-style comments. It's a common error.
+    const jsonWithoutComments = jsonStr.replace(/\/\/.*/g, '');
+    const parsedData = JSON.parse(jsonWithoutComments);
     return { data: parsedData };
   } catch (e) {
+    // If the above fails, it might be due to other invalid syntax like unquoted text.
+    // We log the error and return a failure state. Trying to "fix" arbitrary invalid JSON
+    // is brittle and can lead to unexpected data corruption. The fix should be in the prompt.
     console.error("Failed to parse JSON response:", e, "Original text:", text);
     return { data: null, error: `Failed to parse JSON: ${(e as Error).message}. Original text: ${text.slice(0,100)}...` };
   }
