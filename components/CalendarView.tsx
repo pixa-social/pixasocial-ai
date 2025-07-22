@@ -6,7 +6,7 @@ import { getDay } from 'date-fns/getDay';
 import { parse as fnsParse } from 'date-fns/parse';
 import { startOfWeek } from 'date-fns/startOfWeek';
 import { enUS } from 'date-fns/locale/en-US';
-import { ScheduledPost, ViewName, ScheduledPostStatus } from '../../types';
+import { ScheduledPost, ViewName, ScheduledPostStatus } from '../types';
 import { PrerequisiteMessageCard } from './ui/PrerequisiteMessageCard';
 import { CalendarSkeleton } from './skeletons/CalendarSkeleton';
 import { useAppDataContext } from './MainAppLayout';

@@ -21,6 +21,7 @@
     "framer-motion": "^11.2.12",
     "gun": "^0.2020.1241",
     "html2canvas": "^1.4.1",
+    "jspdf": "^2.5.1",
     "lucide-react": "^0.395.0",
     "openai": "^5.9.0",
     "react": "^19.1.0",

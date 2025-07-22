@@ -6,13 +6,13 @@ import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon, PlusCircleIcon } from 
 import { CONTENT_PLATFORMS } from '../../constants';
 import { ScheduledPost, ScheduledPostStatus } from '../../types';
 
-interface CustomToolbarProps extends ToolbarProps<ScheduledPost> {
+type CustomToolbarProps = ToolbarProps<ScheduledPost> & {
   statusFilter: ScheduledPostStatus | 'all';
   onStatusFilterChange: (status: ScheduledPostStatus | 'all') => void;
   platformFilter: string | 'all';
   onPlatformFilterChange: (platform: string | 'all') => void;
   onScheduleNew: () => void;
-}
+};
 
 const statusOptions = [
   { value: 'all', label: 'All Statuses' },
@@ -29,20 +29,18 @@ const platformOptions = [
   ...CONTENT_PLATFORMS.map(p => ({ value: p.key, label: p.label })),
 ];
 
-export const CalendarToolbar: React.FC<CustomToolbarProps> = (props) => {
-  const {
-    onNavigate,
-    onView,
-    label,
-    view,
-    views,
-    statusFilter,
-    onStatusFilterChange,
-    platformFilter,
-    onPlatformFilterChange,
-    onScheduleNew,
-  } = props;
-
+export const CalendarToolbar: React.FC<CustomToolbarProps> = ({
+  onNavigate,
+  onView,
+  label,
+  view,
+  views,
+  statusFilter,
+  onStatusFilterChange,
+  platformFilter,
+  onPlatformFilterChange,
+  onScheduleNew,
+}) => {
   const viewNames = Array.isArray(views) ? views : (Object.keys(views) as View[]);
 
   return (
