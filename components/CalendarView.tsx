@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Calendar as BigCalendar, dateFnsLocalizer, Views, SlotInfo } from 'react-big-calendar';
-import * as Dnd from 'react-big-calendar/lib/addons/dragAndDrop';
+import dnd from 'react-big-calendar/lib/addons/dragAndDrop';
 import { format } from 'date-fns/format';
 import { getDay } from 'date-fns/getDay';
 import { parse as fnsParse } from 'date-fns/parse';
@@ -25,8 +25,9 @@ const localizer = dateFnsLocalizer({
 });
 
 // The default export from 'react-big-calendar/lib/addons/dragAndDrop' can be inconsistent with esm.sh.
-// This handles cases where it's a namespace with a `default` property or the module itself.
-const withDragAndDrop = (Dnd as any).default ?? Dnd;
+// This handles cases where the default export is an object containing another 'default' property (CJS/ESM interop),
+// or if the default export is the function itself.
+const withDragAndDrop = (dnd as any).default || dnd;
 const DnDCalendar = withDragAndDrop(BigCalendar);
 
 export const CalendarView: React.FC = () => {
