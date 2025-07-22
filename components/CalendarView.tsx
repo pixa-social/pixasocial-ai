@@ -1,12 +1,12 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Calendar as BigCalendar, dateFnsLocalizer, Views, SlotInfo } from 'react-big-calendar';
-import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop';
+import * as Dnd from 'react-big-calendar/lib/addons/dragAndDrop';
 import { format } from 'date-fns/format';
 import { getDay } from 'date-fns/getDay';
 import { parse as fnsParse } from 'date-fns/parse';
 import { startOfWeek } from 'date-fns/startOfWeek';
 import { enUS } from 'date-fns/locale/en-US';
-import { ScheduledPost, ViewName, ScheduledPostStatus } from '../types';
+import { ScheduledPost, ViewName, ScheduledPostStatus } from '../../types';
 import { PrerequisiteMessageCard } from './ui/PrerequisiteMessageCard';
 import { CalendarSkeleton } from './skeletons/CalendarSkeleton';
 import { useAppDataContext } from './MainAppLayout';
@@ -23,7 +23,11 @@ const localizer = dateFnsLocalizer({
   getDay,
   locales,
 });
-const DnDCalendar = withDragAndDrop<ScheduledPost>(BigCalendar);
+
+// The default export from 'react-big-calendar/lib/addons/dragAndDrop' can be inconsistent with esm.sh.
+// This handles cases where it's a namespace with a `default` property or the module itself.
+const withDragAndDrop = (Dnd as any).default ?? Dnd;
+const DnDCalendar = withDragAndDrop(BigCalendar);
 
 export const CalendarView: React.FC = () => {
   const { scheduledPosts, contentDrafts, personas, operators, handlers, onNavigate } = useAppDataContext();

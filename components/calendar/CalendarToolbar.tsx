@@ -4,9 +4,9 @@ import { Button } from '../ui/Button';
 import { Select } from '../ui/Select';
 import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon, PlusCircleIcon } from '../ui/Icons';
 import { CONTENT_PLATFORMS } from '../../constants';
-import { ScheduledPostStatus } from '../../types';
+import { ScheduledPost, ScheduledPostStatus } from '../../types';
 
-interface CustomToolbarProps extends ToolbarProps {
+interface CustomToolbarProps extends ToolbarProps<ScheduledPost> {
   statusFilter: ScheduledPostStatus | 'all';
   onStatusFilterChange: (status: ScheduledPostStatus | 'all') => void;
   platformFilter: string | 'all';
