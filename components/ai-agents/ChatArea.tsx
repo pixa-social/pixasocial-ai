@@ -1,7 +1,8 @@
+
 import React, { useRef, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useChat } from '@ai-sdk/react';
-import { Persona, UserProfile } from '../../types';
+import { Persona, UserProfile, AdminPersona } from '../../types';
 import { Textarea } from '../ui/Textarea';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
@@ -67,8 +68,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   /* callbacks wrapped in useCallback to preserve reference equality */
   const handlePersonaSelect = useCallback(
-    (persona: Persona) => {
-      chatHandlers.handleSetActivePersona(persona);
+    (persona: Persona | AdminPersona) => {
+      if ('user_id' in persona) { // This is a type guard for Persona
+        chatHandlers.handleSetActivePersona(persona);
+      }
+      // An admin persona cannot be selected from within an active chat area,
+      // so we don't need an else block.
       setPopoverOpen(false);
     },
     [chatHandlers],

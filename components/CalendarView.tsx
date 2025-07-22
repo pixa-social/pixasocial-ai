@@ -7,13 +7,14 @@ import { parse as fnsParse } from 'date-fns/parse';
 import { startOfWeek } from 'date-fns/startOfWeek';
 import { enUS } from 'date-fns/locale/en-US';
 import { ScheduledPost, ViewName, ScheduledPostStatus } from '../types';
-import { PrerequisiteMessageCard } from './ui/PrerequisiteMessageCard';
+import { EmptyState } from './ui/EmptyState';
 import { CalendarSkeleton } from './skeletons/CalendarSkeleton';
 import { useAppDataContext } from './MainAppLayout';
 import { EventDetailModal } from './calendar/EventDetailModal';
 import { NewEventModal } from './calendar/NewEventModal';
 import { CalendarToolbar } from './calendar/CalendarToolbar';
 import { CalendarEvent } from './calendar/CalendarEvent';
+import { DocumentTextIcon } from './ui/Icons';
 
 const locales = { 'en-US': enUS };
 const localizer = dateFnsLocalizer({
@@ -99,7 +100,12 @@ export const CalendarView: React.FC = () => {
     return <CalendarSkeleton />;
   }
   if (contentDrafts.length === 0) {
-    return <PrerequisiteMessageCard title="Create Content to Schedule" message="Please create at least one content draft in the Content Planner before using the calendar." action={{ label: 'Go to Content Planner', onClick: () => onNavigate(ViewName.ContentPlanner) }} />;
+    return <EmptyState
+      icon={<DocumentTextIcon className="w-8 h-8 text-primary" />}
+      title="Create Content to Schedule"
+      description="The calendar visualizes your scheduled posts. Start by creating content drafts in the Content Planner."
+      action={{ label: 'Go to Content Planner', onClick: () => onNavigate(ViewName.ContentPlanner) }}
+    />;
   }
 
   return (

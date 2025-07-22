@@ -7,6 +7,51 @@ export type Json = | string | number | boolean | null | { [key: string]: Json } 
 export interface Database {
   public: {
     Tables: {
+      admin_personas: {
+        Row: {
+          id: number;
+          name: string;
+          demographics: string | null;
+          psychographics: string | null;
+          initial_beliefs: string | null;
+          vulnerabilities: string[] | null;
+          goals: string[] | null;
+          fears: string[] | null;
+          avatar_url: string | null;
+          rst_profile: Json | null;
+          created_at: string;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: number;
+          name: string;
+          demographics?: string | null;
+          psychographics?: string | null;
+          initial_beliefs?: string | null;
+          vulnerabilities?: string[] | null;
+          goals?: string[] | null;
+          fears?: string[] | null;
+          avatar_url?: string | null;
+          rst_profile?: Json | null;
+          created_at?: string;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          name?: string;
+          demographics?: string | null;
+          psychographics?: string | null;
+          initial_beliefs?: string | null;
+          vulnerabilities?: string[] | null;
+          goals?: string[] | null;
+          fears?: string[] | null;
+          avatar_url?: string | null;
+          rst_profile?: Json | null;
+          created_at?: string;
+          updated_at?: string | null;
+        };
+        Relationships: [];
+      };
       app_global_settings: {
         Row: {
           id: number;
@@ -150,6 +195,7 @@ export interface Database {
           rst_profile: Json | null;
           created_at: string;
           updated_at: string | null;
+          source_admin_persona_id: number | null;
         };
         Insert: {
           user_id: string;
@@ -162,6 +208,7 @@ export interface Database {
           fears?: string[] | null;
           avatar_url?: string | null;
           rst_profile?: Json | null;
+          source_admin_persona_id?: number | null;
         };
         Update: {
           id?: number;
@@ -177,8 +224,16 @@ export interface Database {
           rst_profile?: Json | null;
           created_at?: string;
           updated_at?: string | null;
+          source_admin_persona_id?: number | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "personas_source_admin_persona_id_fkey";
+            columns: ["source_admin_persona_id"];
+            referencedRelation: "admin_personas";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       persona_deep_dives: {
         Row: {

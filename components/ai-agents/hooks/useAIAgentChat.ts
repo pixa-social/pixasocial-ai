@@ -1,5 +1,3 @@
-
-
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useChat, Message } from '@ai-sdk/react';
 import { useToast } from '../../ui/ToastProvider';
@@ -180,9 +178,9 @@ When chatting, communicate naturally as this person would. Your goal is a realis
         }, 0);
     };
 
-    const handleNewChat = useCallback(() => {
+    const handleNewChat = useCallback((personaToChatWith?: Persona) => {
         setActiveSessionId(null);
-        setActivePersona(personas[0] || null);
+        setActivePersona(personaToChatWith || personas[0] || null);
         chatHelpers.setMessages([]);
         setSentiment(null);
         setInsights(null);

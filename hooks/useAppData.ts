@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { useToast } from '../components/ui/ToastProvider';
@@ -5,7 +6,7 @@ import * as dataService from '../services/dataService';
 import { 
     Persona, Operator, ContentDraft, ScheduledPost, ScheduledPostDbRow, 
     ContentLibraryAsset, CustomChannel, UserProfile, ConnectedAccount, 
-    SocialPlatformType, Database, ScheduledPostStatus
+    SocialPlatformType, Database, ScheduledPostStatus, AdminPersona
 } from '../types';
 import { CONTENT_PLATFORMS } from '../constants';
 
@@ -24,7 +25,6 @@ const dataURLtoBlob = (dataurl: string) => {
     return new Blob([u8arr], {type:mime});
 }
 
-
 export const useAppData = (currentUser: UserProfile | null) => {
     const { showToast } = useToast();
   
@@ -35,6 +35,7 @@ export const useAppData = (currentUser: UserProfile | null) => {
     const [contentLibraryAssets, setContentLibraryAssets] = useState<ContentLibraryAsset[]>([]);
     const [customChannels, setCustomChannels] = useState<CustomChannel[]>([]);
     const [connectedAccounts, setConnectedAccounts] = useState<ConnectedAccount[]>([]);
+    const [adminPersonas, setAdminPersonas] = useState<AdminPersona[]>([]);
     
     const fetchPersonas = useCallback(async () => {
         if (!currentUser) return;
@@ -70,11 +71,18 @@ export const useAppData = (currentUser: UserProfile | null) => {
         else { setConnectedAccounts(data || []); }
     }, [currentUser, showToast]);
 
+    const fetchAdminPersonas = useCallback(async () => {
+        const { data, error } = await supabase.from('admin_personas').select('*').order('name', { ascending: true });
+        if (error) { showToast('Could not fetch template agent personas.', 'error'); }
+        else { setAdminPersonas(data || []); }
+    }, [showToast]);
+
     useEffect(() => {
         if (!currentUser) return;
         const fetchAllData = async () => {
             fetchPersonas();
             fetchOperators();
+            fetchAdminPersonas();
             const { data: rawDraftData } = await supabase.from('content_drafts').select('*').eq('user_id', currentUser.id);
 
             // Process raw data to create the client-side ContentDraft shape
@@ -119,11 +127,11 @@ export const useAppData = (currentUser: UserProfile | null) => {
             setScheduledPosts(scheduledPostsFromDb);
         };
         fetchAllData();
-    }, [currentUser, fetchContentLibraryAssets, fetchConnectedAccounts, fetchPersonas, fetchOperators]);
+    }, [currentUser, fetchContentLibraryAssets, fetchConnectedAccounts, fetchPersonas, fetchOperators, fetchAdminPersonas]);
 
     // --- Persona Handlers ---
     const handleAddPersona = useCallback(async (personaData: Partial<Omit<Persona, 'id' | 'user_id' | 'created_at' | 'updated_at'>> & { name: string, avatar_base64?: string }) => {
-        if(!currentUser) return;
+        if(!currentUser) return { data: null, error: { message: "No user found." } as any };
 
         let avatarUrl = personaData.avatar_url;
         if (personaData.avatar_base64) {
@@ -156,10 +164,17 @@ export const useAppData = (currentUser: UserProfile | null) => {
             rst_profile: personaData.rst_profile || null,
             user_id: currentUser.id,
             avatar_url: avatarUrl,
+            source_admin_persona_id: (personaData as any).source_admin_persona_id || null,
         };
         const { data, error } = await supabase.from('personas').insert(newPersonaData).select().single();
-        if (error) { showToast(`Failed to create persona: ${error.message}`, 'error'); } 
-        else { setPersonas(prev => [data, ...prev]); showToast("Persona created.", "success"); }
+        if (error) { 
+            showToast(`Failed to create persona: ${error.message}`, 'error'); 
+        } 
+        else if(data) { 
+            setPersonas(prev => [data, ...prev]); 
+            showToast("Persona created.", "success"); 
+        }
+        return { data, error };
     }, [currentUser, showToast]);
 
     const handleUpdatePersona = useCallback(async (personaId: number, personaData: Partial<Omit<Persona, 'id' | 'user_id' | 'created_at'>> & { avatar_base64?: string }) => {
@@ -491,11 +506,13 @@ export const useAppData = (currentUser: UserProfile | null) => {
         contentLibraryAssets,
         customChannels,
         connectedAccounts,
+        adminPersonas,
         fetchers: {
             fetchPersonas,
             fetchOperators,
             fetchContentLibraryAssets,
             fetchConnectedAccounts,
+            fetchAdminPersonas,
         },
         handlers: {
             addPersona: handleAddPersona,

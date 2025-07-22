@@ -5,7 +5,7 @@ import { Button } from './ui/Button';
 import { ArrowDownOnSquareIcon } from './ui/Icons';
 import { ScheduleModal } from './content-planner/ScheduleModal';
 import ContentPlannerConfig from './content-planner/ContentPlannerConfig';
-import { PrerequisiteMessageCard } from './ui/PrerequisiteMessageCard'; 
+import { EmptyState } from './ui/EmptyState'; 
 import { useNavigate } from 'react-router-dom';
 import { ContentPlannerSkeleton } from './skeletons/ContentPlannerSkeleton';
 import { PlatformContentCard } from './content-planner/PlatformContentCard';
@@ -15,6 +15,7 @@ import { useToast } from './ui/ToastProvider';
 import { SavedContentDrafts } from './content-planner/SavedContentDrafts';
 import { useAppDataContext } from './MainAppLayout';
 import { VIEW_PATH_MAP } from '../constants';
+import { UsersIcon, BeakerIcon } from './ui/Icons';
 
 export const ContentPlannerView: React.FC = () => {
   const { currentUser, contentDrafts, personas, operators, handlers: appDataHandlers, onNavigate } = useAppDataContext();
@@ -30,8 +31,18 @@ export const ContentPlannerView: React.FC = () => {
   const { state, handlers, refs } = useContentPlanner(propsForHook);
   
   let prerequisiteAction;
-  if (personas.length === 0) prerequisiteAction = { label: 'Go to Audience Modeling', onClick: () => onNavigate(ViewName.AudienceModeling) };
-  else if (operators.length === 0) prerequisiteAction = { label: 'Go to Operator Builder', onClick: () => onNavigate(ViewName.OperatorBuilder) };
+  let prerequisiteTitle = "Prerequisites Missing";
+  let prerequisiteDescription = "Please create at least one Persona and Operator before using the Content Planner.";
+  let prerequisiteIcon = <UsersIcon className="w-8 h-8 text-primary" />;
+
+  if (personas.length === 0) {
+    prerequisiteAction = { label: 'Go to Audience Modeling', onClick: () => onNavigate(ViewName.AudienceModeling) };
+  } else if (operators.length === 0) {
+    prerequisiteTitle = "Operator Missing";
+    prerequisiteDescription = "You have personas, but you need to create at least one Operator to define your campaign's strategy.";
+    prerequisiteIcon = <BeakerIcon className="w-8 h-8 text-accent" />;
+    prerequisiteAction = { label: 'Go to Operator Builder', onClick: () => onNavigate(ViewName.OperatorBuilder) };
+  }
 
   const handleLoadDraft = (draft: any) => {
     handlers.setSelectedPersonaId(draft.persona_id);
@@ -58,9 +69,10 @@ export const ContentPlannerView: React.FC = () => {
       <h2 className="text-3xl font-bold text-textPrimary mb-6">Content Planner</h2>
       
       {prerequisiteAction && (
-        <PrerequisiteMessageCard
-          title="Prerequisites Missing"
-          message={`Please create at least one Persona and Operator before using the Content Planner.`}
+        <EmptyState
+          icon={prerequisiteIcon}
+          title={prerequisiteTitle}
+          description={prerequisiteDescription}
           action={prerequisiteAction}
         />
       )}

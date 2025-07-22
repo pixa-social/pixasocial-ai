@@ -5,9 +5,9 @@ import { Button } from './ui/Button';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { generateJson } from '../services/aiService';
 import { useToast } from './ui/ToastProvider';
-import { PrerequisiteMessageCard } from './ui/PrerequisiteMessageCard';
+import { EmptyState } from './ui/EmptyState';
 import { useNavigate } from 'react-router-dom';
-import { TrashIcon, PlusCircleIcon, DocumentDuplicateIcon } from './ui/Icons';
+import { TrashIcon, PlusCircleIcon, DocumentDuplicateIcon, UsersIcon } from './ui/Icons';
 import { OperatorForm } from './operator-builder/OperatorForm';
 import { OperatorFlowDiagram } from './operator-builder/OperatorFlowDiagram';
 import { EffectivenessGauge } from './operator-builder/EffectivenessGauge';
@@ -32,7 +32,7 @@ const OperatorCard: React.FC<{ operator: Operator, personaName: string, onSelect
 };
 
 export const OperatorBuilderView: React.FC = () => {
-  const { currentUser, personas, operators, handlers } = useAppDataContext();
+  const { currentUser, personas, operators, handlers, onNavigate } = useAppDataContext();
   const { addOperator: onAddOperator, updateOperator: onUpdateOperator, deleteOperator: onDeleteOperator } = handlers;
   const navigate = useNavigate();
   const [selectedOperator, setSelectedOperator] = useState<Operator | null>(null);
@@ -71,59 +71,110 @@ export const OperatorBuilderView: React.FC = () => {
   const handleAnalyzeOperator = useCallback(async (operatorData: Operator, persona: Persona) => {
       setIsLoading(true);
       const rstProfile = persona.rst_profile as unknown as RSTProfile | null;
-      const prompt = `Analyze the effectiveness of a psychological operator on a target persona. Persona Details: - RST Profile: BAS: ${rstProfile?.bas}, BIS: ${rstProfile?.bis}, FFFS: ${rstProfile?.fffs}, Demographics: ${persona.demographics}, Psychographics: ${persona.psychographics}. Operator Details: - Type: ${operatorData.type}, Desired Response: ${operatorData.desired_conditioned_response}, Conditioned Stimulus: ${operatorData.conditioned_stimulus}, Unconditioned Stimulus: ${operatorData.unconditioned_stimulus}, Reinforcement Loop: ${operatorData.reinforcement_loop}. Provide a JSON response with: 1. "effectivenessScore": An integer score from 0 to 100. 2. "alignmentAnalysis": A concise paragraph explaining how well the operator type and stimuli align with the persona's RST profile and psychology. 3. "improvementSuggestions": An array of 2-3 actionable, concrete suggestions to strengthen the operator's impact.`;
-      const systemInstruction = "You are a behavioral psychology expert. Analyze the operator-persona fit and provide a structured JSON response with a score, analysis, and suggestions.";
-      const result = await generateJson<AIOperatorEffectivenessAnalysis>(prompt, currentUser, systemInstruction);
+      const prompt = `Analyze the effectiveness of a psychological operator on a target persona. Persona Details: - RST Profile: BAS: ${rstProfile?.bas}, BIS: ${rstProfile?.bis}, FFFS: ${rstProfile?.fffs}, Demographics: ${persona.demographics}, Psychographics: ${persona.psychographics}. Operator Details: - Type: ${operatorData.type}, Desired Response: ${operatorData.desired_conditioned_response}, Conditioned Stimulus: ${operatorData.conditioned_stimulus}, Unconditioned Stimulus: ${operatorData.unconditioned_stimulus}. Provide a JSON response with three keys: "effectivenessScore" (a number 0-100), "alignmentAnalysis" (a string explaining the score), and "improvementSuggestions" (an array of strings).`;
+      
+      const result = await generateJson<AIOperatorEffectivenessAnalysis>(prompt, currentUser);
+      
       if (result.data) {
-          const analysisData = { effectiveness_score: result.data.effectivenessScore, alignment_analysis: result.data.alignmentAnalysis, improvement_suggestions: result.data.improvementSuggestions };
-          await onUpdateOperator(operatorData.id, analysisData);
-          setSelectedOperator(prev => prev ? { ...prev, ...analysisData } : null);
+          const { effectivenessScore, alignmentAnalysis, improvementSuggestions } = result.data;
+          await onUpdateOperator(operatorData.id, {
+              effectiveness_score: effectivenessScore,
+              alignment_analysis: alignmentAnalysis,
+              improvement_suggestions: improvementSuggestions,
+          });
           showToast("Effectiveness analysis complete!", "success");
-      } else { showToast(result.error || "Analysis failed.", "error"); }
+      } else {
+          showToast(result.error || "Failed to analyze operator.", "error");
+      }
       setIsLoading(false);
   }, [currentUser, onUpdateOperator, showToast]);
 
-  return (
-    <div className="p-4 md:p-6">
-      {isTemplatesModalOpen && <OperatorTemplatesModal isOpen={isTemplatesModalOpen} onClose={() => setIsTemplatesModalOpen(false)} onSelect={handleApplyTemplate} />}
-      <h2 className="text-3xl font-bold text-textPrimary mb-6">Operator Builder</h2>
-      {personas.length === 0 && ( <PrerequisiteMessageCard title="Prerequisite Missing" message="Please create at least one Persona before building an Operator." action={{ label: 'Go to Audience Modeling', onClick: () => navigate(VIEW_PATH_MAP[ViewName.AudienceModeling]) }} /> )}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1">
-          <Card title="Your Operators">
-            <div className="space-y-2">
-              <Button onClick={handleCreateNew} variant="primary" className="w-full mb-2" leftIcon={<PlusCircleIcon className="w-4 h-4" />} disabled={personas.length === 0}>Create New Operator</Button>
-              <Button onClick={() => setIsTemplatesModalOpen(true)} variant="secondary" className="w-full" leftIcon={<DocumentDuplicateIcon className="w-4 h-4" />} disabled={personas.length === 0}>Use a Template</Button>
-            </div>
-            <div className="mt-4 pt-4 border-t border-border space-y-1 max-h-96 overflow-y-auto">
-              {sortedOperators.map(op => <OperatorCard key={op.id} operator={op} personaName={personas.find(p => p.id === op.target_audience_id)?.name || "N/A"} onSelect={() => handleSelectOperator(op)} isActive={selectedOperator?.id === op.id} />)}
-              {operators.length === 0 && personas.length > 0 && <p className="text-sm text-center text-muted-foreground py-4">No operators created yet.</p>}
-            </div>
-          </Card>
+    const selectedPersonaForDiagram = useMemo(() => {
+        const op = selectedOperator || (isCreatingNew ? null : sortedOperators[0]);
+        if (!op) return undefined;
+        return personas.find(p => p.id === op.target_audience_id);
+    }, [selectedOperator, isCreatingNew, sortedOperators, personas]);
+
+    if (personas.length === 0) {
+        return (
+          <div className="p-6">
+            <EmptyState
+              icon={<UsersIcon className="w-8 h-8 text-primary" />}
+              title="Create a Persona to Begin"
+              description="Operators need a target audience. Please create at least one persona in the 'Audience Modeling' section before building an operator."
+              action={{ label: 'Go to Audience Modeling', onClick: () => navigate(VIEW_PATH_MAP.AudienceModeling) }}
+            />
+          </div>
+        );
+    }
+    
+    const currentOperator = selectedOperator || (!isCreatingNew && sortedOperators.length > 0 ? sortedOperators[0] : null);
+
+    return (
+    <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-1 flex flex-col gap-6">
+            <Card title="Operators">
+                <div className="flex gap-2 mb-4">
+                    <Button onClick={handleCreateNew} size="sm" className="flex-1" leftIcon={<PlusCircleIcon className="w-4 h-4" />}>New Operator</Button>
+                    <Button onClick={() => setIsTemplatesModalOpen(true)} size="sm" variant="secondary" className="flex-1" leftIcon={<DocumentDuplicateIcon className="w-4 h-4" />}>Templates</Button>
+                </div>
+                <div className="space-y-1 max-h-96 overflow-y-auto pr-2">
+                    {sortedOperators.map(op => {
+                    const personaName = personas.find(p => p.id === op.target_audience_id)?.name || 'N/A';
+                    return <OperatorCard key={op.id} operator={op} personaName={personaName} onSelect={() => handleSelectOperator(op)} isActive={selectedOperator?.id === op.id} />
+                    })}
+                </div>
+            </Card>
+            {isLoading && (
+                <Card><LoadingSpinner text="Analyzing..." /></Card>
+            )}
+            {currentOperator && currentOperator.effectiveness_score !== null && (
+                <Card title="Effectiveness Analysis">
+                    <div className="flex flex-col items-center text-center">
+                        <EffectivenessGauge score={currentOperator.effectiveness_score || 0} />
+                        <p className="text-sm text-muted-foreground mt-4">{currentOperator.alignment_analysis}</p>
+                        {currentOperator.improvement_suggestions && currentOperator.improvement_suggestions.length > 0 && (
+                            <div className="mt-4 text-left w-full">
+                            <h5 className="font-semibold text-sm text-foreground">Suggestions:</h5>
+                            <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1 mt-1">
+                                {currentOperator.improvement_suggestions.map((s, i) => <li key={i}>{s}</li>)}
+                            </ul>
+                            </div>
+                        )}
+                    </div>
+                </Card>
+            )}
         </div>
         <div className="lg:col-span-2">
-          {!selectedOperator && !isCreatingNew && ( <Card className="flex items-center justify-center h-full min-h-[400px] text-center"><p className="text-muted-foreground">Select an operator to view its details, or create a new one.</p></Card> )}
-          {(selectedOperator || isCreatingNew) && (
-            <div className="space-y-6">
-              <Card title={isCreatingNew && !selectedOperator?.name ? "Create New Operator" : (selectedOperator?.name || "Edit Operator")}>
-                <OperatorForm key={selectedOperator?.id || 'new'} initialOperator={selectedOperator || undefined} personas={personas} onAddOperator={onAddOperator} onUpdateOperator={onUpdateOperator} onCancel={handleCancel} onDelete={handleDelete} onAnalyze={handleAnalyzeOperator} currentUser={currentUser} />
-              </Card>
-              <Card title="Operator Flow Diagram"><OperatorFlowDiagram operator={selectedOperator} persona={personas.find(p => p.id === selectedOperator?.target_audience_id)} /></Card>
-              {selectedOperator?.id && (
-                  <Card title="Effectiveness Analysis">
-                      {isLoading && <LoadingSpinner text="Analyzing..." />}
-                      {!isLoading && selectedOperator.effectiveness_score !== null && selectedOperator.effectiveness_score !== undefined ? (
-                          <div className="space-y-4">
-                              <div className="flex flex-col md:flex-row items-center gap-6"><EffectivenessGauge score={selectedOperator.effectiveness_score} /><div className="flex-1"><h4 className="font-semibold text-foreground mb-1">Alignment Analysis</h4><p className="text-sm text-muted-foreground">{selectedOperator.alignment_analysis}</p></div></div>
-                              <div><h4 className="font-semibold text-foreground mb-2">Improvement Suggestions</h4><ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">{(selectedOperator.improvement_suggestions || []).map((s, i) => <li key={i}>{s}</li>)}</ul></div>
-                          </div>
-                      ) : ( <p className="text-muted-foreground text-center py-4">No analysis performed yet. Complete and save the operator, then click "Analyze Operator".</p> )}
-                  </Card>
-              )}
-            </div>
-          )}
+            {isCreatingNew || selectedOperator ? (
+                <Card title={isCreatingNew ? "Create New Operator" : "Edit Operator"}>
+                    <OperatorForm
+                        key={selectedOperator?.id || 'new'}
+                        initialOperator={selectedOperator || undefined}
+                        personas={personas}
+                        currentUser={currentUser}
+                        onAddOperator={onAddOperator}
+                        onUpdateOperator={onUpdateOperator}
+                        onDelete={handleDelete}
+                        onCancel={handleCancel}
+                        onAnalyze={handleAnalyzeOperator}
+                    />
+                </Card>
+            ) : (
+                <Card>
+                    <div className="text-center py-12">
+                        <h3 className="text-xl font-semibold text-foreground">Select an Operator</h3>
+                        <p className="text-muted-foreground mt-2">Select an operator from the list to view or edit its details, or create a new one.</p>
+                    </div>
+                </Card>
+            )}
+            {(isCreatingNew || selectedOperator) && (
+                <Card title="Operator Flow Diagram" className="mt-6">
+                    <OperatorFlowDiagram operator={selectedOperator} persona={selectedPersonaForDiagram} />
+                </Card>
+            )}
         </div>
-      </div>
+        {isTemplatesModalOpen && <OperatorTemplatesModal isOpen={isTemplatesModalOpen} onClose={() => setIsTemplatesModalOpen(false)} onSelect={handleApplyTemplate} />}
     </div>
-  );
+    );
 };

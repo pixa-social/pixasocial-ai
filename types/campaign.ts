@@ -12,6 +12,10 @@ export interface RSTProfile {
 // Derived type from Supabase schema
 export type Persona = Database['public']['Tables']['personas']['Row'];
 
+// AdminPersona is structurally a Persona without user-specific fields.
+// This is structurally equivalent to the admin_personas table row but helps with type compatibility.
+export type AdminPersona = Omit<Persona, 'user_id' | 'source_admin_persona_id'>;
+
 // Represents a persona from the imported library (Nemotron-style)
 // Derived type from Supabase schema
 export type LibraryPersona = Database['public']['Tables']['persona_library']['Row'];

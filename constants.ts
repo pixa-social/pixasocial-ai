@@ -12,18 +12,24 @@ import {
     ThreadsIcon, DiscordIcon, RedditIcon, SnapchatIcon,
     ChartPieIcon,
     EnvelopeIcon,
-    SparklesIcon
+    SparklesIcon,
+    LayoutDashboardIcon,
+    UsersIcon,
+    BeakerIcon,
+    Cog6ToothIcon,
+    ShieldCheckIcon
 } from './components/ui/Icons';
 
 export const APP_TITLE = "PixaSocial Ai";
 
 export const NAVIGATION_ITEMS: NavItem[] = [
-  { label: ViewName.Dashboard, viewName: ViewName.Dashboard },
-  { label: ViewName.AIAgents, viewName: ViewName.AIAgents, icon: React.createElement(SparklesIcon, { className: 'w-4 h-4' }) },
-  { label: ViewName.AudienceModeling, viewName: ViewName.AudienceModeling },
-  { label: ViewName.Analytics, viewName: ViewName.Analytics, icon: React.createElement(ChartPieIcon, { className: 'w-4 h-4' }) },
+  { label: ViewName.Dashboard, viewName: ViewName.Dashboard, icon: React.createElement(LayoutDashboardIcon, { className: 'w-5 h-5' }) },
+  { label: ViewName.AIAgents, viewName: ViewName.AIAgents, icon: React.createElement(SparklesIcon, { className: 'w-5 h-5' }) },
+  { label: ViewName.AudienceModeling, viewName: ViewName.AudienceModeling, icon: React.createElement(UsersIcon, { className: 'w-5 h-5' }) },
+  { label: ViewName.Analytics, viewName: ViewName.Analytics, icon: React.createElement(ChartPieIcon, { className: 'w-5 h-5' }) },
   {
     label: 'Campaign Tools',
+    icon: React.createElement(BeakerIcon, { className: 'w-5 h-5' }),
     children: [
       { label: ViewName.OperatorBuilder, viewName: ViewName.OperatorBuilder },
       { label: ViewName.ContentPlanner, viewName: ViewName.ContentPlanner },
@@ -35,8 +41,8 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     ],
   },
   { label: ViewName.TeamChat, viewName: ViewName.TeamChat, icon: React.createElement(ChatBubbleLeftEllipsisIcon, { className: 'w-5 h-5' }) }, 
-  { label: ViewName.AdminPanel, viewName: ViewName.AdminPanel, isAdminOnly: true },
-  { label: ViewName.Settings, viewName: ViewName.Settings }, 
+  { label: ViewName.AdminPanel, viewName: ViewName.AdminPanel, isAdminOnly: true, icon: React.createElement(ShieldCheckIcon, { className: 'w-5 h-5' }) },
+  { label: ViewName.Settings, viewName: ViewName.Settings, icon: React.createElement(Cog6ToothIcon, { className: 'w-5 h-5' }) }, 
 ];
 
 export const VIEW_PATH_MAP: Record<ViewName, string> = {

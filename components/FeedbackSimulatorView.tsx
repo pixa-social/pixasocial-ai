@@ -7,9 +7,10 @@ import { Select } from './ui/Select';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { generateJson } from '../services/aiService';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
-import { PrerequisiteMessageCard } from './ui/PrerequisiteMessageCard';
+import { EmptyState } from './ui/EmptyState';
 import { useNavigate } from 'react-router-dom';
 import { useAppDataContext } from './MainAppLayout';
+import { UsersIcon } from './ui/Icons';
 
 
 const COLORS = ['#10B981', '#F59E0B', '#EF4444']; // Positive, Neutral, Negative
@@ -134,9 +135,10 @@ export const FeedbackSimulatorView: React.FC = () => {
       <h2 className="text-3xl font-bold text-textPrimary mb-6">Feedback Simulator</h2>
       
       {showPrerequisiteMessage && (
-        <PrerequisiteMessageCard
-          title="Prerequisite Missing"
-          message="Please create at least one Persona in 'Audience Modeling' before simulating feedback. The 'Target Persona' dropdown will populate once personas are available."
+        <EmptyState
+          icon={<UsersIcon className="w-8 h-8 text-primary" />}
+          title="Create a Persona to Begin"
+          description="The Feedback Simulator uses your Audience Personas to predict how they will react to your content. Please create one to get started."
           action={onNavigate ? { label: 'Go to Audience Modeling', onClick: () => onNavigate(ViewName.AudienceModeling) } : undefined }
         />
       )}

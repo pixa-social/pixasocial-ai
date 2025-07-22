@@ -1,14 +1,15 @@
 
 
+
 import React from 'react';
 import { AgentLogo } from './shared';
-import { Persona } from '../../types';
+import { Persona, AdminPersona } from '../../types';
 import { PersonaSelector } from './PersonaSelector';
 
 interface WelcomeScreenProps {
-  personas: Persona[];
+  personas: (Persona | AdminPersona)[];
   activePersona: Persona | null;
-  onSelectPersona: (persona: Persona) => void;
+  onSelectPersona: (persona: Persona | AdminPersona) => void;
 }
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ personas, activePersona, onSelectPersona }) => {

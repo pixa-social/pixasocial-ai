@@ -1,7 +1,11 @@
-
-
-
 import React from 'react';
+
+export const LayoutDashboardIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
+  </svg>
+);
+
 
 export const EyeIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
@@ -421,7 +425,7 @@ export const RedditIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
 
 export const SnapchatIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
-    <path d="M12 0C5.37 0 0 5.37 0 12s5.37 12 12 12 12-5.37 12-12S18.63 0 12 0zm5.13 16.5c-.32 0-.64-.08-.93-.24-.65-.36-1.1-1.02-1.1-1.78v-1.72c0-.76-.45-1.42-1.1-1.78-.29-.16-.6-.24-.93-.24s-.64.08-.93.24c-.65-.36-1.1 1.02-1.1 1.78v1.72c0 .76-.45 1.42-1.1 1.78-.29.16-.6.24-.93.24-.32 0-.64-.08-.93-.24-.65-.36-1.1-1.02-1.1-1.78v-4.5c0-.98.79-1.77 1.77-1.77h7.2c.98 0 1.77.79 1.77 1.77v4.5c0 .76-.45 1.42-1.1 1.78-.29.16-.61.24-.94.24z"/>
+    <path d="M12 0C5.37 0 0 5.37 0 12s5.37 12 12 12 12-5.37 12-12S18.63 0 12 0zm5.13 16.5c-.32 0-.64-.08-.93-.24-.65-.36-1.1-1.02-1.1-1.78v-1.72c0-.76-.45-1.42-1.1-1.78-.29-.16-.6-.24-.93-.24s-.64.08-.93.24c-.65-.36-1.1 1.02-1.1 1.78v1.72c0 .76-.45 1.42-1.1 1.78-.29-.16-.6-.24-.93-.24-.32 0-.64-.08-.93-.24-.65-.36-1.1-1.02-1.1-1.78v-4.5c0-.98.79-1.77 1.77-1.77h7.2c.98 0 1.77.79 1.77 1.77v4.5c0 .76-.45 1.42-1.1 1.78-.29.16-.61.24-.94.24z"/>
   </svg>
 );
 

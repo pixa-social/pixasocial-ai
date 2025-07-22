@@ -2,14 +2,14 @@ import React from 'react';
 import { Popover, PopoverTrigger, PopoverContent } from '../ui/Popover';
 import { Button } from '../ui/Button';
 import { Avatar } from '../ui/Avatar';
-import { Persona, Sentiment } from '../../types';
+import { Persona, Sentiment, AdminPersona } from '../../types';
 import { User, ChevronDown } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 interface PersonaSelectorProps {
-  personas: Persona[];
+  personas: (Persona | AdminPersona)[];
   activePersona: Persona | null;
-  onSelect: (persona: Persona) => void;
+  onSelect: (persona: Persona | AdminPersona) => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   sentiment: Sentiment;

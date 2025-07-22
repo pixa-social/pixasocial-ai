@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
@@ -14,6 +13,7 @@ import { LoadingSpinner } from './ui/LoadingSpinner';
 import { Textarea } from './ui/Textarea';
 import { SeoSettingsTab } from './admin/SeoSettingsTab';
 import { AI_PROVIDERS_CONFIG_TEMPLATE } from '../constants';
+import { AdminPersonasTab } from './admin/AdminPersonasTab';
 
 // --- AI Provider Config Tab ---
 const AiProviderConfigTab: React.FC = () => {
@@ -478,6 +478,9 @@ export const AdminPanelView: React.FC = () => {
             <Tabs>
                 <Tab label="AI Providers" icon={<ServerStackIcon className="w-5 h-5"/>}>
                     <AiProviderConfigTab />
+                </Tab>
+                 <Tab label="Agent Personas" icon={<UsersIcon className="w-5 h-5"/>}>
+                    <AdminPersonasTab />
                 </Tab>
                 <Tab label="User Management" icon={<UsersIcon className="w-5 h-5" />}>
                     <UserManagementTab />

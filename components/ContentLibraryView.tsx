@@ -5,7 +5,7 @@ import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { 
-    ArrowUpTrayIcon, TrashIcon, TagIcon
+    ArrowUpTrayIcon, TrashIcon, TagIcon, PhotoIcon
 } from './ui/Icons'; 
 import { useToast } from './ui/ToastProvider';
 import { MAX_FILE_UPLOAD_SIZE_BYTES, MAX_FILE_UPLOAD_SIZE_MB, ACCEPTED_MEDIA_TYPES } from '../constants';
@@ -13,6 +13,7 @@ import { AssetCard } from './content-library/AssetCard';
 import { ContentLibrarySkeleton } from './skeletons/ContentLibrarySkeleton';
 import { ImageLightbox } from './content-library/ImageLightbox';
 import { useAppDataContext } from './MainAppLayout';
+import { EmptyState } from './ui/EmptyState';
 
 export const ContentLibraryView: React.FC = () => {
   const { contentLibraryAssets: assets, handlers } = useAppDataContext();
@@ -279,9 +280,11 @@ export const ContentLibraryView: React.FC = () => {
       <Card title={`Showing ${filteredAssets.length} Assets`} shadow="soft-lg">
         {isLoading && assets.length === 0 && !isInitialLoading && <LoadingSpinner text="Loading assets..." />}
         {!isInitialLoading && assets.length === 0 && (
-          <p className="text-textSecondary text-center py-4">
-            No media uploaded yet. Use the form above to add assets to your library.
-          </p>
+           <EmptyState
+            icon={<PhotoIcon className="w-8 h-8 text-primary" />}
+            title="Your Content Library is Empty"
+            description="Upload images and videos using the form above to start building your collection of reusable media assets for your campaigns."
+          />
         )}
         {!isInitialLoading && assets.length > 0 && filteredAssets.length === 0 && (
             <p className="text-textSecondary text-center py-4">

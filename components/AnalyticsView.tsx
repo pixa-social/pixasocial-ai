@@ -6,7 +6,7 @@ import { Button } from './ui/Button';
 import { Select } from './ui/Select';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { generateJson } from '../services/aiService';
-import { PrerequisiteMessageCard } from './ui/PrerequisiteMessageCard';
+import { EmptyState } from './ui/EmptyState';
 import { useNavigate } from 'react-router-dom';
 import OceanRadarChart from './analytics/OceanRadarChart';
 import OceanIntroductionGraphic from './analytics/OceanIntroductionGraphic';
@@ -107,7 +107,12 @@ export const AnalyticsView: React.FC = () => {
     <div className="p-6">
       <h2 className="text-3xl font-bold text-textPrimary mb-6">Persona Analytics</h2>
       <OceanIntroductionGraphic />
-      {personas.length === 0 && ( <PrerequisiteMessageCard title="Prerequisite Missing" message="Please create at least one Persona in 'Audience Modeling' before running an analysis." action={{ label: 'Go to Audience Modeling', onClick: () => onNavigate(ViewName.AudienceModeling) }} /> )}
+      {personas.length === 0 && ( <EmptyState
+        title="No Personas to Analyze"
+        description="Create an audience persona in the 'Audience Modeling' section to unlock powerful psychographic analytics."
+        action={{ label: 'Go to Audience Modeling', onClick: () => onNavigate(ViewName.AudienceModeling) }}
+        icon={<UsersIcon className="w-8 h-8 text-primary" />}
+      /> )}
       {error && <Card className="mb-4 bg-red-500/10 border-l-4 border-danger text-danger p-4"><p>{error}</p></Card>}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card title="Configuration" className="md:col-span-1">

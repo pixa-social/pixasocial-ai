@@ -97,31 +97,49 @@ serve(async (req)=>{
       case 'generateImage':
         {
           let imageModel;
-          const imageParams = {
-            ...params
+          
+          // Create a specific params object for the image generation call
+          // to handle differences between providers (e.g., Gemini vs OpenAI).
+          const finalImageParams: {
+            prompt: string;
+            numberOfImages?: number;
+            width?: number;
+            height?: number;
+            n?: number;
+            size?: string;
+            responseFormat?: 'b64_json';
+          } = {
+            prompt: params.prompt,
           };
-          // Ensure b64_json format for OpenAI compatible providers to get base64 string directly
-          if (provider !== 'Gemini') {
-            imageParams.responseFormat = 'b64_json';
-          }
+          
           switch(provider){
             case 'Gemini':
-              imageModel = createGoogleGenerativeAI({
-                apiKey
-              }).image(model);
+              imageModel = createGoogleGenerativeAI({ apiKey }).image(model);
+              
+              // Translate common params (n, size) to Gemini-specific params.
+              if (params.n) {
+                  finalImageParams.numberOfImages = params.n;
+              }
+              if (params.size) {
+                  const [width, height] = params.size.split('x').map(Number);
+                  finalImageParams.width = width;
+                  finalImageParams.height = height;
+              }
+              // Gemini doesn't use responseFormat; it returns Uint8Array by default with this SDK.
               break;
+              
             case 'OpenAI':
             default:
-              imageModel = createOpenAI({
-                apiKey,
-                baseURL: baseUrl
-              }).image(model);
+              imageModel = createOpenAI({ apiKey, baseURL: baseUrl }).image(model);
+              
+              // Use OpenAI compatible params directly and ensure b64_json format.
+              if (params.n) finalImageParams.n = params.n;
+              if (params.size) finalImageParams.size = params.size;
+              finalImageParams.responseFormat = 'b64_json';
               break;
           }
-          // Corrected call: use the .generate() method on the model instance
-          const { images } = await imageModel.generate({
-            ...imageParams
-          });
+
+          const { images } = await imageModel.generate(finalImageParams as any);
 
           const base64Images = await Promise.all(images.map(async (image)=>{
             if (typeof image === 'string') return image; // Already base64 from b64_json
