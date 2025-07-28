@@ -17,7 +17,9 @@ import {
     UsersIcon,
     BeakerIcon,
     Cog6ToothIcon,
-    ShieldCheckIcon
+    ShieldCheckIcon,
+    MegaphoneIcon,
+    CreditCardIcon
 } from './components/ui/Icons';
 
 export const APP_TITLE = "PixaSocial Ai";
@@ -25,24 +27,32 @@ export const APP_TITLE = "PixaSocial Ai";
 export const NAVIGATION_ITEMS: NavItem[] = [
   { label: ViewName.Dashboard, viewName: ViewName.Dashboard, icon: React.createElement(LayoutDashboardIcon, { className: 'w-5 h-5' }) },
   { label: ViewName.AIAgents, viewName: ViewName.AIAgents, icon: React.createElement(SparklesIcon, { className: 'w-5 h-5' }) },
-  { label: ViewName.AudienceModeling, viewName: ViewName.AudienceModeling, icon: React.createElement(UsersIcon, { className: 'w-5 h-5' }) },
-  { label: ViewName.Analytics, viewName: ViewName.Analytics, icon: React.createElement(ChartPieIcon, { className: 'w-5 h-5' }) },
+  {
+    label: 'Analytics & Sim',
+    icon: React.createElement(ChartPieIcon, { className: 'w-5 h-5' }),
+    children: [
+      { label: 'Persona Analytics', viewName: ViewName.Analytics, icon: React.createElement(ChartPieIcon, { className: 'w-4 h-4' }) },
+      { label: ViewName.FeedbackSimulator, viewName: ViewName.FeedbackSimulator, icon: React.createElement(ChatBubbleLeftEllipsisIcon, { className: 'w-4 h-4' }) },
+    ],
+  },
   {
     label: 'Campaign Tools',
     icon: React.createElement(BeakerIcon, { className: 'w-5 h-5' }),
     children: [
+      { label: ViewName.AudienceModeling, viewName: ViewName.AudienceModeling, icon: React.createElement(UsersIcon, { className: 'w-4 h-4' }) },
       { label: ViewName.OperatorBuilder, viewName: ViewName.OperatorBuilder },
       { label: ViewName.ContentPlanner, viewName: ViewName.ContentPlanner },
       { label: ViewName.Calendar, viewName: ViewName.Calendar },
       { label: ViewName.SocialPoster, viewName: ViewName.SocialPoster, icon: React.createElement(PaperAirplaneIcon, { className: 'w-4 h-4' }) },
+      { label: ViewName.AISpeechGeneration, viewName: ViewName.AISpeechGeneration, icon: React.createElement(MegaphoneIcon, { className: 'w-4 h-4' }) },
       { label: ViewName.ContentLibrary, viewName: ViewName.ContentLibrary, icon: React.createElement(PhotoIcon, { className: 'w-4 h-4' }) },
-      { label: ViewName.FeedbackSimulator, viewName: ViewName.FeedbackSimulator },
-      { label: ViewName.AuditTool, viewName: ViewName.AuditTool },
+      { label: 'Campaign Blueprint', viewName: ViewName.AuditTool },
     ],
   },
   { label: ViewName.TeamChat, viewName: ViewName.TeamChat, icon: React.createElement(ChatBubbleLeftEllipsisIcon, { className: 'w-5 h-5' }) }, 
   { label: ViewName.AdminPanel, viewName: ViewName.AdminPanel, isAdminOnly: true, icon: React.createElement(ShieldCheckIcon, { className: 'w-5 h-5' }) },
   { label: ViewName.Settings, viewName: ViewName.Settings, icon: React.createElement(Cog6ToothIcon, { className: 'w-5 h-5' }) }, 
+  { label: ViewName.Payments, viewName: ViewName.Payments, icon: React.createElement(CreditCardIcon, { className: 'w-5 h-5' }) },
 ];
 
 export const VIEW_PATH_MAP: Record<ViewName, string> = {
@@ -62,6 +72,8 @@ export const VIEW_PATH_MAP: Record<ViewName, string> = {
     [ViewName.ContentLibrary]: '/content-library',
     [ViewName.TeamChat]: '/team-chat',
     [ViewName.SocialPoster]: '/social-poster',
+    [ViewName.AISpeechGeneration]: '/ai-speech-generation',
+    [ViewName.Payments]: '/payments',
 };
 
 
@@ -278,7 +290,8 @@ export const AI_PROVIDERS_CONFIG_TEMPLATE: AiProviderConfig[] = [
     models: {
       text: [GEMINI_TEXT_MODEL_NAME],
       image: [GEMINI_IMAGE_MODEL_NAME],
-      chat: [GEMINI_TEXT_MODEL_NAME]
+      chat: [GEMINI_TEXT_MODEL_NAME],
+      embedding: ['gemini-embedding-001'],
     },
     notes: `Global key for all users. Managed by Admin.`
   },

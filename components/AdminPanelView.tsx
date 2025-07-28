@@ -3,7 +3,8 @@ import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Select, SelectOption } from './ui/Select';
-import { AiProviderConfig, AiProviderType, RoleType, RoleName, AdminUserView, Database, Json } from '../types';
+import { AiProviderConfig, AiProviderType, RoleType, RoleName, AdminUserView } from '../types';
+import { Database, Json } from '../types/supabase';
 import { EyeIcon, EyeSlashIcon, ExclamationTriangleIcon, WrenchScrewdriverIcon, ServerStackIcon, UsersIcon, ShieldCheckIcon } from './ui/Icons';
 import { useToast } from './ui/ToastProvider';
 import { getStoredAiProviderConfigs, getGlobalAiSettings } from '../services/ai/aiUtils';
@@ -24,6 +25,8 @@ const AiProviderConfigTab: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [globalDefaultTextModel, setGlobalDefaultTextModel] = useState<string>('');
     const [globalDefaultImageModel, setGlobalDefaultImageModel] = useState<string>('');
+    const [globalDefaultChatModel, setGlobalDefaultChatModel] = useState<string>('');
+    const [globalDefaultEmbeddingModel, setGlobalDefaultEmbeddingModel] = useState<string>('');
 
     const loadConfigs = useCallback(async () => {
         setIsLoading(true);
@@ -34,6 +37,9 @@ const AiProviderConfigTab: React.FC = () => {
         setActiveProvider(globalSettings.active_ai_provider as AiProviderType || AiProviderType.Gemini);
         setGlobalDefaultTextModel(globalSettings.global_default_text_model || '');
         setGlobalDefaultImageModel(globalSettings.global_default_image_model || '');
+        setGlobalDefaultChatModel(globalSettings.global_default_chat_model || '');
+        setGlobalDefaultEmbeddingModel(globalSettings.global_default_embedding_model || '');
+
 
         const initialShowState: Record<string, boolean> = {};
         configsToUse.forEach(p => initialShowState[p.id] = false);
@@ -101,6 +107,8 @@ const AiProviderConfigTab: React.FC = () => {
                 active_ai_provider: activeProvider,
                 global_default_text_model: globalDefaultTextModel || null,
                 global_default_image_model: globalDefaultImageModel || null,
+                global_default_chat_model: globalDefaultChatModel || null,
+                global_default_embedding_model: globalDefaultEmbeddingModel || null,
                 updated_at: new Date().toISOString()
             };
             const { error: globalSettingsError } = await supabase.from('app_global_settings').upsert(globalSettingsPayload, { onConflict: 'id' });
@@ -140,6 +148,28 @@ const AiProviderConfigTab: React.FC = () => {
         return options;
     }, [providerConfigs]);
     
+    const allChatModelOptions = useMemo(() => {
+        const options: SelectOption[] = [{ value: '', label: 'Active Provider Default' }];
+        providerConfigs.forEach(provider => {
+            const labelSuffix = provider.is_enabled ? '' : ' (Disabled)';
+            (provider.models?.chat || []).forEach(model => {
+                options.push({ value: model, label: `${provider.name}: ${model}${labelSuffix}`});
+            });
+        });
+        return options;
+    }, [providerConfigs]);
+
+    const allEmbeddingModelOptions = useMemo(() => {
+        const options: SelectOption[] = [{ value: '', label: 'Active Provider Default' }];
+        providerConfigs.forEach(provider => {
+            const labelSuffix = provider.is_enabled ? '' : ' (Disabled)';
+            (provider.models?.embedding || []).forEach(model => {
+                options.push({ value: model, label: `${provider.name}: ${model}${labelSuffix}`});
+            });
+        });
+        return options;
+    }, [providerConfigs]);
+    
     if (isLoading) return <LoadingSpinner text="Loading AI provider configurations..." className="mt-8" />;
 
     return (
@@ -163,23 +193,41 @@ const AiProviderConfigTab: React.FC = () => {
                     containerClassName="max-w-md"
                 />
                  <p className="text-xs text-muted-foreground mt-1 italic">Sets the default provider if no global model or user-specific model is assigned.</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                    <Select
-                        label="Default Text Model (Overrides Active Provider)"
-                        options={allTextModelOptions}
-                        value={globalDefaultTextModel}
-                        onChange={(e) => setGlobalDefaultTextModel(e.target.value)}
-                        containerClassName="mb-0"
-                    />
-                    <Select
-                        label="Default Image Model (Overrides Active Provider)"
-                        options={allImageModelOptions}
-                        value={globalDefaultImageModel}
-                        onChange={(e) => setGlobalDefaultImageModel(e.target.value)}
-                        containerClassName="mb-0"
-                    />
+                <div className="space-y-4 mt-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Select
+                            label="Default Text Model"
+                            options={allTextModelOptions}
+                            value={globalDefaultTextModel}
+                            onChange={(e) => setGlobalDefaultTextModel(e.target.value)}
+                            containerClassName="mb-0"
+                        />
+                        <Select
+                            label="Default Image Model"
+                            options={allImageModelOptions}
+                            value={globalDefaultImageModel}
+                            onChange={(e) => setGlobalDefaultImageModel(e.target.value)}
+                            containerClassName="mb-0"
+                        />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Select
+                            label="Default Chat Model"
+                            options={allChatModelOptions}
+                            value={globalDefaultChatModel}
+                            onChange={(e) => setGlobalDefaultChatModel(e.target.value)}
+                            containerClassName="mb-0"
+                        />
+                        <Select
+                            label="Default Embedding Model"
+                            options={allEmbeddingModelOptions}
+                            value={globalDefaultEmbeddingModel}
+                            onChange={(e) => setGlobalDefaultEmbeddingModel(e.target.value)}
+                            containerClassName="mb-0"
+                        />
+                    </div>
                 </div>
-                 <p className="text-xs text-muted-foreground mt-1 italic">This sets a specific default model for all users, overriding the general 'Active Provider' setting. User-specific assignments still take highest priority.</p>
+                 <p className="text-xs text-muted-foreground mt-2 italic">These settings create a global default for all users. User-specific model assignments will still take the highest priority.</p>
             </Card>
 
             <div className="space-y-6">

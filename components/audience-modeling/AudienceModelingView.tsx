@@ -1,14 +1,16 @@
 
-
-import React, { useState, useCallback, useMemo } from 'react';
-import { Persona, RSTProfile, ViewName, LibraryPersona, Json, AIPersonaDeepDive } from '../../types'; 
+import React, { useState, useCallback, useRef, useMemo } from 'react';
+import { Persona, RSTProfile, ViewName, UserProfile, LibraryPersona, AIPersonaDeepDive } from '../../types'; 
+import { Json } from '../../types/supabase';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { Select } from '../ui/Select';
-import { generateJson } from '../../services/aiService';
+import { Select, SelectOption } from '../ui/Select';
+import { LoadingSpinner } from '../ui/LoadingSpinner';
+import { generateJson, generateImages } from '../../services/aiService';
+import { getExecutionConfig } from '../../services/ai/aiUtils';
 import { supabase } from '../../services/supabaseClient';
-import { ITEMS_PER_PAGE } from '../../constants'; 
+import { RST_TRAITS, DEFAULT_PERSONA_AVATAR, RST_FILTER_OPTIONS, ITEMS_PER_PAGE, RST_TRAIT_LEVELS } from '../../constants'; 
 import RstIntroductionGraphic from '../RstIntroductionGraphic';
 import { useToast } from '../ui/ToastProvider'; 
 import { PersonaForm } from './PersonaForm';
@@ -158,7 +160,8 @@ export const AudienceModelingView: React.FC = () => {
     if (result.data) {
         if (isRefresh) await supabase.from('persona_deep_dives').delete().eq('persona_id', persona.id);
         await supabase.from('persona_deep_dives').insert({
-            persona_id: persona.id, user_id: currentUser.id,
+            persona_id: persona.id,
+            user_id: currentUser.id,
             communication_style: result.data.communicationStyle,
             media_habits: result.data.mediaHabits,
             motivations: result.data.motivations,

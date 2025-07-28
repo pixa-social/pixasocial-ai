@@ -102,7 +102,7 @@ export const OperatorBuilderView: React.FC = () => {
               icon={<UsersIcon className="w-8 h-8 text-primary" />}
               title="Create a Persona to Begin"
               description="Operators need a target audience. Please create at least one persona in the 'Audience Modeling' section before building an operator."
-              action={{ label: 'Go to Audience Modeling', onClick: () => navigate(VIEW_PATH_MAP.AudienceModeling) }}
+              action={{ label: 'Go to Audience Modeling', onClick: () => navigate(VIEW_PATH_MAP[ViewName.AudienceModeling]) }}
             />
           </div>
         );

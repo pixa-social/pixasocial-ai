@@ -3,7 +3,8 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { AuthLayout } from './components/auth/AuthLayout';
 import { MainAppLayout } from './components/MainAppLayout';
-import { ViewName, User, UserProfile, RoleName, RoleType, Database } from './types';
+import { ViewName, User, UserProfile, RoleName, RoleType } from './types';
+import { Database } from './types/supabase';
 import { VIEW_PATH_MAP } from './constants';
 import { ToastProvider, useToast } from './components/ui/ToastProvider';
 import { supabase } from './services/supabaseClient';
@@ -23,7 +24,9 @@ import { SettingsView } from './components/SettingsView';
 import { ContentLibraryView } from './components/ContentLibraryView';
 import { ChatView } from './components/ChatView';
 import { SocialPosterView } from './components/social-poster/SocialPosterView';
+import { AISpeechGenerationView } from './components/AISpeechGenerationView';
 import { MethodologyView } from './components/MethodologyView';
+import { PaymentsView } from './components/PaymentsView';
 
 const AppContent: React.FC = () => {
   const [session, setSession] = useState<AuthSession | null>(null);
@@ -117,14 +120,14 @@ const AppContent: React.FC = () => {
     else { navigate('/', { replace: true }); showToast("You have been logged out.", "info"); }
   }, [showToast, navigate]);
 
-  const handleUpdateUser = useCallback(async (updatedUserData: Partial<User>) => {
+  const handleUpdateUser = useCallback(async (updatedUserData: Partial<UserProfile>) => {
     if (!currentUser) { showToast("No user to update.", "error"); return; }
     const updatePayload: Database['public']['Tables']['profiles']['Update'] = {
         wallet_address: updatedUserData.walletAddress || null, team_members: updatedUserData.teamMembers || [], name: updatedUserData.name || null, updated_at: new Date().toISOString(),
     };
     const { error } = await supabase.from('profiles').update(updatePayload).eq('id', currentUser.id);
     if (error) { showToast(`Error saving profile: ${error.message}`, "error"); }
-    else { setCurrentUser(prev => ({ ...prev!, ...updatedUserData })); showToast("Profile updated successfully!", "success"); }
+    else { setCurrentUser(prev => prev ? ({ ...prev, ...updatedUserData }) : null); showToast("Profile updated successfully!", "success"); }
   }, [currentUser, showToast]);
 
   if (isLoading) {
@@ -151,10 +154,12 @@ const AppContent: React.FC = () => {
           <Route path={VIEW_PATH_MAP[ViewName.FeedbackSimulator]} element={<FeedbackSimulatorView />} />
           <Route path={VIEW_PATH_MAP[ViewName.AuditTool]} element={<AuditToolView />} />
           <Route path={VIEW_PATH_MAP[ViewName.SocialPoster]} element={<SocialPosterView />} />
+          <Route path={VIEW_PATH_MAP[ViewName.AISpeechGeneration]} element={<AISpeechGenerationView />} />
           <Route path={VIEW_PATH_MAP[ViewName.Methodology]} element={<MethodologyView />} />
           {currentUser.role_name === RoleName.Admin && <Route path={VIEW_PATH_MAP[ViewName.AdminPanel]} element={<AdminPanelView />} />}
           <Route path={VIEW_PATH_MAP[ViewName.Settings]} element={<SettingsView />} />
           <Route path={VIEW_PATH_MAP[ViewName.TeamChat]} element={<ChatView />} />
+          <Route path={VIEW_PATH_MAP[ViewName.Payments]} element={<PaymentsView />} />
           <Route path="*" element={<Navigate to={VIEW_PATH_MAP[ViewName.Dashboard]} replace />} />
         </Route>
       ) : (

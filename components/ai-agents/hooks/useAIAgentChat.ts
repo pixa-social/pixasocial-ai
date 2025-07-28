@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useChat, Message } from '@ai-sdk/react';
 import { useToast } from '../../ui/ToastProvider';
 import { supabase, supabaseUrl } from '../../../services/supabaseClient';
-import { Persona, RSTProfile, ChatSession, UserProfile, Sentiment, GroundingSource, SmartReply, Database } from '../../../types';
+import { Persona, RSTProfile, ChatSession, UserProfile, Sentiment, GroundingSource, SmartReply } from '../../../types';
+import { Database, Json } from '../../../types/supabase';
 import * as dataService from '../../../services/dataService';
 import { generateJson } from '../../../services/aiService';
 import html2canvas from 'html2canvas';
@@ -86,13 +87,14 @@ When chatting, communicate naturally as this person would. Your goal is a realis
         const groundingData = (message as any).experimental_customData?.grounding_sources;
 
         if (sessionId && message.role === 'assistant') {
-            await supabase.from('chat_messages').insert({ 
-                session_id: sessionId, 
+            const payload: Database['public']['Tables']['chat_messages']['Insert'] = {
+                 session_id: sessionId, 
                 user_id: currentUser.id, 
                 role: 'assistant', 
                 content: message.content,
                 grounding_sources: groundingData || null,
-            });
+            };
+            await supabase.from('chat_messages').insert(payload);
             const currentSentiment = await getSentimentForMessage(message.content);
             setSentiment(currentSentiment);
             const replies = await getSmartReplies([...chatHelpers.messages, message]);
@@ -137,11 +139,12 @@ When chatting, communicate naturally as this person would. Your goal is a realis
         
         try {
             if (!sessionId) {
-                const { data: newSession, error } = await supabase.from('chat_sessions').insert({
+                const payload: Database['public']['Tables']['chat_sessions']['Insert'] = {
                     user_id: currentUser.id,
                     persona_id: activePersona.id,
                     title: currentInput.substring(0, 50)
-                }).select().single();
+                };
+                const { data: newSession, error } = await supabase.from('chat_sessions').insert(payload).select().single();
                 if (error) throw error;
                 sessionId = newSession.id;
                 setChatSessions(prev => [newSession as ChatSession, ...prev]);
@@ -149,12 +152,13 @@ When chatting, communicate naturally as this person would. Your goal is a realis
                 activeSessionIdRef.current = sessionId;
             }
             
-            await supabase.from('chat_messages').insert({
+            const messagePayload: Database['public']['Tables']['chat_messages']['Insert'] = {
                 session_id: sessionId,
                 user_id: currentUser.id,
                 role: 'user',
                 content: currentInput
-            });
+            };
+            await supabase.from('chat_messages').insert(messagePayload);
 
             chatHelpers.handleSubmit(e, {
                 data: {
@@ -195,7 +199,7 @@ When chatting, communicate naturally as this person would. Your goal is a realis
         setSentiment(null); setInsights(null); setSmartReplies([]);
         const { data, error } = await supabase.from('chat_messages').select('*').eq('session_id', session.id).order('created_at', { ascending: true });
         if (error) { showToast(`Failed to load messages: ${error.message}`, 'error'); }
-        else { chatHelpers.setMessages((data as Message[]) || []); }
+        else { chatHelpers.setMessages((data || []).map(m => ({...m, role: m.role as 'user' | 'assistant'}))); }
     }, [personas, showToast, chatHelpers]);
 
     const handleDeleteSession = useCallback(async (e: React.MouseEvent, sessionId: string) => {

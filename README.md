@@ -13,7 +13,7 @@ PixaSocial Ai is a React-based web application designed for planning, simulating
 *   **Content Library:** Upload, store, and manage reusable media assets (images, videos).
 *   **Team Chat:** Real-time, decentralized chat for team collaboration using GunDB.
 *   **Feedback Simulator:** Predict audience reactions (sentiment, engagement, risks) to your content using AI.
-*   **Audit Tool:** Apply the 8D problem-solving process to your campaigns with AI assistance.
+*   **Campaign Blueprint:** Apply the 8D problem-solving process to your campaigns with AI assistance.
 *   **Admin Panel & Settings:** Configure AI providers and manage user/team settings.
 *   **Authentication & Data Persistence:** User accounts and campaign data are managed via Supabase.
 

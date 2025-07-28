@@ -1,10 +1,11 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { ViewName } from '../types';
 import { format } from 'date-fns';
 import { DashboardSkeleton } from './skeletons/DashboardSkeleton';
+import { OnboardingGuide } from './dashboard/OnboardingGuide';
 import { 
     UsersIcon, BeakerIcon, DocumentTextIcon, CalendarDaysIcon, LinkIcon, 
     ArrowRightIcon, PlusCircleIcon, ExclamationTriangleIcon
@@ -24,6 +25,20 @@ export const DashboardView: React.FC = () => {
     onNavigate,
   } = useAppDataContext();
   const navigate = useNavigate();
+  
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    const onboardingDismissed = localStorage.getItem('pixasocial_onboarding_dismissed');
+    if (onboardingDismissed !== 'true') {
+      setShowOnboarding(true);
+    }
+  }, []);
+
+  const handleDismissOnboarding = () => {
+    localStorage.setItem('pixasocial_onboarding_dismissed', 'true');
+    setShowOnboarding(false);
+  };
 
   const now = useMemo(() => new Date(), []);
   const upcomingPosts = useMemo(() => (scheduledPosts ?? [])
@@ -98,6 +113,8 @@ export const DashboardView: React.FC = () => {
       >
         Dashboard Overview
       </motion.h2>
+
+      {showOnboarding && <OnboardingGuide onDismiss={handleDismissOnboarding} onNavigate={onNavigate} />}
       
       <motion.div 
         className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-6"

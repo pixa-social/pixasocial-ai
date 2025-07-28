@@ -1,10 +1,8 @@
-
-
 // SocialPosterView.tsx  – improved design, same contract
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   ScheduledPost, ViewName, UserProfile, ContentDraft,
-  ScheduledPostStatus, ConnectedAccount, Persona, Operator, SocialPlatformType
+  ScheduledPostStatus, ConnectedAccount, Persona, Operator, SocialPlatformType, RoleName
 } from '../../types';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
@@ -14,11 +12,13 @@ import { Switch } from '../ui/Switch';
 import { Tabs, Tab } from '../ui/Tabs';
 import { useToast } from '../ui/ToastProvider';
 import { SOCIAL_PLATFORMS_TO_CONNECT, ACCEPTED_MEDIA_TYPES, MAX_FILE_UPLOAD_SIZE_MB } from '../../constants';
-import { UploadCloudIcon } from '../ui/Icons';
+import { UploadCloudIcon, PaperAirplaneIcon } from '../ui/Icons';
 import { generateText } from '../../services/aiService';
 import { supabase } from '../../services/supabaseClient';
 import { SocialPostPreview } from './SocialPostPreview';
 import { useAppDataContext } from '../MainAppLayout';
+import { EmptyState } from '../ui/EmptyState';
+
 
 const fileToDataURL = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -34,7 +34,8 @@ export const SocialPosterView: React.FC = () => {
     contentDrafts, 
     personas, 
     operators, 
-    handlers, 
+    handlers,
+    onNavigate,
   } = useAppDataContext();
   const { addScheduledPost } = handlers;
 
@@ -59,6 +60,7 @@ export const SocialPosterView: React.FC = () => {
   const operatorOptions  = useMemo(() => operators.map(o => ({ value: o.id.toString(), label: `${o.name} (${o.type})` })), [operators]);
   const draftOptions     = useMemo(() => contentDrafts.map(d => ({ value: d.id, label: `Draft for ${personas.find(p => p.id === d.persona_id)?.name || 'N/A'}` })), [contentDrafts, personas]);
   const hasNoCredits = currentUser.ai_usage_count_monthly >= currentUser.role.max_ai_uses_monthly;
+  const isFreeUser = currentUser.role.name === RoleName.Free;
 
   const platformToggles = SOCIAL_PLATFORMS_TO_CONNECT.filter(p => p.name !== 'Discord').sort((a, b) => a.name.localeCompare(b.name));
 
@@ -179,6 +181,19 @@ export const SocialPosterView: React.FC = () => {
     window.addEventListener('keydown', down);
     return () => window.removeEventListener('keydown', down);
   }, [handlePublish]);
+
+  if (isFreeUser) {
+    return (
+        <div className="p-6">
+            <EmptyState
+                title="Upgrade to Unlock the Social Poster"
+                description="This feature is available on our paid plans. Upgrade your account to directly publish and schedule content to your connected social accounts."
+                action={{ label: "Upgrade Your Plan", onClick: () => onNavigate(ViewName.Settings) }}
+                icon={<PaperAirplaneIcon className="w-8 h-8 text-primary" />}
+            />
+        </div>
+    );
+  }
 
   return (
     <div className="p-2 md:p-6 space-y-6">

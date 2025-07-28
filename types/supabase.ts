@@ -1,8 +1,12 @@
-import { RoleName, SocialPlatformType, ScheduledPostStatus, AiProviderType } from './app';
-
 // --- Supabase Schema Definition ---
 
-export type Json = | string | number | boolean | null | { [key: string]: Json } | Json[];
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
 
 export interface Database {
   public: {
@@ -59,6 +63,8 @@ export interface Database {
           global_default_text_model: string | null;
           global_default_image_model: string | null;
           updated_at: string | null;
+          global_default_chat_model: string | null;
+          global_default_embedding_model: string | null;
         };
         Insert: {
           id?: number;
@@ -66,6 +72,8 @@ export interface Database {
           global_default_text_model?: string | null;
           global_default_image_model?: string | null;
           updated_at?: string | null;
+          global_default_chat_model?: string | null;
+          global_default_embedding_model?: string | null;
         };
         Update: {
           id?: number;
@@ -73,6 +81,8 @@ export interface Database {
           global_default_text_model?: string | null;
           global_default_image_model?: string | null;
           updated_at?: string | null;
+          global_default_chat_model?: string | null;
+          global_default_embedding_model?: string | null;
         };
         Relationships: [];
       };
@@ -127,7 +137,14 @@ export interface Database {
           role_id?: string;
           assigned_at?: string;
         };
-        Relationships: [];
+        Relationships: [
+           {
+            foreignKeyName: "user_roles_role_id_fkey",
+            columns: ["role_id"],
+            referencedRelation: "role_types",
+            referencedColumns: ["id"]
+          }
+        ];
       };
       oauth_states: {
         Row: {
@@ -149,7 +166,7 @@ export interface Database {
       };
       ai_provider_global_configs: {
         Row: {
-          id: AiProviderType;
+          id: 'Gemini' | 'OpenAI' | 'Anthropic' | 'Groq' | 'Deepseek' | 'Qwen' | 'Openrouter' | 'MistralAI' | 'NovitaAI' | 'Placeholder (Not Implemented)';
           name: string;
           api_key: string | null;
           is_enabled: boolean;
@@ -159,7 +176,7 @@ export interface Database {
           updated_at: string | null;
         };
         Insert: {
-          id: AiProviderType;
+          id: 'Gemini' | 'OpenAI' | 'Anthropic' | 'Groq' | 'Deepseek' | 'Qwen' | 'Openrouter' | 'MistralAI' | 'NovitaAI' | 'Placeholder (Not Implemented)';
           name: string;
           api_key?: string | null;
           is_enabled?: boolean;
@@ -169,7 +186,7 @@ export interface Database {
           updated_at?: string | null;
         };
         Update: {
-          id?: AiProviderType;
+          id?: 'Gemini' | 'OpenAI' | 'Anthropic' | 'Groq' | 'Deepseek' | 'Qwen' | 'Openrouter' | 'MistralAI' | 'NovitaAI' | 'Placeholder (Not Implemented)';
           name?: string;
           api_key?: string | null;
           is_enabled?: boolean;
@@ -228,10 +245,10 @@ export interface Database {
         };
         Relationships: [
           {
-            foreignKeyName: "personas_source_admin_persona_id_fkey";
-            columns: ["source_admin_persona_id"];
-            referencedRelation: "admin_personas";
-            referencedColumns: ["id"];
+            foreignKeyName: "personas_source_admin_persona_id_fkey",
+            columns: ["source_admin_persona_id"],
+            referencedRelation: "admin_personas",
+            referencedColumns: ["id"]
           }
         ];
       };
@@ -267,7 +284,14 @@ export interface Database {
           created_at?: string;
           ai_model_used?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "persona_deep_dives_persona_id_fkey",
+            columns: ["persona_id"],
+            referencedRelation: "personas",
+            referencedColumns: ["id"]
+          }
+        ];
       };
       operators: {
         Row: {
@@ -315,7 +339,14 @@ export interface Database {
           alignment_analysis?: string | null;
           improvement_suggestions?: string[] | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "operators_target_audience_id_fkey",
+            columns: ["target_audience_id"],
+            referencedRelation: "personas",
+            referencedColumns: ["id"]
+          }
+        ];
       };
       content_drafts: {
         Row: {
@@ -348,7 +379,20 @@ export interface Database {
           created_at?: string;
           updated_at?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "content_drafts_operator_id_fkey",
+            columns: ["operator_id"],
+            referencedRelation: "operators",
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_drafts_persona_id_fkey",
+            columns: ["persona_id"],
+            referencedRelation: "personas",
+            referencedColumns: ["id"]
+          }
+        ];
       };
       content_library_assets: {
         Row: {
@@ -393,7 +437,7 @@ export interface Database {
           user_id: string;
           content_draft_id: string;
           platform_key: string;
-          status: ScheduledPostStatus;
+          status: 'Scheduled' | 'Publishing' | 'Published' | 'Failed' | 'Missed' | 'Cancelled';
           notes: string | null;
           scheduled_at: string; // ISO string
           error_message: string | null;
@@ -403,7 +447,7 @@ export interface Database {
           user_id: string;
           content_draft_id: string;
           platform_key: string;
-          status?: ScheduledPostStatus;
+          status?: 'Scheduled' | 'Publishing' | 'Published' | 'Failed' | 'Missed' | 'Cancelled';
           notes?: string | null;
           scheduled_at: string;
           error_message?: string | null;
@@ -414,19 +458,26 @@ export interface Database {
           user_id?: string;
           content_draft_id?: string;
           platform_key?: string;
-          status?: ScheduledPostStatus;
+          status?: 'Scheduled' | 'Publishing' | 'Published' | 'Failed' | 'Missed' | 'Cancelled';
           notes?: string | null;
           scheduled_at?: string;
           error_message?: string | null;
           last_attempted_at?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_posts_content_draft_id_fkey",
+            columns: ["content_draft_id"],
+            referencedRelation: "content_drafts",
+            referencedColumns: ["id"]
+          }
+        ];
       };
       connected_accounts: {
         Row: {
           id: string;
           user_id: string;
-          platform: SocialPlatformType;
+          platform: 'X' | 'Facebook' | 'Instagram' | 'LinkedIn' | 'Pinterest' | 'TikTok' | 'YouTube' | 'Telegram' | 'Bluesky' | 'GoogleBusiness' | 'Threads' | 'Discord' | 'Reddit' | 'Snapchat';
           accountid: string;
           accountname: string | null;
           accesstoken: string | null;
@@ -438,7 +489,7 @@ export interface Database {
         };
         Insert: {
           user_id: string;
-          platform: SocialPlatformType;
+          platform: 'X' | 'Facebook' | 'Instagram' | 'LinkedIn' | 'Pinterest' | 'TikTok' | 'YouTube' | 'Telegram' | 'Bluesky' | 'GoogleBusiness' | 'Threads' | 'Discord' | 'Reddit' | 'Snapchat';
           accountid: string;
           accountname?: string | null;
           accesstoken?: string | null;
@@ -451,7 +502,7 @@ export interface Database {
         Update: {
           id?: string;
           user_id?: string;
-          platform?: SocialPlatformType;
+          platform?: 'X' | 'Facebook' | 'Instagram' | 'LinkedIn' | 'Pinterest' | 'TikTok' | 'YouTube' | 'Telegram' | 'Bluesky' | 'GoogleBusiness' | 'Threads' | 'Discord' | 'Reddit' | 'Snapchat';
           accountid?: string;
           accountname?: string | null;
           accesstoken?: string | null;
@@ -466,7 +517,7 @@ export interface Database {
       role_types: {
         Row: {
           id: string;
-          name: RoleName;
+          name: 'Free' | 'Essentials' | 'Team' | 'Enterprise' | 'Admin';
           max_personas: number;
           max_ai_uses_monthly: number;
           price_monthly: number;
@@ -477,7 +528,7 @@ export interface Database {
         };
         Insert: {
           id: string;
-          name: RoleName;
+          name: 'Free' | 'Essentials' | 'Team' | 'Enterprise' | 'Admin';
           max_personas: number;
           max_ai_uses_monthly: number;
           price_monthly: number;
@@ -488,7 +539,7 @@ export interface Database {
         };
         Update: {
           id?: string;
-          name?: RoleName;
+          name?: 'Free' | 'Essentials' | 'Team' | 'Enterprise' | 'Admin';
           max_personas?: number;
           max_ai_uses_monthly?: number;
           price_monthly?: number;
@@ -581,7 +632,14 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "chat_sessions_persona_id_fkey",
+            columns: ["persona_id"],
+            referencedRelation: "personas",
+            referencedColumns: ["id"]
+          }
+        ];
       };
       chat_messages: {
         Row: {
@@ -609,7 +667,14 @@ export interface Database {
           created_at?: string;
           grounding_sources?: Json | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_session_id_fkey",
+            columns: ["session_id"],
+            referencedRelation: "chat_sessions",
+            referencedColumns: ["id"]
+          }
+        ];
       };
     };
     Views: {
@@ -618,7 +683,7 @@ export interface Database {
           id: string | null;
           email: string | null;
           name: string | null;
-          role_name: RoleName | null;
+          role_name: ('Free' | 'Essentials' | 'Team' | 'Enterprise' | 'Admin') | null;
           ai_usage_count_monthly: number | null;
           assigned_ai_model_text: string | null;
           assigned_ai_model_image: string | null;

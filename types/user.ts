@@ -1,9 +1,6 @@
 import { Database } from './supabase';
 import { RoleName } from './app';
 
-// Derived type from Supabase schema
-export type RoleType = Database['public']['Tables']['role_types']['Row'];
-
 // Represents a Supabase user, with profile data potentially merged in
 export interface User {
   id: string; // Supabase user ID (UUID)
@@ -14,6 +11,11 @@ export interface User {
   role_name?: RoleName;
 }
 
+// Derived type from Supabase schema, but with the 'name' property strongly typed to the RoleName enum
+export type RoleType = Omit<Database['public']['Tables']['role_types']['Row'], 'name'> & {
+  name: RoleName;
+};
+
 // Represents the enriched User object with profile and role details
 export interface UserProfile extends User {
   role: RoleType;
@@ -22,14 +24,7 @@ export interface UserProfile extends User {
   assigned_ai_model_image?: string | null;
 }
 
-// Represents a row from the admin_users_view for the Admin Panel
-export interface AdminUserView {
-  id: string;
-  email?: string;
-  name?: string;
-  role_name: RoleName;
-  ai_usage_count_monthly: number;
-  assigned_ai_model_text?: string | null;
-  assigned_ai_model_image?: string | null;
-  updated_at: string;
-}
+// Represents a row from the admin_users_view for the Admin Panel, also with a strongly typed role_name
+export type AdminUserView = Omit<Database['public']['Views']['admin_users_view']['Row'], 'role_name'> & {
+  role_name: RoleName | null;
+};

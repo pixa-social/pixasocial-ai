@@ -6,8 +6,9 @@ import * as dataService from '../services/dataService';
 import { 
     Persona, Operator, ContentDraft, ScheduledPost, ScheduledPostDbRow, 
     ContentLibraryAsset, CustomChannel, UserProfile, ConnectedAccount, 
-    SocialPlatformType, Database, ScheduledPostStatus, AdminPersona
+    SocialPlatformType, ScheduledPostStatus, AdminPersona
 } from '../types';
+import { Database, Json } from '../types/supabase';
 import { CONTENT_PLATFORMS } from '../constants';
 
 const dataURLtoBlob = (dataurl: string) => {
@@ -179,8 +180,8 @@ export const useAppData = (currentUser: UserProfile | null) => {
 
     const handleUpdatePersona = useCallback(async (personaId: number, personaData: Partial<Omit<Persona, 'id' | 'user_id' | 'created_at'>> & { avatar_base64?: string }) => {
         if (!currentUser) return;
-        let updatePayload = { ...personaData };
-        delete updatePayload.avatar_base64; // Remove base64 before it goes to db
+        let updatePayload: Database['public']['Tables']['personas']['Update'] = { ...personaData };
+        delete (updatePayload as any).avatar_base64; // Remove base64 before it goes to db
 
         if (personaData.avatar_base64) {
             const blob = dataURLtoBlob(personaData.avatar_base64);
@@ -225,7 +226,8 @@ export const useAppData = (currentUser: UserProfile | null) => {
 
     const handleUpdateOperator = useCallback(async (operatorId: number, operatorData: Partial<Omit<Operator, 'id' | 'user_id' | 'created_at'>>) => {
         if (!currentUser) return;
-        const { data, error } = await supabase.from('operators').update({ ...operatorData, updated_at: new Date().toISOString() }).eq('id', operatorId).select().single();
+        const payload: Database['public']['Tables']['operators']['Update'] = { ...operatorData, updated_at: new Date().toISOString() };
+        const { data, error } = await supabase.from('operators').update(payload).eq('id', operatorId).select().single();
         if (error) { showToast(`Failed to update operator: ${error.message}`, 'error'); } 
         else { setOperators(prev => prev.map(o => o.id === data.id ? data : o)); showToast("Operator updated.", "success"); }
     }, [currentUser, showToast]);
@@ -309,9 +311,10 @@ export const useAppData = (currentUser: UserProfile | null) => {
         }
 
         try {
+            const payload: Database['public']['Tables']['content_drafts']['Update'] = { platform_contents: platformContentsForDb };
             await supabase
                 .from('content_drafts')
-                .update({ platform_contents: platformContentsForDb })
+                .update(payload)
                 .eq('id', draftId)
                 .throwOnError();
             
@@ -334,11 +337,13 @@ export const useAppData = (currentUser: UserProfile | null) => {
             showToast("Associated content draft not found.", "error");
             return;
         }
-
-        const { data, error } = await supabase.from('scheduled_posts').insert({
-            user_id: currentUser.id, content_draft_id: post.resource.contentDraftId, platform_key: post.resource.platformKey,
+        
+        const payload: Database['public']['Tables']['scheduled_posts']['Insert'] = {
+             user_id: currentUser.id, content_draft_id: post.resource.contentDraftId, platform_key: post.resource.platformKey,
             status: post.resource.status, notes: post.resource.notes || null, scheduled_at: post.start.toISOString(),
-        }).select().single();
+        };
+
+        const { data, error } = await supabase.from('scheduled_posts').insert(payload).select().single();
         if(error) { showToast(`Failed to schedule: ${error.message}`, 'error');
         } else {
             const platformInfo = CONTENT_PLATFORMS.find(plat => plat.key === data.platform_key);
@@ -429,9 +434,10 @@ export const useAppData = (currentUser: UserProfile | null) => {
   
     const handleAddConnectedAccount = useCallback(async (platform: SocialPlatformType, accountId: string, displayName: string) => {
         if(!currentUser) return;
-        const { data, error } = await supabase.from('connected_accounts').insert({ 
+        const payload: Database['public']['Tables']['connected_accounts']['Insert'] = { 
             platform, accountid: accountId, accountname: displayName, user_id: currentUser.id, created_at: new Date().toISOString() 
-        }).select().single();
+        };
+        const { data, error } = await supabase.from('connected_accounts').insert(payload).select().single();
         if(error) { showToast(`Failed to connect account: ${error.message}`, 'error');
         } else {
             setConnectedAccounts(prev => [...prev, data as ConnectedAccount]);
@@ -454,18 +460,21 @@ export const useAppData = (currentUser: UserProfile | null) => {
         const storagePath = `${currentUser.id}/${Date.now()}-${file.name}`;
         const { error: uploadError } = await supabase.storage.from('content-library').upload(storagePath, file);
         if (uploadError) { showToast(`Upload failed: ${uploadError.message}`, 'error'); return; }
-        const { error: dbError } = await supabase.from('content_library_assets').insert({
+        
+        const payload: Database['public']['Tables']['content_library_assets']['Insert'] = {
             user_id: currentUser.id, name, type: file.type.startsWith('image/') ? 'image' : 'video',
             storage_path: storagePath, file_name: file.name, file_type: file.type, size: file.size,
             tags: tags.length > 0 ? tags : null,
-        });
+        };
+        const { error: dbError } = await supabase.from('content_library_assets').insert(payload);
         if (dbError) { showToast(`Failed to save asset metadata: ${dbError.message}`, 'error');
         } else { showToast("Asset added to library!", "success"); fetchContentLibraryAssets(); }
     }, [currentUser, showToast, fetchContentLibraryAssets]);
 
     const handleUpdateAsset = useCallback(async (assetId: string, updates: Partial<Pick<ContentLibraryAsset, 'name' | 'tags'>>) => {
         if (!currentUser) return;
-        const { error } = await supabase.from('content_library_assets').update(updates).eq('id', assetId);
+        const payload: Database['public']['Tables']['content_library_assets']['Update'] = updates;
+        const { error } = await supabase.from('content_library_assets').update(payload).eq('id', assetId);
         if (error) { showToast(`Failed to update asset: ${error.message}`, 'error');
         } else { showToast("Asset updated successfully!", "success"); fetchContentLibraryAssets(); }
     }, [currentUser, showToast, fetchContentLibraryAssets]);

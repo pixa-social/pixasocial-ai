@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Button } from '../../ui/Button';
 import { AuthViewType } from '../../../types';
@@ -14,7 +15,7 @@ interface HeroSectionProps {
 export const HeroSection: React.FC<HeroSectionProps> = ({
   setAuthView,
   title = "Welcome to PixaSocial Ai",
-  description = "The most powerful social media and messaging platform on the planet, trained on over 14 billion parameters to deliver unparalleled precision and impact. Unlike traditional tools like Buffer or Hootsuite, PixaSocial Ai combines cutting-edge AI, behavioral psychology, and social media mastery to transform how you connect with your audience. Our revolutionary approach ensures your content doesn't just reach people—it resonates, engages, and drives action.",
+  description = "The ultimate social media and messaging platform on the planet. Unlike traditional tools like Buffer or Hootsuite, PixaSocial Ai combines cutting-edge AI, behavioral psychology, and social media mastery to transform how you connect with your audience. Our revolutionary approach ensures your content doesn't just reach people—it resonates, engages, and drives action.",
   primaryButtonText = "Get Started Free",
   secondaryButtonText = "Login"
 }) => {
@@ -36,7 +37,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium mb-8">
             <Sparkles className="w-4 h-4" />
-            <span>Powered by 14 Billion Parameters</span>
+            <span>Driven by Psychology and Precision Algorithms</span>
           </div>
 
           {/* Main heading */}

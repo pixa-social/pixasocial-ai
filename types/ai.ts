@@ -85,6 +85,7 @@ export interface AiProviderModelSet {
   text: string[];
   image?: string[];
   chat?: string[];
+  embedding?: string[];
 }
 export interface AiProviderConfig {
   id: AiProviderType;

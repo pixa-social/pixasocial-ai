@@ -17,6 +17,8 @@ export enum ViewName {
   ContentLibrary = 'Content Library',
   TeamChat = 'Team Chat',
   SocialPoster = 'Social Poster',
+  AISpeechGeneration = 'AI Speech Generation',
+  Payments = 'Payments',
 }
 
 // For pages within the authentication flow (before user is logged in)

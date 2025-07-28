@@ -1,4 +1,5 @@
 
+
 import { 
     AI_PROVIDERS_CONFIG_TEMPLATE, 
     GEMINI_TEXT_MODEL_NAME, 
@@ -22,7 +23,7 @@ export const getStoredAiProviderConfigs = async (forceRefetch = false): Promise<
   const { data: dbConfigs, error } = await supabase.from('ai_provider_global_configs').select('*');
   
   if (error) {
-    console.error("Error fetching global AI configs, returning template:", error);
+    console.error("Error fetching global AI configs, returning template:", error.message);
     // Return template but don't cache it
     return AI_PROVIDERS_CONFIG_TEMPLATE;
   }
@@ -40,11 +41,12 @@ export const getStoredAiProviderConfigs = async (forceRefetch = false): Promise<
       
       // If the DB has a non-empty model list, use it. Otherwise, stick with the template's.
       const dbModels = dbConfig.models as AiProviderModelSet;
-      if (dbModels && (dbModels.text?.length || dbModels.image?.length || dbModels.chat?.length)) {
+      if (dbModels && (dbModels.text?.length || dbModels.image?.length || dbModels.chat?.length || dbModels.embedding?.length)) {
         mergedConfig.models = {
           text: dbModels.text || [],
           image: dbModels.image || [],
           chat: dbModels.chat || [],
+          embedding: dbModels.embedding || [],
         };
       }
     }
@@ -57,7 +59,13 @@ export const getStoredAiProviderConfigs = async (forceRefetch = false): Promise<
   return finalConfigs;
 };
 
-let globalSettingsCache: { active_ai_provider: string; global_default_text_model: string | null; global_default_image_model: string | null; } | null = null;
+let globalSettingsCache: { 
+    active_ai_provider: string; 
+    global_default_text_model: string | null; 
+    global_default_image_model: string | null;
+    global_default_chat_model: string | null;
+    global_default_embedding_model: string | null;
+} | null = null;
 let lastGlobalSettingsFetchTime = 0;
 const GLOBAL_SETTINGS_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
@@ -67,21 +75,27 @@ export const getGlobalAiSettings = async (forceRefetch = false) => {
     return globalSettingsCache;
   }
 
-  const { data, error } = await supabase
-    .from('app_global_settings')
-    .select('active_ai_provider, global_default_text_model, global_default_image_model')
-    .eq('id', 1)
-    .single();
+  try {
+    const { data, error } = await supabase.functions.invoke('get-global-ai-settings');
+    
+    if (error) {
+      throw error;
+    }
+    
+    if (data.error) {
+      // Error from within the function logic
+      throw new Error(data.error);
+    }
 
-  if (error && error.code !== 'PGRST116') { // Ignore "no rows" error
-    console.error("Error fetching global AI settings:", error);
-    return { active_ai_provider: 'Gemini', global_default_text_model: null, global_default_image_model: null }; // Fallback
+    const settings = data || { active_ai_provider: 'Gemini', global_default_text_model: null, global_default_image_model: null, global_default_chat_model: null, global_default_embedding_model: null };
+    globalSettingsCache = settings;
+    lastGlobalSettingsFetchTime = now;
+    return settings;
+
+  } catch(e) {
+    console.error("Error fetching global AI settings:", (e as Error).message);
+    return { active_ai_provider: 'Gemini', global_default_text_model: null, global_default_image_model: null, global_default_chat_model: null, global_default_embedding_model: null }; // Fallback
   }
-
-  const settings = data || { active_ai_provider: 'Gemini', global_default_text_model: null, global_default_image_model: null };
-  globalSettingsCache = settings;
-  lastGlobalSettingsFetchTime = now;
-  return settings;
 };
 
 export const getProviderConfig = async (providerType: AiProviderType): Promise<AiProviderConfig | undefined> => {
@@ -138,7 +152,7 @@ export const handleNonImplementedProvider = async (providerType: AiProviderType,
 };
 
 export const getExecutionConfig = async (
-    modelType: 'text' | 'image' | 'chat',
+    modelType: 'text' | 'image' | 'chat' | 'embedding',
     user: UserProfile
   ): Promise<{ provider: AiProviderType; model: string; apiKey: string | null; baseUrl?: string } | null> => {
   
@@ -150,7 +164,8 @@ export const getExecutionConfig = async (
         p.is_enabled && (
           p.models.text?.includes(modelName) ||
           p.models.image?.includes(modelName) ||
-          p.models.chat?.includes(modelName)
+          p.models.chat?.includes(modelName) ||
+          p.models.embedding?.includes(modelName)
         )
       );
     };
@@ -158,33 +173,38 @@ export const getExecutionConfig = async (
     let targetModel: string | undefined;
     let targetProvider: AiProviderConfig | undefined;
   
-    // 1. Check for user-specific assigned model
-    if (modelType === 'text' || modelType === 'chat') {
-      targetModel = user.assigned_ai_model_text || undefined;
-    } else if (modelType === 'image') {
-      targetModel = user.assigned_ai_model_image || undefined;
+    // 1. User-specific override
+    if ((modelType === 'text' || modelType === 'chat') && user.assigned_ai_model_text) {
+        targetModel = user.assigned_ai_model_text;
+    } else if (modelType === 'image' && user.assigned_ai_model_image) {
+        targetModel = user.assigned_ai_model_image;
     }
-  
+
     if (targetModel) {
-      targetProvider = findProviderForModel(targetModel);
-    }
-  
-    // 2. If no user model, check for global default model
-    if (!targetProvider) {
-      targetModel = modelType === 'image' ? globalSettings.global_default_image_model || undefined : globalSettings.global_default_text_model || undefined;
-      if (targetModel) {
         targetProvider = findProviderForModel(targetModel);
-      }
     }
   
-    // 3. If still no provider, fall back to active provider
+    // 2. Global default override
+    if (!targetProvider) {
+        switch (modelType) {
+            case 'text': targetModel = globalSettings.global_default_text_model || undefined; break;
+            case 'image': targetModel = globalSettings.global_default_image_model || undefined; break;
+            case 'chat': targetModel = globalSettings.global_default_chat_model || undefined; break;
+            case 'embedding': targetModel = globalSettings.global_default_embedding_model || undefined; break;
+        }
+        if (targetModel) {
+            targetProvider = findProviderForModel(targetModel);
+        }
+    }
+  
+    // 3. Fallback to active provider
     if (!targetProvider) {
       const activeProviderType = globalSettings.active_ai_provider as AiProviderType;
       targetProvider = allConfigs.find(p => p.id === activeProviderType && p.is_enabled);
-      targetModel = undefined; // Reset targetModel so we can pick a default from the active provider
+      targetModel = undefined; // Reset model, we'll pick the provider's default
     }
   
-    // 4. If no valid provider could be determined, fail
+    // 4. No valid provider found
     if (!targetProvider) {
       console.error("Could not determine a valid, enabled AI provider.");
       return null;
@@ -193,16 +213,13 @@ export const getExecutionConfig = async (
     // 5. Determine the final model name
     let finalModel = targetModel;
     if (!finalModel) {
-      if (targetProvider.id === AiProviderType.Gemini) {
-        finalModel = modelType === 'image' ? GEMINI_IMAGE_MODEL_NAME : GEMINI_TEXT_MODEL_NAME;
-      } else {
         const providerModels = targetProvider.models;
-        if (modelType === 'image') {
-          finalModel = providerModels.image?.[0];
-        } else { // text or chat
-          finalModel = (modelType === 'chat' ? providerModels.chat?.[0] : providerModels.text?.[0]) || providerModels.text?.[0] || providerModels.chat?.[0];
+        switch (modelType) {
+            case 'text': finalModel = providerModels.text?.[0]; break;
+            case 'image': finalModel = providerModels.image?.[0]; break;
+            case 'chat': finalModel = providerModels.chat?.[0] || providerModels.text?.[0]; break;
+            case 'embedding': finalModel = providerModels.embedding?.[0]; break;
         }
-      }
     }
     
     if (!finalModel) {

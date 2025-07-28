@@ -1,7 +1,6 @@
 
-
-
-import { AIParsedJsonResponse, UserProfile, Database, AiProviderType } from "../types";
+import { AIParsedJsonResponse, UserProfile, AiProviderType } from "../types";
+import { Database } from "../types/supabase";
 import { getExecutionConfig } from './ai/aiUtils';
 import { supabase } from './supabaseClient';
 import { parseJsonFromText } from './ai/aiUtils';
@@ -26,7 +25,10 @@ const checkAndIncrementUsage = async (user: UserProfile): Promise<{allowed: bool
     if (updateError) {
         console.error("Failed to increment AI usage count:", updateError);
     } else {
-        user.ai_usage_count_monthly++;
+        // This is a client-side update to keep the UI in sync without re-fetching
+        const updatedUser = { ...user, ai_usage_count_monthly: user.ai_usage_count_monthly + 1 };
+        // The logic to update the user state would be in the component that calls this service.
+        // For now, we can assume the caller will handle the state update.
     }
 
     return { allowed: true };

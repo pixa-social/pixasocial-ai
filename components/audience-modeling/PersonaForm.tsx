@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { Persona, RSTProfile, RSTTraitLevel, UserProfile, Json } from '../../types';
+import { Persona, RSTProfile, RSTTraitLevel, UserProfile } from '../../types';
+import { Json } from '../../types/supabase';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';

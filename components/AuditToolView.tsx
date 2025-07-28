@@ -35,7 +35,7 @@ export const AuditToolView: React.FC = () => {
   const [isPlanGenerated, setIsPlanGenerated] = useState(false);
   const hasNoCredits = currentUser.ai_usage_count_monthly >= currentUser.role.max_ai_uses_monthly;
 
-  const handleGenerateFullAuditPlan = useCallback(async () => {
+  const handleGenerateFullBlueprint = useCallback(async () => {
     if (!campaignObjective.trim()) {
       setError("Please provide a campaign objective or problem statement.");
       return;
@@ -50,7 +50,7 @@ export const AuditToolView: React.FC = () => {
       Campaign Objective / Problem Statement:
       "${campaignObjective}"
 
-      Based on the above campaign objective/problem statement, generate a comprehensive 8D audit plan.
+      Based on the above campaign objective/problem statement, generate a comprehensive 8D blueprint.
       For each of the 8 Disciplines (D0-D8) detailed below, provide practical and actionable content.
       The content should directly relate to the provided campaign objective.
 
@@ -92,20 +92,20 @@ export const AuditToolView: React.FC = () => {
           setSteps(initialSteps);
       }
     } else {
-      setError(result.error || "Failed to generate AI audit plan. The AI might not have returned data or an error occurred.");
+      setError(result.error || "Failed to generate AI blueprint. The AI might not have returned data or an error occurred.");
       setSteps(initialSteps);
     }
     setIsLoading(false);
   }, [campaignObjective, initialSteps, currentUser]);
 
 
-  const exportAuditPlan = useCallback((format: 'markdown' | 'text') => {
+  const exportBlueprint = useCallback((format: 'markdown' | 'text') => {
     if (!isPlanGenerated) {
-      alert("Please generate the audit plan first.");
+      alert("Please generate the blueprint first.");
       return;
     }
 
-    let fileContent = `# 8D Audit Plan\n\n## Campaign Objective:\n${campaignObjective}\n\n`;
+    let fileContent = `# 8D Campaign Blueprint\n\n## Campaign Objective:\n${campaignObjective}\n\n`;
     const fileExtension = format === 'markdown' ? 'md' : 'txt';
 
     steps.forEach(step => {
@@ -120,12 +120,24 @@ export const AuditToolView: React.FC = () => {
       }
     });
 
-    downloadFile(`8D_Audit_Plan.${fileExtension}`, fileContent, format === 'markdown' ? 'text/markdown' : 'text/plain');
+    downloadFile(`8D_Campaign_Blueprint.${fileExtension}`, fileContent, format === 'markdown' ? 'text/markdown' : 'text/plain');
   }, [isPlanGenerated, campaignObjective, steps]);
 
   return (
     <div className="p-6">
-      <h2 className="text-3xl font-bold text-textPrimary mb-6">Automated 8D Audit Tool</h2>
+      <h2 className="text-3xl font-bold text-textPrimary mb-6">8D Campaign Blueprint</h2>
+      
+      <Card className="mb-6 bg-blue-950/20 border border-blue-800/50">
+        <h3 className="text-xl font-semibold text-blue-300 mb-2">From Problem to Perfect Plan</h3>
+        <div className="text-sm text-blue-200/90 space-y-3">
+          <p>
+            The Campaign Blueprint leverages the <strong>8D (Eight Disciplines) methodology</strong>, a powerful framework used by top industries for structured problem-solving and strategic planning. We've adapted this rigorous process to help you build comprehensive, resilient, and psychologically-attuned marketing campaigns.
+          </p>
+          <p>
+            By defining a clear objective, you enable our AI to act as your strategic partner. It will generate actionable insights for each of the eight stages, helping you identify root causes, verify solutions, and anticipate potential challenges, ensuring your campaign is built for success from the ground up.
+          </p>
+        </div>
+      </Card>
       
       <Card className="mb-6">
         <Textarea
@@ -141,25 +153,25 @@ export const AuditToolView: React.FC = () => {
         )}
         <Button 
           variant="primary" 
-          onClick={handleGenerateFullAuditPlan} 
+          onClick={handleGenerateFullBlueprint} 
           isLoading={isLoading}
           className="w-full mt-2"
           disabled={isLoading || !campaignObjective.trim() || hasNoCredits}
-          title={hasNoCredits ? "You have no AI credits remaining." : "Generate AI audit plan"}
+          title={hasNoCredits ? "You have no AI credits remaining." : "Generate AI blueprint"}
         >
-          {isLoading ? 'AI Generating Full 8D Plan...' : 'Generate Full 8D Audit Plan with AI'}
+          {isLoading ? 'AI Generating Full 8D Blueprint...' : 'Generate Full 8D Blueprint with AI'}
         </Button>
       </Card>
 
       {error && <Card className="mb-4 bg-red-500/10 border-l-4 border-danger text-danger p-4"><p>{error}</p></Card>}
       
-      {isLoading && !isPlanGenerated && <LoadingSpinner text="AI is crafting your 8D Audit Plan..." className="my-8" />}
+      {isLoading && !isPlanGenerated && <LoadingSpinner text="AI is crafting your 8D Campaign Blueprint..." className="my-8" />}
 
       {isPlanGenerated && !error && (
-        <Card title="AI-Generated 8D Audit Plan">
+        <Card title="AI-Generated Campaign Blueprint">
           <div className="flex justify-end space-x-2 mb-4">
-            <Button size="sm" variant="secondary" onClick={() => exportAuditPlan('markdown')}>Export as Markdown</Button>
-            <Button size="sm" variant="secondary" onClick={() => exportAuditPlan('text')}>Export as Text</Button>
+            <Button size="sm" variant="secondary" onClick={() => exportBlueprint('markdown')}>Export as Markdown</Button>
+            <Button size="sm" variant="secondary" onClick={() => exportBlueprint('text')}>Export as Text</Button>
           </div>
           <div className="space-y-6">
             {steps.map(step => (
@@ -180,7 +192,7 @@ export const AuditToolView: React.FC = () => {
 
       {!isLoading && !isPlanGenerated && !error && (
         <Card className="text-center py-8">
-            <p className="text-textSecondary text-lg">Enter your campaign objective above and click "Generate" for the AI to create a full 8D audit plan.</p>
+            <p className="text-textSecondary text-lg">Enter your campaign objective above and click "Generate" for the AI to create a full 8D blueprint.</p>
         </Card>
       )}
     </div>

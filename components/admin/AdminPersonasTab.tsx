@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { Persona, Database } from '../../types';
+import { Persona } from '../../types';
+import { Database } from '../../types/supabase';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { useToast } from '../ui/ToastProvider';
@@ -27,10 +28,10 @@ const dataURLtoBlob = (dataurl: string) => {
 
 
 // Admin-specific handlers since they operate on a different table
-const addAdminPersona = async (personaData: any) => {
+const addAdminPersona = async (personaData: Database['public']['Tables']['admin_personas']['Insert']) => {
     return supabase.from('admin_personas').insert(personaData).select().single();
 };
-const updateAdminPersona = async (id: number, personaData: any) => {
+const updateAdminPersona = async (id: number, personaData: Database['public']['Tables']['admin_personas']['Update']) => {
     return supabase.from('admin_personas').update(personaData).eq('id', id).select().single();
 };
 const deleteAdminPersona = async (id: number) => {
@@ -47,8 +48,10 @@ export const AdminPersonasTab: React.FC = () => {
     const handleCreateOrUpdate = async (personaData: Partial<Omit<Persona, 'id' | 'user_id' | 'created_at' | 'updated_at'>> & { name: string; avatar_base64?: string }) => {
         setIsSubmitting(true);
         
-        const { user_id, avatar_base64, ...restOfData } = personaData as any;
-        let payload = { ...restOfData };
+        // Destructure to remove fields not present in admin_personas and the base64 helper
+        const { avatar_base64, source_admin_persona_id, ...restOfData } = personaData as any;
+        
+        let payload: Database['public']['Tables']['admin_personas']['Insert'] = { ...restOfData };
         
         // Handle avatar upload if a new one is provided
         if (avatar_base64) {
