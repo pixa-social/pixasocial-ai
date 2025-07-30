@@ -1,6 +1,7 @@
 import React from 'react';
-import { ViewName, NavItem, AuditStep, Persona, MediaType, AiProviderType, AiProviderConfig, RSTTraitLevel, RSTProfile, SocialPlatformType, SocialPlatformConnectionDetails, ScheduledPostStatus } from './types';
-import type { Operator } from './types';
+import { ViewName, NavItem, SocialPlatformType, SocialPlatformConnectionDetails, ScheduledPostStatus, AiProviderType } from './types/app';
+import { AiProviderConfig } from './types/ai';
+import { AuditStep, Persona, MediaType, RSTTraitLevel, RSTProfile, Operator } from './types/campaign';
 import { 
     XIcon, FacebookIcon, InstagramIcon, LinkedInIcon, 
     PinterestIcon, TikTokIcon, YouTubeIcon, LinkIcon,
@@ -392,6 +393,17 @@ export const AI_PROVIDERS_CONFIG_TEMPLATE: AiProviderConfig[] = [
     },
     notes: 'Provides OpenAI-compatible endpoints for text/chat. Image generation uses a different API and may not work out-of-the-box.',
     base_url: 'https://api.novita.ai/v3/openai/'
+  },
+  {
+    id: AiProviderType.Cerebras,
+    name: 'Cerebras AI',
+    api_key: null,
+    is_enabled: false,
+    models: {
+      text: ['qwen-3-235b-a22b'],
+      chat: ['qwen-3-235b-a22b']
+    },
+    notes: 'Placeholder only. This provider requires a custom SDK (@cerebras/cerebras_cloud_sdk) and is not implemented in the current ai-proxy.',
   },
   {
     id: AiProviderType.Anthropic,

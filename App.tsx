@@ -1,10 +1,14 @@
 
+
+
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { AuthLayout } from './components/auth/AuthLayout';
 import { MainAppLayout } from './components/MainAppLayout';
-import { ViewName, User, UserProfile, RoleName, RoleType } from './types';
-import { Database } from './types/supabase';
+import { ViewName, RoleName } from './types/app';
+import { User, UserProfile, RoleType } from './types/user';
+import { Database, TablesUpdate } from './types/supabase';
 import { VIEW_PATH_MAP } from './constants';
 import { ToastProvider, useToast } from './components/ui/ToastProvider';
 import { supabase } from './services/supabaseClient';
@@ -57,11 +61,24 @@ const AppContent: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const injectScripts = async () => {
+    const injectScriptsAndFavicon = async () => {
       try {
-        const { data, error } = await supabase.from('seo_settings').select('header_scripts, footer_scripts').single();
+        const { data, error } = await supabase.from('seo_settings').select('header_scripts, footer_scripts, favicon_url').single();
         if (error) { if (error.code !== 'PGRST116') console.warn('Could not fetch SEO settings:', error.message); return; }
         if (!data) return;
+
+        // Favicon injection logic
+        if (data.favicon_url) {
+          let link: HTMLLinkElement | null = document.querySelector("link[rel~='icon']");
+          if (!link) {
+            link = document.createElement('link');
+            link.rel = 'icon';
+            document.head.appendChild(link);
+          }
+          link.href = data.favicon_url;
+        }
+
+        // Script injection logic
         const inject = (content: string, target: 'head' | 'body') => {
           if (!content) return;
           const scriptContainer = document.createElement('div');
@@ -76,9 +93,9 @@ const AppContent: React.FC = () => {
         };
         inject(data.header_scripts || '', 'head');
         inject(data.footer_scripts || '', 'body');
-      } catch (e) { console.warn('Failed to fetch or inject SEO scripts:', (e as Error).message); }
+      } catch (e) { console.warn('Failed to fetch or inject SEO settings:', (e as Error).message); }
     };
-    injectScripts();
+    injectScriptsAndFavicon();
   }, []);
 
   useEffect(() => {
@@ -122,7 +139,7 @@ const AppContent: React.FC = () => {
 
   const handleUpdateUser = useCallback(async (updatedUserData: Partial<UserProfile>) => {
     if (!currentUser) { showToast("No user to update.", "error"); return; }
-    const updatePayload: Database['public']['Tables']['profiles']['Update'] = {
+    const updatePayload: TablesUpdate<'profiles'> = {
         wallet_address: updatedUserData.walletAddress || null, team_members: updatedUserData.teamMembers || [], name: updatedUserData.name || null, updated_at: new Date().toISOString(),
     };
     const { error } = await supabase.from('profiles').update(updatePayload).eq('id', currentUser.id);

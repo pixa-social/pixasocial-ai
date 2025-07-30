@@ -1,11 +1,15 @@
 
 
+
+
 import { 
     AI_PROVIDERS_CONFIG_TEMPLATE, 
     GEMINI_TEXT_MODEL_NAME, 
     GEMINI_IMAGE_MODEL_NAME
 } from '../../constants';
-import { AIParsedJsonResponse, AiProviderType, AiProviderConfig, UserProfile, AiProviderModelSet } from "../../types";
+import { AIParsedJsonResponse, AiProviderConfig, AiProviderModelSet } from "../../types/ai";
+import { AiProviderType } from "../../types/app";
+import { UserProfile } from "../../types/user";
 import { supabase } from '../supabaseClient';
 
 // --- Helper functions to manage AI provider configurations ---

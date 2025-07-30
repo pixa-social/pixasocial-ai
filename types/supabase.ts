@@ -1,4 +1,5 @@
 // --- Supabase Schema Definition ---
+import type { PostgrestError } from '@supabase/supabase-js';
 
 export type Json =
   | string
@@ -166,7 +167,7 @@ export interface Database {
       };
       ai_provider_global_configs: {
         Row: {
-          id: 'Gemini' | 'OpenAI' | 'Anthropic' | 'Groq' | 'Deepseek' | 'Qwen' | 'Openrouter' | 'MistralAI' | 'NovitaAI' | 'Placeholder (Not Implemented)';
+          id: 'Gemini' | 'OpenAI' | 'Anthropic' | 'Groq' | 'Deepseek' | 'Qwen' | 'Openrouter' | 'MistralAI' | 'NovitaAI' | 'Cerebras' | 'Placeholder (Not Implemented)';
           name: string;
           api_key: string | null;
           is_enabled: boolean;
@@ -176,7 +177,7 @@ export interface Database {
           updated_at: string | null;
         };
         Insert: {
-          id: 'Gemini' | 'OpenAI' | 'Anthropic' | 'Groq' | 'Deepseek' | 'Qwen' | 'Openrouter' | 'MistralAI' | 'NovitaAI' | 'Placeholder (Not Implemented)';
+          id: 'Gemini' | 'OpenAI' | 'Anthropic' | 'Groq' | 'Deepseek' | 'Qwen' | 'Openrouter' | 'MistralAI' | 'NovitaAI' | 'Cerebras' | 'Placeholder (Not Implemented)';
           name: string;
           api_key?: string | null;
           is_enabled?: boolean;
@@ -186,7 +187,7 @@ export interface Database {
           updated_at?: string | null;
         };
         Update: {
-          id?: 'Gemini' | 'OpenAI' | 'Anthropic' | 'Groq' | 'Deepseek' | 'Qwen' | 'Openrouter' | 'MistralAI' | 'NovitaAI' | 'Placeholder (Not Implemented)';
+          id?: 'Gemini' | 'OpenAI' | 'Anthropic' | 'Groq' | 'Deepseek' | 'Qwen' | 'Openrouter' | 'MistralAI' | 'NovitaAI' | 'Cerebras' | 'Placeholder (Not Implemented)';
           name?: string;
           api_key?: string | null;
           is_enabled?: boolean;
@@ -352,6 +353,7 @@ export interface Database {
         Row: {
           id: string;
           user_id: string;
+          title: string;
           operator_id: number;
           persona_id: number;
           key_message: string | null;
@@ -359,25 +361,33 @@ export interface Database {
           platform_contents: Json;
           created_at: string;
           updated_at: string | null;
+          tags: string[] | null;
+          status: string | null;
         };
         Insert: {
           user_id: string;
           operator_id: number;
+          title: string;
           persona_id: number;
           key_message?: string | null;
           custom_prompt: string;
           platform_contents: Json;
+          tags?: string[] | null;
+          status?: string | null;
         };
         Update: {
           id?: string;
           user_id?: string;
           operator_id?: number;
+          title?: string;
           persona_id?: number;
           key_message?: string | null;
           custom_prompt?: string;
           platform_contents?: Json;
           created_at?: string;
           updated_at?: string | null;
+          tags?: string[] | null;
+          status?: string | null;
         };
         Relationships: [
           {
@@ -710,8 +720,15 @@ export interface Database {
         }[];
       };
     };
+    Enums: {};
   };
 }
 
 
 export type DbSchema = Database['public'];
+
+// --- Type Helpers ---
+export type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row'];
+export type TablesInsert<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Insert'];
+export type TablesUpdate<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Update'];
+export type Enums<T extends keyof Database['public']['Enums']> = Database['public']['Enums'][T];

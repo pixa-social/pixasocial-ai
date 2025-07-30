@@ -22,13 +22,13 @@ const initializePollyClient = ()=>{
     region,
     credentials: {
       accessKeyId,
-      secretAccessKey
+      secretAccessKey,
     }
   });
 };
 // Helper function to convert a ReadableStream<Uint8Array> to a single Uint8Array.
 // This is a more robust way to handle streams in Deno environments than some SDK helpers.
-async function streamToByteArray(stream) {
+async function streamToByteArray(stream: ReadableStream<Uint8Array>) {
   const reader = stream.getReader();
   const chunks = [];
   while(true){
@@ -47,7 +47,7 @@ async function streamToByteArray(stream) {
   }
   return result;
 }
-serve(async (req)=>{
+serve(async (req: Request)=>{
   if (req.method === 'OPTIONS') {
     return new Response('ok', {
       headers: corsHeaders

@@ -1,9 +1,15 @@
 
-import { AIParsedJsonResponse, UserProfile, AiProviderType } from "../types";
-import { Database } from "../types/supabase";
+
+
+
+
+import { AIParsedJsonResponse } from "../types/ai";
+import { UserProfile } from '../types/user';
+import { Database, TablesUpdate } from "../types/supabase";
 import { getExecutionConfig } from './ai/aiUtils';
 import { supabase } from './supabaseClient';
 import { parseJsonFromText } from './ai/aiUtils';
+import { AiProviderType } from "../types/app";
 
 const checkAndIncrementUsage = async (user: UserProfile): Promise<{allowed: boolean, error?: string}> => {
     if (user.ai_usage_count_monthly >= user.role.max_ai_uses_monthly) {
@@ -13,7 +19,7 @@ const checkAndIncrementUsage = async (user: UserProfile): Promise<{allowed: bool
         };
     }
     
-    const updatePayload: Database['public']['Tables']['profiles']['Update'] = {
+    const updatePayload: TablesUpdate<'profiles'> = {
         ai_usage_count_monthly: user.ai_usage_count_monthly + 1
     };
 

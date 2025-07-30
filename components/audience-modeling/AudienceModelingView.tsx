@@ -16,10 +16,18 @@ import { useToast } from '../ui/ToastProvider';
 import { PersonaForm } from './PersonaForm';
 import { PersonaCard } from './PersonaCard';
 import { PersonaDeepDiveModal } from './PersonaDeepDiveModal';
-import { ArrowPathIcon, AdjustmentsHorizontalIcon, ChevronUpIcon, ChevronDownIcon, ArrowDownOnSquareIcon } from '../ui/Icons';
+import { ArrowPathIcon, AdjustmentsHorizontalIcon, ChevronUpIcon, ChevronDownIcon, ArrowDownOnSquareIcon, UsersIcon } from '../ui/Icons';
 import { PrerequisiteMessageCard } from '../ui/PrerequisiteMessageCard';
 import { PersonaLibraryModal } from './PersonaLibraryModal';
 import { useAppDataContext } from '../MainAppLayout';
+import { EmptyState } from '../ui/EmptyState';
+
+const ITEMS_PER_PAGE_OPTIONS = [
+    { value: "6", label: "6 per page"},
+    { value: "9", label: "9 per page"},
+    { value: "12", label: "12 per page"},
+    { value: "24", label: "24 per page"},
+];
 
 interface AIPersonaSuggestion {
   demographics: string;
@@ -34,8 +42,8 @@ interface AIPersonaSuggestion {
 export const AudienceModelingView: React.FC = () => {
   const { currentUser, personas, handlers, onNavigate } = useAppDataContext();
   const { addPersona: onAddPersona, updatePersona: onUpdatePersona, deletePersona: onDeletePersona } = handlers;
-  const { showToast } = useToast();
   
+  const { showToast } = useToast();
   const [showForm, setShowForm] = useState(false);
   const [editingPersona, setEditingPersona] = useState<Persona | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false); 
@@ -43,7 +51,8 @@ export const AudienceModelingView: React.FC = () => {
   const [individualLoading, setIndividualLoading] = useState<Record<string, boolean>>({});
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [isMappingPersona, setIsMappingPersona] = useState(false);
-  
+
+  // New state for Deep Dive
   const [deepDiveData, setDeepDiveData] = useState<{ persona: Persona; analysis: AIPersonaDeepDive | null } | null>(null);
   const [isDiving, setIsDiving] = useState<Record<string, boolean>>({});
 
@@ -53,7 +62,7 @@ export const AudienceModelingView: React.FC = () => {
   const [sortField, setSortField] = useState<'name' | 'id'>('id');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
-  const hasNoCredits = currentUser.ai_usage_count_monthly >= currentUser.role.max_personas;
+  const hasNoCredits = currentUser.ai_usage_count_monthly >= currentUser.role.max_ai_uses_monthly;
 
   const resetFiltersAndPagination = useCallback(() => {
     setFilterName('');
@@ -69,8 +78,7 @@ export const AudienceModelingView: React.FC = () => {
     setIsMappingPersona(true);
     showToast("AI is analyzing...", "info");
     const prompt = `Based on this persona data: ${JSON.stringify(libraryPersona, null, 2)}, generate a profile with "demographics", "psychographics", "initial_beliefs", "rst_profile", "suggestedVulnerabilities", "goals", and "fears".`;
-    const systemInstruction = "You are an AI assistant that analyzes brief persona data and expands it into a detailed profile. Your entire output must be a single, valid JSON object and nothing else. Do not add any text, comments, or markdown formatting before or after the JSON.";
-    const result = await generateJson<AIPersonaSuggestion>(prompt, currentUser, systemInstruction);
+    const result = await generateJson<AIPersonaSuggestion>(prompt, currentUser);
 
     if (result.data) {
         const seededPersona: Partial<Persona> = {
@@ -119,9 +127,8 @@ export const AudienceModelingView: React.FC = () => {
 
   const handleSimulateVulnerabilitiesOnCard = useCallback(async (persona: Persona) => {
     setIndividualLoading(prev => ({ ...prev, [String(persona.id)]: true }));
-    const prompt = `Based on the persona "${persona.name}" with demographics "${persona.demographics}", identify 3-5 key psychological or marketing vulnerabilities. Return a valid JSON object with a single key "vulnerabilities" containing an array of strings. Example: {"vulnerabilities": ["Vulnerability 1", "Vulnerability 2"]}`;
-    const systemInstruction = "You are a psychological analyst. Your entire response must be a single, valid JSON object and nothing else. Do not add any text, comments, or markdown formatting.";
-    const result = await generateJson<{ vulnerabilities: string[] }>(prompt, currentUser, systemInstruction);
+    const prompt = `Persona: ${persona.name}, Demo: ${persona.demographics}. Identify 3-5 key vulnerabilities. Return comma-separated list.`;
+    const result = await generateJson<{ vulnerabilities: string[] }>(prompt, currentUser);
     if (result.data?.vulnerabilities) {
       await onUpdatePersona(persona.id, { vulnerabilities: result.data.vulnerabilities });
       showToast("Vulnerabilities refreshed with AI.", "success");
@@ -181,9 +188,12 @@ export const AudienceModelingView: React.FC = () => {
   
   const processedPersonas = useMemo(() => {
     let filtered = [...personas];
-    if (filterName) { filtered = filtered.filter(p => p.name.toLowerCase().includes(filterName.toLowerCase())); }
+    if (filterName) {
+      filtered = filtered.filter(p => p.name.toLowerCase().includes(filterName.toLowerCase()));
+    }
     return filtered.sort((a, b) => {
-        const fieldA = a[sortField]; const fieldB = b[sortField];
+        const fieldA = a[sortField];
+        const fieldB = b[sortField];
         if (fieldA < fieldB) return sortDirection === 'asc' ? -1 : 1;
         if (fieldA > fieldB) return sortDirection === 'asc' ? 1 : -1;
         return 0;
@@ -202,36 +212,75 @@ export const AudienceModelingView: React.FC = () => {
     <div className="p-6">
        {isLibraryOpen && <PersonaLibraryModal isOpen={isLibraryOpen} onClose={() => setIsLibraryOpen(false)} onImport={handleImportAndMapPersona} isMapping={isMappingPersona} />}
        {deepDiveData && <PersonaDeepDiveModal 
-            data={deepDiveData} 
-            onClose={() => setDeepDiveData(null)} 
-            onRefresh={(p) => handleDeepDiveRequest(p, true)}
-            isRefreshing={isDiving[String(deepDiveData.persona.id)] || false}
+          data={deepDiveData} 
+          onClose={() => setDeepDiveData(null)}
+          onRefresh={(p) => handleDeepDiveRequest(p, true)}
+          isRefreshing={isDiving[String(deepDiveData.persona.id)] || false}
         />}
       <RstIntroductionGraphic />
       <div className="flex justify-between items-center mb-6 mt-2 flex-wrap gap-2">
         <h2 className="text-3xl font-bold text-textPrimary">Audience Persona Management</h2>
-        {!showForm && ( <div className="flex gap-2"><Button variant="secondary" onClick={() => setIsLibraryOpen(true)} disabled={!canCreatePersona} leftIcon={<ArrowDownOnSquareIcon className="w-5 h-5"/>}>Import from Library</Button><Button variant="primary" onClick={() => { setShowForm(true); setEditingPersona(undefined); }} disabled={!canCreatePersona}>Create New Persona</Button></div> )}
+        {!showForm && (
+            <div className="flex gap-2">
+                 <Button variant="secondary" onClick={() => setIsLibraryOpen(true)} disabled={!canCreatePersona} leftIcon={<ArrowDownOnSquareIcon className="w-5 h-5"/>}>Import from Library</Button>
+                <Button variant="primary" onClick={() => { setShowForm(true); setEditingPersona(undefined); }} disabled={!canCreatePersona}>Create New Persona</Button>
+            </div>
+        )}
       </div>
        {!canCreatePersona && !showForm && <Card className="mb-4 bg-yellow-500/10 border-warning p-4"><p>Persona limit reached for your plan.</p></Card>}
        {error && !showForm && <Card className="mb-4 bg-red-500/10 border-danger p-4"><p>{error}</p></Card>}
+
       {showForm ? (
-        <Card title={editingPersona ? "Edit Persona" : "Create New Persona"}><PersonaForm initialPersona={editingPersona} onSubmit={handleCreateOrUpdatePersona} onCancel={() => setShowForm(false)} isLoading={isSubmitting} currentUser={currentUser} /></Card>
+        <Card title={editingPersona ? "Edit Persona" : "Create New Persona"}>
+          <PersonaForm initialPersona={editingPersona} onSubmit={handleCreateOrUpdatePersona} onCancel={() => setShowForm(false)} isLoading={isSubmitting} currentUser={currentUser} />
+        </Card>
+      ) : personas.length === 0 ? (
+        <EmptyState
+          icon={<UsersIcon className="w-8 h-8 text-primary" />}
+          title="Create Your First Audience Persona"
+          description="Personas are the foundation of your strategy. Define your target audience to start generating tailored content."
+          action={{ label: 'Create New Persona', onClick: () => { setShowForm(true); setEditingPersona(undefined); } }}
+        />
       ) : (
         <>
         <Card title="Filters & Sorting" className="mb-6" icon={<AdjustmentsHorizontalIcon className="w-5 h-5"/>}>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <Input label="Filter by Name" value={filterName} onChange={e => setFilterName(e.target.value)} containerClassName="mb-0"/>
             <Select label="Sort by" options={[{ value: 'id', label: 'Creation Date' }, { value: 'name', label: 'Name' }]} value={sortField} onChange={e => setSortField(e.target.value as 'name' | 'id')} containerClassName="mb-0"/>
-            <Button variant="outline" onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')} className="self-end h-10" rightIcon={sortDirection === 'asc' ? <ChevronUpIcon className="w-4 h-4" /> : <ChevronDownIcon className="w-4 h-4" />}>{sortDirection === 'asc' ? 'Ascending' : 'Descending'}</Button>
+            <Button variant="outline" onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')} className="self-end h-10" rightIcon={sortDirection === 'asc' ? <ChevronUpIcon className="w-4 h-4" /> : <ChevronDownIcon className="w-4 h-4" />}>
+                {sortDirection === 'asc' ? 'Ascending' : 'Descending'}
+            </Button>
           </div>
           <Button variant="ghost" onClick={resetFiltersAndPagination} leftIcon={<ArrowPathIcon className="w-4 h-4"/>} size="sm" className="mt-4">Reset</Button>
         </Card>
+        
         {paginatedPersonas.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {paginatedPersonas.map((persona) => <PersonaCard key={persona.id} persona={persona} onEdit={handleEdit} onDelete={handleDeletePersona} onRefreshVulnerabilities={handleSimulateVulnerabilitiesOnCard} isRefreshingVulnerabilities={individualLoading[String(persona.id)] || false} currentUser={currentUser} onDeepDiveRequest={() => handleDeepDiveRequest(persona)} isDiving={isDiving[String(persona.id)] || false} />)}
+              {paginatedPersonas.map((persona) => (
+              <PersonaCard 
+                key={persona.id} 
+                persona={persona} 
+                onEdit={handleEdit} 
+                onDelete={handleDeletePersona} 
+                onRefreshVulnerabilities={handleSimulateVulnerabilitiesOnCard} 
+                isRefreshingVulnerabilities={individualLoading[String(persona.id)] || false} 
+                currentUser={currentUser}
+                onDeepDiveRequest={() => handleDeepDiveRequest(persona)}
+                isDiving={isDiving[String(persona.id)] || false}
+              />
+              ))}
           </div>
-        ) : ( <PrerequisiteMessageCard title="No Personas Found" message={personas.length > 0 ? "No personas match your current filters." : "Get started by creating a new persona."} /> )}
-        {totalPages > 1 && ( <div className="mt-8 flex justify-between items-center"><Button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Previous</Button><span className="text-sm text-textSecondary">Page {currentPage} of {totalPages}</span><Button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Next</Button></div> )}
+        ) : (
+             <Card className="text-center py-8"><p className="text-muted-foreground">No personas match your current filters.</p></Card>
+        )}
+
+        {totalPages > 1 && (
+            <div className="mt-8 flex justify-between items-center">
+              <Button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Previous</Button>
+              <span className="text-sm text-textSecondary">Page {currentPage} of {totalPages}</span>
+              <Button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Next</Button>
+            </div>
+        )}
         </>
       )}
     </div>

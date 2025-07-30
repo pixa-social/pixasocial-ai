@@ -1,11 +1,13 @@
 
+
 import React, { useMemo } from 'react';
 import { Persona, Operator, MediaType, UserProfile } from '../../types';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
+import { Input } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
 import { Select } from '../ui/Select';
-import { SparklesIcon, CheckCircle2, Circle } from 'lucide-react';
+import { SparklesIcon, CheckCircle2, Circle, TagIcon } from 'lucide-react';
 import { 
     CONTENT_PLATFORMS, MEDIA_TYPE_OPTIONS, TONE_OF_VOICE_OPTIONS,
     CURATED_FONT_OPTIONS, MEME_TEXT_COLOR_OPTIONS
@@ -58,12 +60,27 @@ const ContentPlannerConfigComponent: React.FC<ContentPlannerConfigProps> = ({
       </Card>
       
       <Card title="2. Creative Brief">
-          <div className="relative group">
+          <Input 
+            label="Draft Title"
+            value={state.title}
+            onChange={e => handlers.setTitle(e.target.value)}
+            placeholder="e.g., Q3 Product Launch Announcement"
+            required
+          />
+          <div className="relative group mt-4">
               <Textarea label="Key Message / Core Idea" value={state.keyMessage} onChange={e => handlers.setKeyMessage(e.target.value)} placeholder="e.g., Our new product is revolutionary..." rows={3} />
               <Button size="sm" variant="ghost" className="absolute top-0 right-0 text-primary opacity-60 group-hover:opacity-100 transition-opacity" onClick={handlers.handleAmplifyKeyMessage} isLoading={state.isAmplifying} disabled={state.isAmplifying || !state.keyMessage || !state.selectedPersonaId} title="Amplify with AI" leftIcon={<SparklesIcon className="w-4 h-4"/>}>
                   Amplify
               </Button>
           </div>
+          <Input 
+            label="Tags (comma-separated)"
+            value={state.tags}
+            onChange={e => handlers.setTags(e.target.value)}
+            placeholder="e.g., summer-promo, new-feature"
+            containerClassName="mt-4"
+            leftIcon={<TagIcon className="w-4 h-4 text-gray-400" />}
+          />
           <Select label="Global Media Type" options={MEDIA_TYPE_OPTIONS} value={state.globalMediaType} onChange={e => handlers.setGlobalMediaType(e.target.value as MediaType)} containerClassName="mt-4" required />
           {showFontColorOptions && (
               <div className="grid grid-cols-2 gap-4 mt-4">

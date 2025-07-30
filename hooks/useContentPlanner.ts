@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { 
     ContentDraft, Persona, Operator, PlatformContentMap, PlatformContentDetail, 
-    MediaType, ScheduledPost, ImageSourceType, UserProfile, RSTProfile 
+    MediaType, ScheduledPost, ImageSourceType, UserProfile, RSTProfile, KanbanStatus 
 } from '../types';
 import { useToast } from '../components/ui/ToastProvider';
 import { generateJson, generateImages } from '../services/aiService';
@@ -18,7 +18,7 @@ interface UseContentPlannerProps {
   contentDrafts: ContentDraft[];
   personas: Persona[];
   operators: Operator[];
-  onAddContentDraft: (draft: Omit<ContentDraft, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  onAddContentDraft: (draft: Omit<ContentDraft, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'status'> & { status?: KanbanStatus }) => Promise<void>;
   onAddScheduledPost: (post: ScheduledPost) => void;
   onAddContentLibraryAsset: (file: File, name: string, tags: string[]) => Promise<void>;
 }
@@ -37,7 +37,9 @@ export const useContentPlanner = ({
   const [selectedPersonaId, setSelectedPersonaId] = useState<number | null>(null);
   const [selectedOperatorId, setSelectedOperatorId] = useState<number | null>(null);
   const [keyMessage, setKeyMessage] = useState<string>('');
+  const [title, setTitle] = useState<string>('');
   const [customPrompt, setCustomPrompt] = useState<string>('');
+  const [tags, setTags] = useState<string>('');
   const [globalMediaType, setGlobalMediaType] = useState<MediaType>('none');
   const [selectedTone, setSelectedTone] = useState<string>('');
   const [defaultFontFamily, setDefaultFontFamily] = useState<string>(DEFAULT_FONT_FAMILY);
@@ -366,20 +368,26 @@ export const useContentPlanner = ({
 
 
   const handleSaveDraft = useCallback(async () => {
-    if (!selectedPersonaId || !selectedOperatorId || Object.keys(platformContents).length === 0) {
-      showToast("Cannot save empty draft or draft without persona/operator and content.", "error"); return;
+    if (!title.trim() || !selectedPersonaId || !selectedOperatorId || Object.keys(platformContents).length === 0) {
+      showToast("Please provide a Title, Persona, Operator, and generate content before saving.", "error"); return;
     }
     await onAddContentDraft({
-      persona_id: selectedPersonaId, operator_id: selectedOperatorId, key_message: keyMessage,
-      custom_prompt: customPrompt, platform_contents: platformContents, platform_media_overrides: platformMediaOverrides,
+      persona_id: selectedPersonaId, 
+      title: title,
+      operator_id: selectedOperatorId, 
+      key_message: keyMessage,
+      custom_prompt: customPrompt, 
+      platform_contents: platformContents, 
+      platform_media_overrides: platformMediaOverrides,
+      tags: tags.split(',').map(t => t.trim()).filter(Boolean),
     });
     // Reset state
-    setSelectedPersonaId(null); setSelectedOperatorId(null); setKeyMessage(''); setCustomPrompt('');
-    setPlatformContents({}); setGlobalMediaType('none'); setSelectedTone('');
+    setTitle(''); setSelectedPersonaId(null); setSelectedOperatorId(null); setKeyMessage(''); setCustomPrompt('');
+    setTags(''); setPlatformContents({}); setGlobalMediaType('none'); setSelectedTone('');
     setDefaultFontFamily(DEFAULT_FONT_FAMILY); setDefaultFontColor(DEFAULT_FONT_COLOR);
     setSelectedPlatformsForGeneration(initialSelectedPlatforms); setPlatformMediaOverrides(initialPlatformMediaOverrides);
   }, [
-    platformContents, selectedPersonaId, selectedOperatorId, keyMessage, customPrompt, 
+    platformContents, title, selectedPersonaId, selectedOperatorId, keyMessage, customPrompt, tags,
     platformMediaOverrides, onAddContentDraft, showToast
   ]);
 
@@ -388,8 +396,7 @@ export const useContentPlanner = ({
     if (!draft || !draft.platform_contents[platformKey]) return;
 
     const scheduledDate = new Date(scheduledDateTime);
-    let titleContent = draft.platform_contents[platformKey].subject || draft.platform_contents[platformKey].content || 'Content';
-    const title = `${platformKey}: ${titleContent.substring(0, 20)}...`;
+    const title = `${platformKey}: ${draft.title}`;
 
     onAddScheduledPost({
       id: `sch_${Date.now()}`, db_id: 0, title, start: scheduledDate,
@@ -401,21 +408,23 @@ export const useContentPlanner = ({
 
   return {
     state: {
-      selectedPersonaId, selectedOperatorId, keyMessage, customPrompt, globalMediaType,
+      title, selectedPersonaId, selectedOperatorId, keyMessage, customPrompt, globalMediaType,
       selectedTone, defaultFontFamily, defaultFontColor, selectedPlatformsForGeneration,
       platformMediaOverrides, platformContents, isLoading, isAmplifying, isProcessingMedia,
-      isRegeneratingPlatform, error, schedulingPostInfo, isAnyPlatformSelectedForGeneration
+      isRegeneratingPlatform, error, schedulingPostInfo, isAnyPlatformSelectedForGeneration,
+      tags,
     },
     handlers: {
       setSelectedPersonaId, setSelectedOperatorId, setKeyMessage, setCustomPrompt,
-      setGlobalMediaType, setSelectedTone, setDefaultFontFamily, setDefaultFontColor,
+      setTitle, setGlobalMediaType, setSelectedTone, setDefaultFontFamily, setDefaultFontColor,
       setSelectedPlatformsForGeneration, setPlatformMediaOverrides, handleGenerateOrRegenerate,
       handleAmplifyKeyMessage, handleGenerateVariant,
       handleSaveDraft, setSchedulingPostInfo, handleConfirmSchedule,
       handleFieldChange, handleHashtagsChange, handleImageSourceTypeChange,
       handleCustomImageUpload, handleProcessImage, handleDownloadImage, handlePushToLibrary,
       setPlatformContents,
-      handleSelectAllPlatforms, handleDeselectAllPlatforms
+      handleSelectAllPlatforms, handleDeselectAllPlatforms,
+      setTags,
     },
     refs: {
       imageUploadRefs

@@ -8,7 +8,7 @@ import { DashboardSkeleton } from './skeletons/DashboardSkeleton';
 import { OnboardingGuide } from './dashboard/OnboardingGuide';
 import { 
     UsersIcon, BeakerIcon, DocumentTextIcon, CalendarDaysIcon, LinkIcon, 
-    ArrowRightIcon, PlusCircleIcon, ExclamationTriangleIcon
+    ArrowRightIcon, PlusCircleIcon, ExclamationTriangleIcon, SparklesIcon
 } from './ui/Icons'; 
 import { useAppDataContext } from './MainAppLayout';
 import { useNavigate } from 'react-router-dom';
@@ -220,7 +220,11 @@ export const DashboardView: React.FC = () => {
                 })}
               </div>
             ) : (
-              <p className="text-muted-foreground text-center py-4">No upcoming posts scheduled.</p>
+              <div className="text-center py-4 text-muted-foreground">
+                <CalendarDaysIcon className="w-10 h-10 mx-auto mb-2 text-primary/50" />
+                <h4 className="font-semibold text-foreground">No Upcoming Posts</h4>
+                <p className="text-sm mt-1">Schedule posts from the Content Planner to see them here.</p>
+              </div>
             )}
             <Button 
               variant="ghost" 
@@ -239,7 +243,13 @@ export const DashboardView: React.FC = () => {
               {latestPersona && ( <div className="p-3 bg-white/5 rounded-lg"><p className="text-xs text-muted-foreground mb-0.5">Latest Persona Added:</p><h5 className="font-semibold text-sm text-primary">{latestPersona.name}</h5><p className="text-xs text-muted-foreground truncate">{latestPersona.demographics}</p></div> )}
               {latestOperator && ( <div className="p-3 bg-white/5 rounded-lg"><p className="text-xs text-muted-foreground mb-0.5">Latest Operator Added:</p><h5 className="font-semibold text-sm text-accent">{latestOperator.name} ({latestOperator.type})</h5><p className="text-xs text-muted-foreground truncate">For: {(personas ?? []).find(p=>p.id === latestOperator.target_audience_id)?.name || 'N/A'}</p></div> )}
               {latestDraft && ( <div className="p-3 bg-white/5 rounded-lg"><p className="text-xs text-muted-foreground mb-0.5">Latest Content Draft Added:</p><h5 className="font-semibold text-sm text-yellow-500">Draft for {(personas ?? []).find(p => p.id === latestDraft.persona_id)?.name || 'N/A'}</h5><p className="text-xs text-muted-foreground truncate">Using Op: {(operators ?? []).find(o => o.id === latestDraft.operator_id)?.name || 'N/A'}</p></div> )}
-              {!latestPersona && !latestOperator && !latestDraft && ( <p className="text-muted-foreground text-center py-4">No recent activity to display.</p> )}
+              {!latestPersona && !latestOperator && !latestDraft && (
+                <div className="text-center py-4 text-muted-foreground">
+                    <SparklesIcon className="w-10 h-10 mx-auto mb-2 text-primary/50" />
+                    <h4 className="font-semibold text-foreground">No Recent Activity</h4>
+                    <p className="text-sm mt-1">Create personas, operators, or drafts to see your latest work here.</p>
+                </div>
+              )}
             </div>
           </Card>
         </motion.div>

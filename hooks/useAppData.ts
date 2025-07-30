@@ -1,14 +1,19 @@
 
+
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { useToast } from '../components/ui/ToastProvider';
 import * as dataService from '../services/dataService';
 import { 
     Persona, Operator, ContentDraft, ScheduledPost, ScheduledPostDbRow, 
-    ContentLibraryAsset, CustomChannel, UserProfile, ConnectedAccount, 
-    SocialPlatformType, ScheduledPostStatus, AdminPersona
-} from '../types';
-import { Database, Json } from '../types/supabase';
+    KanbanStatus, AdminPersona
+} from '../types/campaign';
+import { UserProfile } from '../types/user';
+import { CustomChannel } from '../types/chat';
+import { ConnectedAccount, ContentLibraryAsset } from '../types/social';
+import { SocialPlatformType, ScheduledPostStatus } from '../types/app';
+import { Database, Json, TablesInsert, TablesUpdate } from '../types/supabase';
 import { CONTENT_PLATFORMS } from '../constants';
 
 const dataURLtoBlob = (dataurl: string) => {
@@ -25,6 +30,22 @@ const dataURLtoBlob = (dataurl: string) => {
     }
     return new Blob([u8arr], {type:mime});
 }
+
+const processRawDraftData = (drafts: any[]): ContentDraft[] => {
+    return (drafts || []).map(draft => {
+        const processedDraft: any = { ...draft };
+        const dbContents = processedDraft.platform_contents as any;
+        if (dbContents && dbContents._media_overrides) {
+            processedDraft.platform_media_overrides = dbContents._media_overrides;
+            delete dbContents._media_overrides;
+        } else {
+            processedDraft.platform_media_overrides = null;
+        }
+        processedDraft.platform_contents = dbContents;
+        processedDraft.status = draft.status || 'Draft'; // Set default status if null
+        return processedDraft as ContentDraft;
+    });
+};
 
 export const useAppData = (currentUser: UserProfile | null) => {
     const { showToast } = useToast();
@@ -85,20 +106,7 @@ export const useAppData = (currentUser: UserProfile | null) => {
             fetchOperators();
             fetchAdminPersonas();
             const { data: rawDraftData } = await supabase.from('content_drafts').select('*').eq('user_id', currentUser.id);
-
-            // Process raw data to create the client-side ContentDraft shape
-            const processedDrafts = (rawDraftData || []).map(draft => {
-                const processedDraft: any = { ...draft };
-                const dbContents = processedDraft.platform_contents as any;
-                if (dbContents && dbContents._media_overrides) {
-                    processedDraft.platform_media_overrides = dbContents._media_overrides;
-                    delete dbContents._media_overrides;
-                } else {
-                    processedDraft.platform_media_overrides = null;
-                }
-                processedDraft.platform_contents = dbContents;
-                return processedDraft as ContentDraft;
-            });
+            const processedDrafts = processRawDraftData(rawDraftData || []);
             setContentDrafts(processedDrafts);
 
             fetchContentLibraryAssets();
@@ -109,12 +117,7 @@ export const useAppData = (currentUser: UserProfile | null) => {
             const { data: scheduleData } = await supabase.from('scheduled_posts').select('*').eq('user_id', currentUser.id);
             const scheduledPostsFromDb: ScheduledPost[] = (scheduleData || []).map((p: ScheduledPostDbRow) => {
                 const draft = processedDrafts.find((d: ContentDraft) => d.id === p.content_draft_id);
-                let titleContent = "Untitled";
-                if (draft) {
-                    const platformDetail = draft.platform_contents[p.platform_key];
-                    titleContent = platformDetail?.subject || platformDetail?.content?.substring(0, 20) || draft.key_message?.substring(0,20) || 'Content Draft';
-                }
-                const title = `${titleContent}...`;
+                const title = draft ? `${p.platform_key}: ${draft.title}` : 'Scheduled Post';
                 const startDate = new Date(p.scheduled_at);
                 return {
                     id: `sch_${p.id}_${p.platform_key}`, db_id: p.id, title: title, start: startDate,
@@ -154,7 +157,7 @@ export const useAppData = (currentUser: UserProfile | null) => {
             avatarUrl = `https://picsum.photos/seed/${personaData.name.trim().toLowerCase().replace(/[^a-z0-9]/gi, '')}/100/100`;
         }
         
-        const newPersonaData: Database['public']['Tables']['personas']['Insert'] = {
+        const newPersonaData: TablesInsert<'personas'> = {
             name: personaData.name,
             demographics: personaData.demographics || null,
             psychographics: personaData.psychographics || null,
@@ -180,7 +183,7 @@ export const useAppData = (currentUser: UserProfile | null) => {
 
     const handleUpdatePersona = useCallback(async (personaId: number, personaData: Partial<Omit<Persona, 'id' | 'user_id' | 'created_at'>> & { avatar_base64?: string }) => {
         if (!currentUser) return;
-        let updatePayload: Database['public']['Tables']['personas']['Update'] = { ...personaData };
+        let updatePayload: TablesUpdate<'personas'> = { ...personaData };
         delete (updatePayload as any).avatar_base64; // Remove base64 before it goes to db
 
         if (personaData.avatar_base64) {
@@ -218,7 +221,7 @@ export const useAppData = (currentUser: UserProfile | null) => {
     // --- Operator Handlers ---
     const handleAddOperator = useCallback(async (operatorData: Omit<Operator, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
         if(!currentUser) return;
-        const newOperatorData: Database['public']['Tables']['operators']['Insert'] = { ...operatorData, user_id: currentUser.id };
+        const newOperatorData: TablesInsert<'operators'> = { ...operatorData, user_id: currentUser.id };
         const { data, error } = await supabase.from('operators').insert(newOperatorData).select().single();
         if (error) { showToast(`Failed to create operator: ${error.message}`, 'error'); } 
         else { setOperators(prev => [data, ...prev]); showToast("Operator created.", "success"); }
@@ -226,7 +229,7 @@ export const useAppData = (currentUser: UserProfile | null) => {
 
     const handleUpdateOperator = useCallback(async (operatorId: number, operatorData: Partial<Omit<Operator, 'id' | 'user_id' | 'created_at'>>) => {
         if (!currentUser) return;
-        const payload: Database['public']['Tables']['operators']['Update'] = { ...operatorData, updated_at: new Date().toISOString() };
+        const payload: TablesUpdate<'operators'> = { ...operatorData, updated_at: new Date().toISOString() };
         const { data, error } = await supabase.from('operators').update(payload).eq('id', operatorId).select().single();
         if (error) { showToast(`Failed to update operator: ${error.message}`, 'error'); } 
         else { setOperators(prev => prev.map(o => o.id === data.id ? data : o)); showToast("Operator updated.", "success"); }
@@ -242,8 +245,8 @@ export const useAppData = (currentUser: UserProfile | null) => {
         }
     }, [showToast]);
 
-    // --- Other Handlers ---
-    const handleAddContentDraft = useCallback(async (draftData: Omit<ContentDraft, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
+    // --- Content Draft Handlers ---
+    const handleAddContentDraft = useCallback(async (draftData: Omit<ContentDraft, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'status'> & { status?: KanbanStatus }) => {
         if(!currentUser) return;
 
         const platformContentsForDb = {
@@ -251,28 +254,37 @@ export const useAppData = (currentUser: UserProfile | null) => {
             _media_overrides: draftData.platform_media_overrides || {},
         };
 
-        const dataToInsert: Database['public']['Tables']['content_drafts']['Insert'] = {
+        const dataToInsert: TablesInsert<'content_drafts'> = {
             user_id: currentUser.id, 
+            title: draftData.title,
             operator_id: draftData.operator_id,
             persona_id: draftData.persona_id, 
             key_message: draftData.key_message || null, 
             custom_prompt: draftData.custom_prompt,
             platform_contents: platformContentsForDb,
+            tags: draftData.tags || [],
+            status: draftData.status || 'Draft',
         };
         
         const { data, error } = await supabase.from('content_drafts').insert(dataToInsert).select().single();
         if (error) { 
             showToast(`Failed to save draft: ${error.message}`, 'error');
         } else if (data) {
-            const newDraft: any = { ...data };
-            if (newDraft.platform_contents && (newDraft.platform_contents as any)._media_overrides) {
-                newDraft.platform_media_overrides = (newDraft.platform_contents as any)._media_overrides;
-                delete (newDraft.platform_contents as any)._media_overrides;
-            } else {
-                newDraft.platform_media_overrides = null;
-            }
-            setContentDrafts(prev => [...prev, newDraft as ContentDraft]);
+            const [ newDraft ] = processRawDraftData([data]);
+            setContentDrafts(prev => [...prev, newDraft]);
             showToast("Draft saved successfully!", "success");
+        }
+    }, [currentUser, showToast]);
+
+    const handleUpdateContentDraft = useCallback(async (draftId: string, updates: TablesUpdate<'content_drafts'>) => {
+        if (!currentUser) return;
+        const { data, error } = await supabase.from('content_drafts').update(updates).eq('id', draftId).select().single();
+        if (error) {
+            showToast(`Failed to update draft: ${error.message}`, 'error');
+        } else if (data) {
+            const [ updatedDraft ] = processRawDraftData([data]);
+            setContentDrafts(prev => prev.map(d => d.id === draftId ? updatedDraft : d));
+            showToast('Draft updated.', 'success');
         }
     }, [currentUser, showToast]);
 
@@ -311,7 +323,7 @@ export const useAppData = (currentUser: UserProfile | null) => {
         }
 
         try {
-            const payload: Database['public']['Tables']['content_drafts']['Update'] = { platform_contents: platformContentsForDb };
+            const payload: TablesUpdate<'content_drafts'> = { platform_contents: platformContentsForDb };
             await supabase
                 .from('content_drafts')
                 .update(payload)
@@ -338,7 +350,7 @@ export const useAppData = (currentUser: UserProfile | null) => {
             return;
         }
         
-        const payload: Database['public']['Tables']['scheduled_posts']['Insert'] = {
+        const payload: TablesInsert<'scheduled_posts'> = {
              user_id: currentUser.id, content_draft_id: post.resource.contentDraftId, platform_key: post.resource.platformKey,
             status: post.resource.status, notes: post.resource.notes || null, scheduled_at: post.start.toISOString(),
         };
@@ -346,15 +358,11 @@ export const useAppData = (currentUser: UserProfile | null) => {
         const { data, error } = await supabase.from('scheduled_posts').insert(payload).select().single();
         if(error) { showToast(`Failed to schedule: ${error.message}`, 'error');
         } else {
-            const platformInfo = CONTENT_PLATFORMS.find(plat => plat.key === data.platform_key);
-            const platformDetail = draft.platform_contents[data.platform_key];
-            const titleContent = platformDetail?.subject || platformDetail?.content?.substring(0, 20) || draft.key_message?.substring(0,20) || 'Content Draft';
-            const title = `${titleContent}...`;
             
             const newPostForState: ScheduledPost = {
                 id: `sch_${data.id}_${data.platform_key}`,
                 db_id: data.id,
-                title: title,
+                title: post.title, // Title is already passed in from the hook with correct format
                 start: new Date(data.scheduled_at),
                 end: new Date(new Date(data.scheduled_at).getTime() + 60 * 60 * 1000), // Default 1 hr duration
                 resource: {
@@ -364,9 +372,13 @@ export const useAppData = (currentUser: UserProfile | null) => {
                 }
             };
             setScheduledPosts(prev => [...prev, newPostForState]);
+            
+            // Also update the draft's status
+            await handleUpdateContentDraft(post.resource.contentDraftId, { status: 'Scheduled' });
+
             showToast("Post scheduled!", "success");
         }
-    }, [currentUser, showToast, contentDrafts]);
+    }, [currentUser, showToast, contentDrafts, handleUpdateContentDraft]);
 
     const handleUpdateScheduledPost = useCallback(async (post: ScheduledPost, updates: Partial<{start: Date, end: Date, notes: string, status: ScheduledPostStatus}>) => {
         if (!currentUser) return;
@@ -385,7 +397,7 @@ export const useAppData = (currentUser: UserProfile | null) => {
         setScheduledPosts(prev => prev.map(p => p.id === post.id ? updatedPostForState : p));
     
         // Build database payload with only changed fields
-        const updatePayload: Database['public']['Tables']['scheduled_posts']['Update'] = {};
+        const updatePayload: TablesUpdate<'scheduled_posts'> = {};
         if (updates.start) {
             updatePayload.scheduled_at = updates.start.toISOString();
         }
@@ -418,23 +430,24 @@ export const useAppData = (currentUser: UserProfile | null) => {
     }, [currentUser, showToast]);
 
     const handleDeleteScheduledPost = useCallback(async (postId: string) => {
-        const dbId = parseInt(postId.split('_')[1], 10);
-        if (isNaN(dbId)) {
-            showToast("Invalid post database ID.", "error"); return;
-        }
+        const post = scheduledPosts.find(p => p.id === postId);
+        if (!post) return;
+        const dbId = post.db_id;
         
         const { error } = await dataService.deleteScheduledPost(dbId);
         if (error) {
             showToast(`Failed to delete schedule: ${error.message}`, 'error');
         } else {
             setScheduledPosts(prev => prev.filter(p => p.id !== postId));
+            // Revert draft status to 'Approved'
+            await handleUpdateContentDraft(post.resource.contentDraftId, { status: 'Approved' });
             showToast("Schedule removed.", "info");
         }
-    }, [showToast]);
+    }, [showToast, scheduledPosts, handleUpdateContentDraft]);
   
     const handleAddConnectedAccount = useCallback(async (platform: SocialPlatformType, accountId: string, displayName: string) => {
         if(!currentUser) return;
-        const payload: Database['public']['Tables']['connected_accounts']['Insert'] = { 
+        const payload: TablesInsert<'connected_accounts'> = { 
             platform, accountid: accountId, accountname: displayName, user_id: currentUser.id, created_at: new Date().toISOString() 
         };
         const { data, error } = await supabase.from('connected_accounts').insert(payload).select().single();
@@ -461,7 +474,7 @@ export const useAppData = (currentUser: UserProfile | null) => {
         const { error: uploadError } = await supabase.storage.from('content-library').upload(storagePath, file);
         if (uploadError) { showToast(`Upload failed: ${uploadError.message}`, 'error'); return; }
         
-        const payload: Database['public']['Tables']['content_library_assets']['Insert'] = {
+        const payload: TablesInsert<'content_library_assets'> = {
             user_id: currentUser.id, name, type: file.type.startsWith('image/') ? 'image' : 'video',
             storage_path: storagePath, file_name: file.name, file_type: file.type, size: file.size,
             tags: tags.length > 0 ? tags : null,
@@ -473,7 +486,7 @@ export const useAppData = (currentUser: UserProfile | null) => {
 
     const handleUpdateAsset = useCallback(async (assetId: string, updates: Partial<Pick<ContentLibraryAsset, 'name' | 'tags'>>) => {
         if (!currentUser) return;
-        const payload: Database['public']['Tables']['content_library_assets']['Update'] = updates;
+        const payload: TablesUpdate<'content_library_assets'> = updates;
         const { error } = await supabase.from('content_library_assets').update(payload).eq('id', assetId);
         if (error) { showToast(`Failed to update asset: ${error.message}`, 'error');
         } else { showToast("Asset updated successfully!", "success"); fetchContentLibraryAssets(); }
@@ -531,6 +544,7 @@ export const useAppData = (currentUser: UserProfile | null) => {
             updateOperator: handleUpdateOperator,
             deleteOperator: handleDeleteOperator,
             addContentDraft: handleAddContentDraft,
+            updateContentDraft: handleUpdateContentDraft,
             deleteContentDraft: handleDeleteContentDraft,
             deletePlatformContent: handleDeletePlatformContent,
             addScheduledPost: handleAddScheduledPost,

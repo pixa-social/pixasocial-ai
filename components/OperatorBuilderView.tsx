@@ -7,7 +7,7 @@ import { generateJson } from '../services/aiService';
 import { useToast } from './ui/ToastProvider';
 import { EmptyState } from './ui/EmptyState';
 import { useNavigate } from 'react-router-dom';
-import { TrashIcon, PlusCircleIcon, DocumentDuplicateIcon, UsersIcon } from './ui/Icons';
+import { TrashIcon, PlusCircleIcon, DocumentDuplicateIcon, UsersIcon, BeakerIcon } from './ui/Icons';
 import { OperatorForm } from './operator-builder/OperatorForm';
 import { OperatorFlowDiagram } from './operator-builder/OperatorFlowDiagram';
 import { EffectivenessGauge } from './operator-builder/EffectivenessGauge';
@@ -160,6 +160,13 @@ export const OperatorBuilderView: React.FC = () => {
                         onAnalyze={handleAnalyzeOperator}
                     />
                 </Card>
+            ) : operators.length === 0 ? (
+                <EmptyState
+                    icon={<BeakerIcon className="w-8 h-8 text-accent" />}
+                    title="Build Your First Operator"
+                    description="Operators define the psychological approach of your campaign. Create one to start shaping your message."
+                    action={{ label: 'Create New Operator', onClick: handleCreateNew }}
+                />
             ) : (
                 <Card>
                     <div className="text-center py-12">

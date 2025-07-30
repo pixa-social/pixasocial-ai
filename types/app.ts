@@ -80,5 +80,6 @@ export enum AiProviderType {
   Openrouter = 'Openrouter',
   MistralAI = 'MistralAI',
   NovitaAI = 'NovitaAI',
+  Cerebras = 'Cerebras',
   Placeholder = 'Placeholder (Not Implemented)',
 }

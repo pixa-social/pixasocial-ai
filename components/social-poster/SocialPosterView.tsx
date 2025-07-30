@@ -58,7 +58,7 @@ export const SocialPosterView: React.FC = () => {
   /* ---------- data ---------- */
   const personaOptions   = useMemo(() => personas.map(p => ({ value: p.id.toString(), label: p.name })), [personas]);
   const operatorOptions  = useMemo(() => operators.map(o => ({ value: o.id.toString(), label: `${o.name} (${o.type})` })), [operators]);
-  const draftOptions     = useMemo(() => contentDrafts.map(d => ({ value: d.id, label: `Draft for ${personas.find(p => p.id === d.persona_id)?.name || 'N/A'}` })), [contentDrafts, personas]);
+  const draftOptions     = useMemo(() => contentDrafts.map(d => ({ value: d.id, label: d.title || `Draft for ${personas.find(p => p.id === d.persona_id)?.name || 'N/A'}` })), [contentDrafts, personas]);
   const hasNoCredits = currentUser.ai_usage_count_monthly >= currentUser.role.max_ai_uses_monthly;
   const isFreeUser = currentUser.role.name === RoleName.Free;
 

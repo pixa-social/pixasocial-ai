@@ -1,4 +1,3 @@
-import { Database } from './supabase';
 import { RoleName } from './app';
 
 // Represents a Supabase user, with profile data potentially merged in
@@ -11,10 +10,19 @@ export interface User {
   role_name?: RoleName;
 }
 
-// Derived type from Supabase schema, but with the 'name' property strongly typed to the RoleName enum
-export type RoleType = Omit<Database['public']['Tables']['role_types']['Row'], 'name'> & {
+// Manually defined to break circular dependency with supabase types.
+// This needs to be kept in sync with the 'role_types' table in the database.
+export interface RoleType {
+  id: string;
   name: RoleName;
-};
+  max_personas: number;
+  max_ai_uses_monthly: number;
+  price_monthly: number;
+  price_yearly: number;
+  features: string[];
+  created_at: string;
+  updated_at: string | null;
+}
 
 // Represents the enriched User object with profile and role details
 export interface UserProfile extends User {
@@ -24,7 +32,15 @@ export interface UserProfile extends User {
   assigned_ai_model_image?: string | null;
 }
 
-// Represents a row from the admin_users_view for the Admin Panel, also with a strongly typed role_name
-export type AdminUserView = Omit<Database['public']['Views']['admin_users_view']['Row'], 'role_name'> & {
+// Manually defined to break circular dependency with supabase types.
+// This needs to be kept in sync with the 'admin_users_view' view in the database.
+export interface AdminUserView {
+  id: string | null;
+  email: string | null;
+  name: string | null;
   role_name: RoleName | null;
-};
+  ai_usage_count_monthly: number | null;
+  assigned_ai_model_text: string | null;
+  assigned_ai_model_image: string | null;
+  updated_at: string | null;
+}

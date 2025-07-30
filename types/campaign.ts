@@ -25,6 +25,7 @@ export type Operator = Database['public']['Tables']['operators']['Row'];
 
 export type MediaType = 'none' | 'image' | 'video';
 export type ImageSourceType = 'generate' | 'upload' | 'library';
+export type KanbanStatus = 'Draft' | 'For Review' | 'Approved' | 'Scheduled';
 
 export interface PlatformContentDetail {
   content: string;
@@ -57,12 +58,15 @@ export interface ContentDraft {
   user_id: string;
   operator_id: number;
   persona_id: number;
+  title: string;
   key_message: string | null;
   custom_prompt: string;
   platform_contents: PlatformContentMap;
   platform_media_overrides: Record<string, MediaType | 'global'> | null;
   created_at: string;
   updated_at: string | null;
+  tags: string[] | null;
+  status: KanbanStatus;
 }
 
 export interface ScheduledPostResource {
