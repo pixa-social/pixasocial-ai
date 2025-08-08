@@ -1,13 +1,13 @@
 import React, { useCallback } from 'react';
-import { useAppDataContext } from './MainAppLayout';
+import { useAppDataContext } from '../MainAppLayout';
 import { ViewName, Persona, AdminPersona } from '../types';
-import { PrerequisiteMessageCard } from './ui/PrerequisiteMessageCard';
+import { PrerequisiteMessageCard } from '../ui/PrerequisiteMessageCard';
 import { ChatSidebar } from './ai-agents/ChatSidebar';
 import { ChatArea } from './ai-agents/ChatArea';
 import { WelcomeScreen } from './ai-agents/WelcomeScreen';
 import { useAIAgentChat } from './ai-agents/hooks/useAIAgentChat';
 import { InsightsPanel } from './ai-agents/InsightsPanel';
-import { useToast } from './ui/ToastProvider';
+import { useToast } from '../ui/ToastProvider';
 
 export const AIAgentsView: React.FC = () => {
     const { currentUser, personas, adminPersonas, handlers: appDataHandlers, onNavigate } = useAppDataContext();

@@ -1,7 +1,6 @@
-
 import React, { useState, useCallback, useRef, useMemo } from 'react';
 import { Persona, RSTProfile, ViewName, UserProfile, LibraryPersona, AIPersonaDeepDive, AdminPersona } from '../../types'; 
-import type { Json } from '../../types/supabase';
+import type { Json } from '../../types/json';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -62,7 +61,7 @@ export const AudienceModelingView: React.FC = () => {
   const [sortField, setSortField] = useState<'name' | 'id'>('id');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
-  const hasNoCredits = currentUser.ai_usage_count_monthly >= currentUser.role.max_personas;
+  const hasNoCredits = currentUser.ai_usage_count_monthly >= currentUser.role.max_ai_uses_monthly;
 
   const resetFiltersAndPagination = useCallback(() => {
     setFilterName('');
@@ -285,4 +284,3 @@ export const AudienceModelingView: React.FC = () => {
       )}
     </div>
   );
-};
