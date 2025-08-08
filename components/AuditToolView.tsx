@@ -112,11 +112,11 @@ export const AuditToolView: React.FC = () => {
       if (format === 'markdown') {
         fileContent += `## ${step.id}: ${step.title}\n`;
         fileContent += `**Description:** ${step.description}\n\n`;
-        fileContent += `**AI Generated Content:**\n${step.content || 'No content generated.'}\n\n`;
+        fileContent += `${step.content || 'No content generated.'}\n\n`;
       } else {
         fileContent += `${step.id}: ${step.title}\n`;
-        fileContent += `Description: ${step.description}\n`;
-        fileContent += `AI Generated Content:\n${step.content || 'No content generated.'}\n\n-----------------\n\n`;
+        fileContent += `Description: ${step.description}\n\n`;
+        fileContent += `${step.content || 'No content generated.'}\n\n-----------------\n\n`;
       }
     });
 
@@ -179,7 +179,6 @@ export const AuditToolView: React.FC = () => {
                 <h3 className="text-xl font-semibold text-primary">{step.id}: {step.title}</h3>
                 <p className="text-sm text-textSecondary mt-1 italic">{step.description}</p>
                 <div className="mt-3 p-3 bg-background rounded border border-mediumBorder">
-                  <h4 className="text-sm font-semibold text-textPrimary mb-1">AI Generated Content:</h4>
                   <pre className="whitespace-pre-wrap text-sm text-textPrimary font-sans">
                     {step.content || "No content generated for this step."}
                   </pre>

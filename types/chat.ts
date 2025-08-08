@@ -1,5 +1,4 @@
-import { Database } from './supabase';
-import { GroundingSource } from './ai';
+import type { GroundingSource } from './ai';
 
 export interface ChatMessageAttachment {
   name: string;
@@ -29,4 +28,12 @@ export interface CustomChannel {
   created_at: string;
 }
 
-export type ChatSession = Database['public']['Tables']['chat_sessions']['Row'];
+// Manually defined from supabase schema to break circular dependency
+export interface ChatSession {
+  id: string;
+  user_id: string;
+  persona_id: number | null;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}

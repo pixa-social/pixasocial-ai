@@ -1,112 +1,138 @@
 # PixaSocial Ai - Strategic Social Engagement Suite
 
-PixaSocial Ai is a React-based web application designed for planning, simulating, and evaluating social engagement strategies. It leverages behavioral insights, psychological frameworks like Reinforcement Sensitivity Theory (RST), AI-driven assistance, and decentralized real-time communication to support global campaign managers.
+PixaSocial Ai is a sophisticated, React-based web application designed for global campaign managers, strategists, and content creators. It moves beyond traditional social media scheduling by integrating **behavioral psychology**, **AI-driven assistance**, and structured strategic frameworks to help you plan, simulate, and execute high-impact social engagement campaigns.
 
-## Features
-
-*   **Dashboard:** Dynamic overview of your campaign data, upcoming posts, and quick actions.
-*   **Audience Modeling:** Create detailed audience personas using RST (BAS, BIS, FFFS) and AI-assisted suggestions.
-*   **Analytics:** Generate and visualize OCEAN (Big Five) personality scores for your personas with AI-powered analysis and radar charts.
-*   **Operator Builder:** Design campaign mechanics (Hope, Fear, Custom, etc.) based on Pavlovian conditioning principles, tailored to specific personas.
-*   **Content Planner:** Generate multi-platform content (X, Facebook, Instagram, Email, Posters) with AI, including text, image prompts, meme text, and video ideas.
-*   **Calendar:** Schedule and visualize your content plan with an interactive calendar.
-*   **Content Library:** Upload, store, and manage reusable media assets (images, videos).
-*   **Team Chat:** Real-time, decentralized chat for team collaboration using GunDB.
-*   **Feedback Simulator:** Predict audience reactions (sentiment, engagement, risks) to your content using AI.
-*   **Campaign Blueprint:** Apply the 8D problem-solving process to your campaigns with AI assistance.
-*   **Admin Panel & Settings:** Configure AI providers and manage user/team settings.
-*   **Authentication & Data Persistence:** User accounts and campaign data are managed via Supabase.
+Our platform empowers you to understand your audience on a deeper level, craft messages that resonate with their core motivations, and predict their reactions, giving you an unparalleled strategic advantage.
 
 ## Tech Stack
 
-*   **Runtime & Tooling:** [Bun](https://bun.sh/)
-*   **Frontend:** React 19, TypeScript
-*   **Styling:** Tailwind CSS (via CDN)
-*   **AI Integration:** Google Gemini API (`@google/genai`), OpenAI API (`openai`), and other compatible APIs.
-*   **Database & Auth:** [Supabase](https://supabase.com/)
-*   **Decentralized Real-time Chat:** GunDB (`gun`)
-*   **Forms:** React Hook Form & Zod
-*   **Calendar:** `react-big-calendar`
-*   **Charts:** `recharts`
-*   **Date Management:** `date-fns`
+PixaSocial Ai is built with a modern, performant, and scalable tech stack:
 
-## Local Development Setup with Bun
+*   **Runtime & Tooling:** [Bun](https://bun.sh/) (Runtime, Bundler, Package Manager)
+*   **Frontend:** React 19, TypeScript, Tailwind CSS
+*   **Routing:** React Router
+*   **State Management:** React Hooks & Context API
+*   **Backend as a Service (BaaS):** [Supabase](https://supabase.com/)
+    *   **Database:** Supabase Postgres
+    *   **Authentication:** Supabase Auth
+    *   **Storage:** Supabase Storage for assets like avatars and content library files.
+    *   **Serverless Functions:** Supabase Edge Functions (Deno) for secure backend logic.
+*   **AI Integration:**
+    *   Google Gemini API (`@google/genai`)
+    *   OpenAI API (`openai`) & various OpenAI-compatible providers (Groq, etc.)
+    *   Vercel AI SDK for streaming and unified provider access.
+*   **Real-time Chat:** GunDB (`gun`) for decentralized team communication.
+*   **UI Components:** Radix UI primitives, Framer Motion for animations.
+*   **Forms:** React Hook Form & Zod for validation.
+*   **Charts & Calendar:** `recharts` & `react-big-calendar`.
 
-This project is configured to run using the Bun toolkit, which provides a fast runtime, bundler, and package manager all-in-one.
+## How It Works: Backend & Architecture
 
-### 1. Install Bun
+The application is architected with a secure and scalable backend powered by Supabase:
 
-If you don't have Bun installed, run the following command in your terminal:
+*   **Client-Side:** The React frontend is a powerful user interface for managing all campaign activities.
+*   **Supabase Backend:** All core data—including user profiles, personas, operators, content drafts, and settings—is stored securely in a Supabase Postgres database. Authentication is handled by Supabase Auth, supporting email/password and OAuth providers.
+*   **Edge Functions:** All interactions with third-party APIs (like AI models and social media platforms) are proxied through **Supabase Edge Functions**. This is a critical security feature:
+    *   **API Key Security:** Your sensitive API keys are stored and used only on the server-side, never exposed to the client's browser.
+    *   **Unified Logic:** Functions like `ai-proxy` and `text-to-speech` contain the logic to interact with services like Google Gemini, OpenAI, and AWS Polly, providing a consistent interface for the frontend.
+    *   **Secure Connections:** Functions for connecting social accounts (e.g., `connect-reddit`, `connect-google-business`) handle the OAuth 2.0 flow securely on the backend.
 
+This architecture ensures that the application is not only feature-rich but also secure and robust.
+
+## Key Modules & Features Explained
+
+PixaSocial Ai's power comes from its interconnected modules, which guide you through a strategic workflow.
+
+#### 1. **Audience Modeling**
+*   **What it is:** The foundation of your strategy. This module lets you create detailed audience personas.
+*   **How it works:** Instead of just demographics, you define psychographics, goals, fears, and core beliefs. It integrates the **Reinforcement Sensitivity Theory (RST)**, a neuropsychological model that helps you understand an individual's sensitivity to rewards (BAS), punishments (BIS), and threats (FFFS). You can create personas from scratch, use AI suggestions, or import from a global library of pre-built templates managed by an admin.
+
+#### 2. **Operator Builder**
+*   **What it is:** Your strategic toolkit for influencing perception. An "Operator" is a campaign mechanic based on principles of Pavlovian conditioning.
+*   **How it works:** You define a desired response you want from a persona (e.g., "feel a sense of urgency") and link it to a conditioned stimulus (e.g., your brand's hashtag) by associating it with an unconditioned stimulus (e.g., a countdown timer). The AI can help you design these components, and you can even analyze an operator's predicted effectiveness on a specific persona.
+
+#### 3. **Content Planner**
+*   **What it is:** An AI-powered content generation engine.
+*   **How it works:** Select a persona and an operator, and the AI will generate tailored content for multiple social platforms (X, Facebook, Instagram, Email, Posters, etc.). It crafts text, image prompts, meme text, and video ideas that align with your strategy. You can edit, regenerate, and save all generated content as drafts.
+
+#### 4. **AI Agents**
+*   **What it is:** A conversational AI chat interface.
+*   **How it works:** Chat directly with your created personas. The AI adopts the persona's personality, beliefs, and communication style, allowing you to test ideas, gather insights, or role-play interactions in a safe environment. You can also import pre-built template agents from a global library to quickly start new conversations.
+
+#### 5. **Analytics & Feedback Simulator**
+*   **Analytics:** Generate **BRM (Behavioral Resonance Model)** scores for your personas. The AI provides a full analysis, a radar chart, and strategic recommendations based on the persona's psychological profile.
+*   **Feedback Simulator:** Predict audience reactions before you post. Input your content and select a persona, and the AI will forecast audience sentiment (Positive, Neutral, Negative), predict engagement levels, and identify potential risks or misinterpretations.
+
+#### 6. **Campaign Blueprint (Audit Tool)**
+*   **What it is:** A strategic planning tool based on the **8D (Eight Disciplines) problem-solving framework**.
+*   **How it works:** Define your primary campaign objective, and the AI will generate a comprehensive, structured plan covering everything from team establishment and root cause analysis to implementation and prevention of recurrence.
+
+#### 7. **Social Poster & Calendar**
+*   **Social Poster:** A central hub to create and publish posts to your connected social media accounts. You can compose new posts, attach media from your Content Library, and publish directly.
+*   **Calendar:** An interactive calendar to visualize, manage, and schedule all your planned content. Drag and drop to reschedule posts and maintain a clear overview of your campaign timeline.
+
+#### 8. **Content Library**
+*   A centralized repository for all your media assets. Upload images and videos to reuse them across the Content Planner and Social Poster, ensuring brand consistency and streamlining your workflow.
+
+---
+
+## Local Development Setup
+
+This project is configured to run using the **Bun toolkit**.
+
+### 1. Prerequisites
+First, ensure you have Bun installed. If not, run the following command in your terminal:
 ```bash
 curl -fsSL https://bun.sh/install | bash
 ```
-(Follow the on-screen instructions to add Bun to your shell's PATH)
+Follow the on-screen instructions to add Bun to your shell's `PATH`.
 
 ### 2. Clone the Repository
-
 ```bash
 git clone <repository-url>
-cd <repository-directory>
+cd pixasocial-ai # Or your repository directory name
 ```
 
 ### 3. Install Dependencies
-
-Install all the necessary packages using Bun. This is significantly faster than `npm install`.
-
+Use Bun to install all the necessary packages. This is significantly faster than `npm install`.
 ```bash
 bun install
 ```
 
-### 4. Run the Development Server
+### 4. Configure Environment Variables
+You need to connect the application to your own Supabase project.
 
-Start the development server with hot-reloading. Bun will automatically handle TypeScript/JSX.
+1.  Create a new project on [Supabase](https://supabase.com/).
+2.  In your Supabase project dashboard, go to **Project Settings > API**.
+3.  Create a file named `.env` in the root of your local project directory.
+4.  Copy the contents of the example below into your `.env` file and replace the placeholder values with your actual Supabase credentials.
 
+**`.env.example`:**
+```env
+# Supabase Project URL and Anon Key (from Project Settings > API)
+SUPABASE_URL="https://your-project-ref.supabase.co"
+SUPABASE_ANON_KEY="your-anon-key"
+```
+*Note: Using a `.env` file is the recommended and more secure practice for local development, even if the source code contains hard-coded fallback keys.*
+
+### 5. Run the Development Server
+Start the development server with hot-reloading. Bun will automatically handle TypeScript and JSX compilation.
 ```bash
 bun dev
 ```
 The application will be available at `http://localhost:3000` by default.
 
-### Available Scripts
+## Available Scripts
 
 *   `bun dev`: Starts the development server with hot-reloading.
-*   `bun build`: Creates a production-ready, optimized build of the application in the `./dist` directory.
+*   `bun build`: Creates a production-ready, optimized build in the `./dist` directory.
 *   `bun start`: Serves the production build from the `./dist` directory.
-*   `bun format`: Formats the entire codebase using Biome.
 *   `bun lint`: Lints the entire codebase using Biome.
-
-## Deployment
-
-### Deploying to Vercel
-
-You can easily deploy this application for free on Vercel.
-
-1.  **Push to a Git Repository:** Ensure your project is pushed to a GitHub, GitLab, or Bitbucket repository.
-
-2.  **Vercel Setup:**
-    *   Sign up or log in to your [Vercel](https://vercel.com/) account.
-    *   On your dashboard, click "Add New..." -> "Project".
-    *   Import the Git repository containing your project.
-
-3.  **Configure Project:**
-    *   Vercel will automatically detect this as a **Bun** project and configure the build settings correctly.
-    *   **Build Command:** Should be automatically set to `bun run build`.
-    *   **Output Directory:** Should be automatically set to `dist`.
-    *   You do **not** need to set up environment variables in Vercel for the client-side app to work. API keys are managed through the application's Admin Panel.
-
-4.  **Deploy:** Click the "Deploy" button.
+*   `bun format`: Formats the entire codebase using Biome.
 
 ## API Key Configuration
 
 PixaSocial Ai integrates with various AI models, which require API keys.
 
-*   **Admin Panel (Primary Method):** The primary way to manage API keys is through the **Admin Panel** within the live application.
-    *   Navigate to `Admin Panel` from the sidebar.
-    *   Enter your API keys for the desired providers (e.g., Google Gemini, OpenAI). These keys are stored in your Supabase database.
-    *   Select an "Active AI Provider" for the application to use.
-
-## Important Notes
-
-*   **Data Persistence:** All major data (user profiles, personas, operators, drafts, scheduled posts) is stored in your Supabase database. The Content Library and Team Chat Channels use browser `localStorage` for persistence in this version.
-*   **Team Chat:** Chat messages are handled by GunDB, a decentralized database. It attempts to persist data via connected peers and uses local browser storage (IndexedDB) as a fallback.
-*   **Content Library Storage:** Uploaded media assets in the Content Library are stored as base64 data URLs in `localStorage`. This is suitable for a prototype but has size limitations.
+*   **Admin Panel (Primary Method):** For the live application, the primary way to manage API keys is through the **Admin Panel**. Navigate to `Admin Panel > AI Providers` to enter your keys for services like Google Gemini, OpenAI, etc. These are stored securely in your Supabase database.
+*   **Environment Variables (For Edge Functions):** Some backend Edge Functions that connect to services like AWS Polly for text-to-speech may require environment variables to be set directly in your Supabase project settings. Go to **Project Settings > Edge Functions** to configure these secrets for your deployed application. For local development, these can be added to a `.env` file.

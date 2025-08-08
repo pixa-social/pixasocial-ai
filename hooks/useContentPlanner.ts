@@ -3,7 +3,8 @@
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { 
     ContentDraft, Persona, Operator, PlatformContentMap, PlatformContentDetail, 
-    MediaType, ScheduledPost, ImageSourceType, UserProfile, RSTProfile, KanbanStatus 
+    MediaType, ScheduledPost, ImageSourceType, UserProfile, RSTProfile, KanbanStatus,
+    ContentLibraryAsset
 } from '../types';
 import { useToast } from '../components/ui/ToastProvider';
 import { generateJson, generateImages } from '../services/aiService';
@@ -56,6 +57,9 @@ export const useContentPlanner = ({
   const [error, setError] = useState<string | null>(null);
   const [schedulingPostInfo, setSchedulingPostInfo] = useState<{draft: ContentDraft, platformKey: string, platformDetail: PlatformContentDetail} | null>(null);
   
+  const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
+  const [platformKeyForLibrary, setPlatformKeyForLibrary] = useState<string | null>(null);
+
   const imageUploadRefs = useRef<Record<string, React.RefObject<HTMLInputElement>>>({});
   CONTENT_PLATFORMS.forEach(platform => {
     if (!imageUploadRefs.current[platform.key]) {
@@ -127,27 +131,46 @@ export const useContentPlanner = ({
     }
   }, [showToast, handleFieldChange]);
   
+  const handleOpenLibraryModal = useCallback((platformKey: string) => {
+    setIsLibraryModalOpen(true);
+    setPlatformKeyForLibrary(platformKey);
+  }, []);
+
+  const handleSelectAssetFromLibrary = useCallback((assets: ContentLibraryAsset[]) => {
+      if (platformKeyForLibrary && assets.length > 0) {
+          const asset = assets[0];
+          handleFieldChange(platformKeyForLibrary, 'libraryAssetId', asset.id);
+          handleFieldChange(platformKeyForLibrary, 'libraryAssetUrl', asset.publicUrl);
+          handleFieldChange(platformKeyForLibrary, 'imageSourceType', 'library');
+          handleFieldChange(platformKeyForLibrary, 'imagePrompt', '');
+          handleFieldChange(platformKeyForLibrary, 'uploadedImageBase64', undefined);
+      }
+      setIsLibraryModalOpen(false);
+      setPlatformKeyForLibrary(null);
+  }, [platformKeyForLibrary, handleFieldChange]);
+
   const handleProcessImage = useCallback(async (platformKey: string) => {
     const content = platformContents[platformKey];
-    if (!content || !content.imageSourceType) return;
+    if (!content) return;
     
     setIsProcessingMedia(prev => ({ ...prev, [platformKey]: true }));
-    let finalBase64Image: string | null = null;
+    let imageUrlToProcess: string | null = null;
     let errorMsg: string | undefined = undefined;
 
     if (content.imageSourceType === 'generate' && content.imagePrompt) {
       const result = await generateImages(content.imagePrompt, currentUser, 1);
       if (result.images && result.images.length > 0) {
-        finalBase64Image = result.images[0];
+        imageUrlToProcess = `data:image/jpeg;base64,${result.images[0]}`;
       } else {
         errorMsg = result.error || "AI image generation failed.";
       }
     } else if (content.imageSourceType === 'upload' && content.uploadedImageBase64) {
-      finalBase64Image = content.uploadedImageBase64.split(',')[1];
+      imageUrlToProcess = content.uploadedImageBase64;
+    } else if (content.imageSourceType === 'library' && content.libraryAssetUrl) {
+      imageUrlToProcess = content.libraryAssetUrl;
     }
     
-    if (finalBase64Image) {
-      // Create a canvas to draw the image and text
+    if (imageUrlToProcess) {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       const img = new Image();
@@ -169,7 +192,7 @@ export const useContentPlanner = ({
 
             const text = content.memeText!.toUpperCase();
             const x = canvas.width / 2;
-            const y = canvas.height * 0.85; // Lower part of the image
+            const y = canvas.height * 0.85;
             ctx!.strokeText(text, x, y);
             ctx!.fillText(text, x, y);
         }
@@ -180,7 +203,7 @@ export const useContentPlanner = ({
           showToast("Failed to load image for processing.", 'error');
           setIsProcessingMedia(prev => ({ ...prev, [platformKey]: false }));
       };
-      img.src = `data:image/jpeg;base64,${finalBase64Image}`;
+      img.src = imageUrlToProcess;
     } else {
         showToast(errorMsg || "No image source available to process.", 'error');
         if (errorMsg) handleFieldChange(platformKey, 'imagePrompt', `${content.imagePrompt} (Error: ${errorMsg})`);
@@ -412,7 +435,7 @@ export const useContentPlanner = ({
       selectedTone, defaultFontFamily, defaultFontColor, selectedPlatformsForGeneration,
       platformMediaOverrides, platformContents, isLoading, isAmplifying, isProcessingMedia,
       isRegeneratingPlatform, error, schedulingPostInfo, isAnyPlatformSelectedForGeneration,
-      tags,
+      tags, isLibraryModalOpen, platformKeyForLibrary
     },
     handlers: {
       setSelectedPersonaId, setSelectedOperatorId, setKeyMessage, setCustomPrompt,
@@ -425,6 +448,7 @@ export const useContentPlanner = ({
       setPlatformContents,
       handleSelectAllPlatforms, handleDeselectAllPlatforms,
       setTags,
+      setIsLibraryModalOpen, handleOpenLibraryModal, handleSelectAssetFromLibrary
     },
     refs: {
       imageUploadRefs

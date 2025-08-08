@@ -34,7 +34,7 @@ serve(async (req) => {
     // Now, fetch settings using the admin client (bypassing RLS)
     const { data, error } = await supabaseAdmin
       .from('app_global_settings')
-      .select('active_ai_provider, global_default_text_model, global_default_image_model, global_default_chat_model, global_default_embedding_model')
+      .select('active_ai_provider, global_default_text_model, global_default_image_model, global_default_chat_model, global_default_embedding_model, global_default_video_model')
       .eq('id', 1)
       .single();
 

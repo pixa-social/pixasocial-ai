@@ -1,7 +1,8 @@
 import React from 'react';
-import { ViewName, NavItem, SocialPlatformType, SocialPlatformConnectionDetails, ScheduledPostStatus, AiProviderType } from './types/app';
-import { AiProviderConfig } from './types/ai';
-import { AuditStep, Persona, MediaType, RSTTraitLevel, RSTProfile, Operator } from './types/campaign';
+import { 
+    ViewName, NavItem, SocialPlatformType, ScheduledPostStatus, AiProviderType, SocialPlatformConnectionDetails, AiProviderConfig, 
+    AuditStep, Persona, MediaType, RSTTraitLevel, RSTProfile, Operator 
+} from './types';
 import { 
     XIcon, FacebookIcon, InstagramIcon, LinkedInIcon, 
     PinterestIcon, TikTokIcon, YouTubeIcon, LinkIcon,
@@ -20,7 +21,11 @@ import {
     Cog6ToothIcon,
     ShieldCheckIcon,
     MegaphoneIcon,
-    CreditCardIcon
+    CreditCardIcon,
+    DocumentTextIcon,
+    WrenchScrewdriverIcon,
+    PencilSquareIcon,
+    CalendarDaysIcon
 } from './components/ui/Icons';
 
 export const APP_TITLE = "PixaSocial Ai";
@@ -28,6 +33,7 @@ export const APP_TITLE = "PixaSocial Ai";
 export const NAVIGATION_ITEMS: NavItem[] = [
   { label: ViewName.Dashboard, viewName: ViewName.Dashboard, icon: React.createElement(LayoutDashboardIcon, { className: 'w-5 h-5' }) },
   { label: ViewName.AIAgents, viewName: ViewName.AIAgents, icon: React.createElement(SparklesIcon, { className: 'w-5 h-5' }) },
+  { label: 'Campaign Blueprint', viewName: ViewName.AuditTool, icon: React.createElement(DocumentTextIcon, { className: 'w-5 h-5' }) },
   {
     label: 'Analytics & Sim',
     icon: React.createElement(ChartPieIcon, { className: 'w-5 h-5' }),
@@ -41,13 +47,12 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     icon: React.createElement(BeakerIcon, { className: 'w-5 h-5' }),
     children: [
       { label: ViewName.AudienceModeling, viewName: ViewName.AudienceModeling, icon: React.createElement(UsersIcon, { className: 'w-4 h-4' }) },
-      { label: ViewName.OperatorBuilder, viewName: ViewName.OperatorBuilder },
-      { label: ViewName.ContentPlanner, viewName: ViewName.ContentPlanner },
-      { label: ViewName.Calendar, viewName: ViewName.Calendar },
+      { label: ViewName.OperatorBuilder, viewName: ViewName.OperatorBuilder, icon: React.createElement(WrenchScrewdriverIcon, { className: 'w-4 h-4' }) },
+      { label: ViewName.ContentPlanner, viewName: ViewName.ContentPlanner, icon: React.createElement(PencilSquareIcon, { className: 'w-4 h-4' }) },
+      { label: ViewName.Calendar, viewName: ViewName.Calendar, icon: React.createElement(CalendarDaysIcon, { className: 'w-4 h-4' }) },
       { label: ViewName.SocialPoster, viewName: ViewName.SocialPoster, icon: React.createElement(PaperAirplaneIcon, { className: 'w-4 h-4' }) },
       { label: ViewName.AISpeechGeneration, viewName: ViewName.AISpeechGeneration, icon: React.createElement(MegaphoneIcon, { className: 'w-4 h-4' }) },
       { label: ViewName.ContentLibrary, viewName: ViewName.ContentLibrary, icon: React.createElement(PhotoIcon, { className: 'w-4 h-4' }) },
-      { label: 'Campaign Blueprint', viewName: ViewName.AuditTool },
     ],
   },
   { label: ViewName.TeamChat, viewName: ViewName.TeamChat, icon: React.createElement(ChatBubbleLeftEllipsisIcon, { className: 'w-5 h-5' }) }, 
@@ -141,15 +146,15 @@ export const OPERATOR_TEMPLATES: Array<{
 ];
 
 export const AUDIT_TOOL_STEPS_DATA: Array<Pick<AuditStep, 'id' | 'title' | 'description'>> = [
-    { id: 'D0', title: 'D0: Plan', description: 'Define the campaign objectives and scope.' },
-    { id: 'D1', title: 'D1: Establish the Team', description: 'Identify key personnel and responsibilities (for this tool, you are the team).' },
-    { id: 'D2', title: 'D2: Describe the Problem/Opportunity', description: 'Clearly define the issue the campaign addresses or the opportunity it pursues.' },
-    { id: 'D3', title: 'D3: Develop Interim Containment Actions (ICA)', description: 'If addressing an ongoing issue, what immediate steps can be taken?' },
-    { id: 'D4', title: 'D4: Identify and Verify Root Causes', description: 'Analyze why the problem exists or what factors will influence the opportunity.' },
-    { id: 'D5', title: 'D5: Choose and Verify Permanent Corrective Actions (PCA)', description: 'Develop and select long-term solutions or strategies.' },
-    { id: 'D6', title: 'D6: Implement and Validate PCA', description: 'Put the chosen strategies into action and verify their effectiveness.' },
-    { id: 'D7', title: 'D7: Prevent Recurrence', description: 'Establish measures to ensure sustained success and avoid similar issues in the future.' },
-    { id: 'D8', title: 'D8: Congratulate the Team', description: 'Acknowledge the effort and successful completion of the planning/auditing process.' },
+    { id: 'D0', title: 'Plan', description: 'Define the campaign objectives and scope.' },
+    { id: 'D1', title: 'Establish the Team', description: 'Identify key personnel and responsibilities (for this tool, you are the team).' },
+    { id: 'D2', title: 'Describe the Problem/Opportunity', description: 'Clearly define the issue the campaign addresses or the opportunity it pursues.' },
+    { id: 'D3', title: 'Develop Interim Containment Actions (ICA)', description: 'If addressing an ongoing issue, what immediate steps can be taken?' },
+    { id: 'D4', title: 'Identify and Verify Root Causes', description: 'Analyze why the problem exists or what factors will influence the opportunity.' },
+    { id: 'D5', title: 'Choose and Verify Permanent Corrective Actions (PCA)', description: 'Develop and select long-term solutions or strategies.' },
+    { id: 'D6', title: 'Implement and Validate PCA', description: 'Put the chosen strategies into action and verify their effectiveness.' },
+    { id: 'D7', title: 'Prevent Recurrence', description: 'Establish measures to ensure sustained success and avoid similar issues in the future.' },
+    { id: 'D8', title: 'Congratulate the Team', description: 'Acknowledge the effort and successful completion of the planning/auditing process.' },
 ];
 
 export const REGION_COUNTRY_OPTIONS: Array<{ value: string; label: string }> = [
@@ -293,6 +298,7 @@ export const AI_PROVIDERS_CONFIG_TEMPLATE: AiProviderConfig[] = [
       image: [GEMINI_IMAGE_MODEL_NAME],
       chat: [GEMINI_TEXT_MODEL_NAME],
       embedding: ['gemini-embedding-001'],
+      video: [],
     },
     notes: `Global key for all users. Managed by Admin.`
   },
@@ -304,7 +310,9 @@ export const AI_PROVIDERS_CONFIG_TEMPLATE: AiProviderConfig[] = [
     models: {
       text: ['gpt-4-turbo', 'gpt-3.5-turbo'],
       image: ['dall-e-3'],
-      chat: ['gpt-4-turbo', 'gpt-3.5-turbo']
+      chat: ['gpt-4-turbo', 'gpt-3.5-turbo'],
+      embedding: ['text-embedding-3-small'],
+      video: [],
     },
     notes: 'Uses OpenAI API.',
     base_url: 'https://api.openai.com/v1/'
@@ -316,7 +324,9 @@ export const AI_PROVIDERS_CONFIG_TEMPLATE: AiProviderConfig[] = [
     is_enabled: false,
     models: {
       text: ['llama3-8b-8192', 'llama3-70b-8192', 'mixtral-8x7b-32768'],
-      chat: ['llama3-8b-8192', 'llama3-70b-8192', 'mixtral-8x7b-32768']
+      chat: ['llama3-8b-8192', 'llama3-70b-8192', 'mixtral-8x7b-32768'],
+      embedding: [],
+      video: [],
     },
     notes: 'Uses GroqCloud API (OpenAI compatible).',
     base_url: 'https://api.groq.com/openai/v1/'
@@ -328,7 +338,9 @@ export const AI_PROVIDERS_CONFIG_TEMPLATE: AiProviderConfig[] = [
     is_enabled: false,
     models: {
       text: ['deepseek-chat', 'deepseek-coder'],
-      chat: ['deepseek-chat', 'deepseek-coder']
+      chat: ['deepseek-chat', 'deepseek-coder'],
+      embedding: [],
+      video: [],
     },
     notes: 'Uses Deepseek API (OpenAI compatible).',
     base_url: 'https://api.deepseek.com/v1/'
@@ -364,7 +376,9 @@ export const AI_PROVIDERS_CONFIG_TEMPLATE: AiProviderConfig[] = [
         'moonshotai/kimi-k2:free',
         'tngtech/deepseek-r1t2-chimera:free',
         'deepseek/deepseek-r1-0528-qwen3-8b:free'
-      ]
+      ],
+      embedding: [],
+      video: [],
     },
     notes: 'Acts as a router to many models. Use your OpenRouter API key.',
     base_url: 'https://openrouter.ai/api/v1/'
@@ -376,7 +390,9 @@ export const AI_PROVIDERS_CONFIG_TEMPLATE: AiProviderConfig[] = [
     is_enabled: false,
     models: {
       text: ['open-mistral-7b', 'open-mixtral-8x7b', 'mistral-large-latest'],
-      chat: ['open-mistral-7b', 'open-mixtral-8x7b', 'mistral-large-latest']
+      chat: ['open-mistral-7b', 'open-mixtral-8x7b', 'mistral-large-latest'],
+      embedding: ['mistral-embed'],
+      video: [],
     },
     notes: 'Uses the official Mistral AI API (OpenAI compatible).',
     base_url: 'https://api.mistral.ai/v1/'
@@ -389,7 +405,9 @@ export const AI_PROVIDERS_CONFIG_TEMPLATE: AiProviderConfig[] = [
     models: {
       text: ['meta-llama/Llama-3-8b-chat', 'google/gemma-7b-it', 'mistralai/Mixtral-8x7B-Instruct-v0.1'],
       image: ['dall-e-3', 'sd_xl_base_1.0.safetensors'],
-      chat: ['meta-llama/Llama-3-8b-chat', 'google/gemma-7b-it', 'mistralai/Mixtral-8x7B-Instruct-v0.1']
+      chat: ['meta-llama/Llama-3-8b-chat', 'google/gemma-7b-it', 'mistralai/Mixtral-8x7B-Instruct-v0.1'],
+      embedding: [],
+      video: [],
     },
     notes: 'Provides OpenAI-compatible endpoints for text/chat. Image generation uses a different API and may not work out-of-the-box.',
     base_url: 'https://api.novita.ai/v3/openai/'
@@ -401,7 +419,9 @@ export const AI_PROVIDERS_CONFIG_TEMPLATE: AiProviderConfig[] = [
     is_enabled: false,
     models: {
       text: ['qwen-3-235b-a22b'],
-      chat: ['qwen-3-235b-a22b']
+      chat: ['qwen-3-235b-a22b'],
+      embedding: [],
+      video: [],
     },
     notes: 'Placeholder only. This provider requires a custom SDK (@cerebras/cerebras_cloud_sdk) and is not implemented in the current ai-proxy.',
   },
@@ -410,7 +430,7 @@ export const AI_PROVIDERS_CONFIG_TEMPLATE: AiProviderConfig[] = [
     name: 'Anthropic (Claude)',
     api_key: null,
     is_enabled: false,
-    models: { text: [], chat: [] },
+    models: { text: [], chat: [], embedding: [], video: [] },
     notes: 'Placeholder only. This provider is not implemented as it requires a custom SDK.',
   },
   {
@@ -418,7 +438,7 @@ export const AI_PROVIDERS_CONFIG_TEMPLATE: AiProviderConfig[] = [
     name: 'Qwen (Alibaba)',
     api_key: null,
     is_enabled: false,
-    models: { text: [], chat: [] },
+    models: { text: [], chat: [], embedding: [], video: [] },
     notes: 'Placeholder only. This provider is not implemented as it requires a custom SDK.',
   },
 ];

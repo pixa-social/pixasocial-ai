@@ -1,9 +1,35 @@
 import React from 'react';
-import { Database } from './supabase';
-import { SocialPlatformType } from './app';
+import type { SocialPlatformType } from './app';
 
-// Derived type from Supabase schema
-export type ConnectedAccount = Database['public']['Tables']['connected_accounts']['Row'];
+// Manually defined from supabase schema to break circular dependency
+export interface ConnectedAccount {
+  id: string;
+  user_id: string;
+  platform: 'X' | 'Facebook' | 'Instagram' | 'LinkedIn' | 'Pinterest' | 'TikTok' | 'YouTube' | 'Telegram' | 'Bluesky' | 'GoogleBusiness' | 'Threads' | 'Discord' | 'Reddit' | 'Snapchat';
+  accountid: string;
+  accountname: string | null;
+  accesstoken: string | null;
+  tokenexpiry: string | null;
+  refreshtoken: string | null;
+  created_at: string | null;
+  encrypted_bot_token: string | null;
+  channel_id: string | null;
+}
+
+// Manually defined from supabase schema to break circular dependency
+export interface ContentLibraryAsset {
+  id: string;
+  user_id: string;
+  name: string;
+  type: 'image' | 'video';
+  storage_path: string;
+  file_name: string;
+  file_type: string;
+  size: number;
+  tags: string[] | null;
+  uploaded_at: string;
+  publicUrl?: string;
+}
 
 // For the detailed connection flow modal
 export interface ConnectionOption {
@@ -13,7 +39,6 @@ export interface ConnectionOption {
   features: string[];
   recommended?: boolean;
   warning?: string;
-  // This would be the actual auth URL in a real implementation
   authUrl?: string;
 }
 
@@ -25,8 +50,3 @@ export interface SocialPlatformConnectionDetails {
   brandColor?: string;
   connectionOptions: ConnectionOption[];
 }
-
-// Derived type from Supabase schema, with added publicUrl property for client-side use
-export type ContentLibraryAsset = Database['public']['Tables']['content_library_assets']['Row'] & {
-  publicUrl?: string;
-};

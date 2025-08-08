@@ -1,4 +1,4 @@
-import { AiProviderType } from "./app";
+import type { AiProviderType } from "./app";
 
 export type Sentiment = 'positive' | 'neutral' | 'negative' | null;
 
@@ -23,12 +23,19 @@ export interface FeedbackSimulationResult {
   potentialRisks?: string[];
 }
 
-export interface OceanScores {
-    creativity: number;
-    organization: number;
-    sociability: number;
-    kindness: number;
-    emotionalStability: number;
+// NEW: Behavioral Resonance Model Scores
+export interface BrmScores {
+    overconfidence: number;
+    frameExploit: number;
+    existingBelief: number;
+    followingTheCrowd: number;
+    appealToAuthority: number;
+    anger: number;
+    moralizing: number;
+    simplification: number;
+    directness: number;
+    socialPressure: number;
+    selfAffirmation: number;
 }
 
 export interface AIPersonaAnalysis {
@@ -36,14 +43,14 @@ export interface AIPersonaAnalysis {
   strategy: string;
 }
 
-export interface AIOceanResponse {
-  oceanScores: OceanScores;
+export interface AIBrmResponse {
+  brmScores: BrmScores;
   analysis: AIPersonaAnalysis;
 }
 
 export interface AIComparisonResponse {
-  persona1Scores: OceanScores;
-  persona2Scores: OceanScores;
+  persona1Scores: BrmScores;
+  persona2Scores: BrmScores;
   comparisonText: string;
 }
 
@@ -54,10 +61,11 @@ export interface AudienceArchetype {
 }
 
 export interface AIAudienceSnapshotResponse {
-    averageOceanScores: OceanScores;
+    averageBrmScores: BrmScores;
     strategicSummary: string;
     archetypes: AudienceArchetype[];
 }
+
 
 export interface AIPersonaDeepDive {
   communicationStyle: string;
@@ -72,20 +80,12 @@ export interface AIOperatorEffectivenessAnalysis {
     improvementSuggestions: string[];
 }
 
-export interface AuditStep {
-  id: string;
-  title: string;
-  description: string;
-  content?: string;
-  isCompleted: boolean;
-  riskAlerts?: string[];
-}
-
 export interface AiProviderModelSet {
   text: string[];
   image?: string[];
   chat?: string[];
   embedding?: string[];
+  video?: string[];
 }
 export interface AiProviderConfig {
   id: AiProviderType;

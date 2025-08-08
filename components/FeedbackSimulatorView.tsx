@@ -190,7 +190,7 @@ export const FeedbackSimulatorView: React.FC = () => {
                   <PieChart>
                     <Pie
                       data={sentimentChartData}
-                      cx="50%"
+                      cx="40%"
                       cy="50%"
                       labelLine={false}
                       outerRadius={80}
@@ -203,7 +203,7 @@ export const FeedbackSimulatorView: React.FC = () => {
                       ))}
                     </Pie>
                     <Tooltip contentStyle={{ backgroundColor: 'rgba(31, 41, 55, 0.8)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '0.5rem' }} />
-                    <Legend wrapperStyle={{ color: '#F3F4F6' }} />
+                    <Legend layout="vertical" verticalAlign="middle" align="right" wrapperStyle={{ color: '#F3F4F6' }} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>

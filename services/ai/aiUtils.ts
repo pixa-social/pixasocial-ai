@@ -1,7 +1,3 @@
-
-
-
-
 import { 
     AI_PROVIDERS_CONFIG_TEMPLATE, 
     GEMINI_TEXT_MODEL_NAME, 
@@ -45,12 +41,13 @@ export const getStoredAiProviderConfigs = async (forceRefetch = false): Promise<
       
       // If the DB has a non-empty model list, use it. Otherwise, stick with the template's.
       const dbModels = dbConfig.models as AiProviderModelSet;
-      if (dbModels && (dbModels.text?.length || dbModels.image?.length || dbModels.chat?.length || dbModels.embedding?.length)) {
+      if (dbModels && (dbModels.text?.length || dbModels.image?.length || dbModels.chat?.length || dbModels.embedding?.length || dbModels.video?.length)) {
         mergedConfig.models = {
           text: dbModels.text || [],
           image: dbModels.image || [],
           chat: dbModels.chat || [],
           embedding: dbModels.embedding || [],
+          video: dbModels.video || [],
         };
       }
     }
@@ -69,6 +66,7 @@ let globalSettingsCache: {
     global_default_image_model: string | null;
     global_default_chat_model: string | null;
     global_default_embedding_model: string | null;
+    global_default_video_model: string | null;
 } | null = null;
 let lastGlobalSettingsFetchTime = 0;
 const GLOBAL_SETTINGS_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
@@ -91,14 +89,14 @@ export const getGlobalAiSettings = async (forceRefetch = false) => {
       throw new Error(data.error);
     }
 
-    const settings = data || { active_ai_provider: 'Gemini', global_default_text_model: null, global_default_image_model: null, global_default_chat_model: null, global_default_embedding_model: null };
+    const settings = data || { active_ai_provider: 'Gemini', global_default_text_model: null, global_default_image_model: null, global_default_chat_model: null, global_default_embedding_model: null, global_default_video_model: null };
     globalSettingsCache = settings;
     lastGlobalSettingsFetchTime = now;
     return settings;
 
   } catch(e) {
     console.error("Error fetching global AI settings:", (e as Error).message);
-    return { active_ai_provider: 'Gemini', global_default_text_model: null, global_default_image_model: null, global_default_chat_model: null, global_default_embedding_model: null }; // Fallback
+    return { active_ai_provider: 'Gemini', global_default_text_model: null, global_default_image_model: null, global_default_chat_model: null, global_default_embedding_model: null, global_default_video_model: null }; // Fallback
   }
 };
 
@@ -156,7 +154,7 @@ export const handleNonImplementedProvider = async (providerType: AiProviderType,
 };
 
 export const getExecutionConfig = async (
-    modelType: 'text' | 'image' | 'chat' | 'embedding',
+    modelType: 'text' | 'image' | 'chat' | 'embedding' | 'video',
     user: UserProfile
   ): Promise<{ provider: AiProviderType; model: string; apiKey: string | null; baseUrl?: string } | null> => {
   
@@ -169,7 +167,8 @@ export const getExecutionConfig = async (
           p.models.text?.includes(modelName) ||
           p.models.image?.includes(modelName) ||
           p.models.chat?.includes(modelName) ||
-          p.models.embedding?.includes(modelName)
+          p.models.embedding?.includes(modelName) ||
+          p.models.video?.includes(modelName)
         )
       );
     };
@@ -195,6 +194,7 @@ export const getExecutionConfig = async (
             case 'image': targetModel = globalSettings.global_default_image_model || undefined; break;
             case 'chat': targetModel = globalSettings.global_default_chat_model || undefined; break;
             case 'embedding': targetModel = globalSettings.global_default_embedding_model || undefined; break;
+            case 'video': targetModel = globalSettings.global_default_video_model || undefined; break;
         }
         if (targetModel) {
             targetProvider = findProviderForModel(targetModel);
@@ -223,6 +223,7 @@ export const getExecutionConfig = async (
             case 'image': finalModel = providerModels.image?.[0]; break;
             case 'chat': finalModel = providerModels.chat?.[0] || providerModels.text?.[0]; break;
             case 'embedding': finalModel = providerModels.embedding?.[0]; break;
+            case 'video': finalModel = providerModels.video?.[0]; break;
         }
     }
     

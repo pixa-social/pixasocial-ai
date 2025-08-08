@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   ScheduledPost, ViewName, UserProfile, ContentDraft,
-  ScheduledPostStatus, ConnectedAccount, Persona, Operator, SocialPlatformType, RoleName
+  ScheduledPostStatus, ConnectedAccount, Persona, Operator, SocialPlatformType, RoleName, ContentLibraryAsset
 } from '../../types';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
@@ -12,12 +12,14 @@ import { Switch } from '../ui/Switch';
 import { Tabs, Tab } from '../ui/Tabs';
 import { useToast } from '../ui/ToastProvider';
 import { SOCIAL_PLATFORMS_TO_CONNECT, ACCEPTED_MEDIA_TYPES, MAX_FILE_UPLOAD_SIZE_MB } from '../../constants';
-import { UploadCloudIcon, PaperAirplaneIcon } from '../ui/Icons';
+import { UploadCloudIcon, PaperAirplaneIcon, PhotoIcon } from '../ui/Icons';
 import { generateText } from '../../services/aiService';
 import { supabase } from '../../services/supabaseClient';
 import { SocialPostPreview } from './SocialPostPreview';
 import { useAppDataContext } from '../MainAppLayout';
 import { EmptyState } from '../ui/EmptyState';
+import { ContentLibrarySelectionModal } from '../content-library/ContentLibrarySelectionModal';
+import { fetchFile } from '@ffmpeg/util';
 
 
 const fileToDataURL = (file: File): Promise<string> =>
@@ -34,6 +36,7 @@ export const SocialPosterView: React.FC = () => {
     contentDrafts, 
     personas, 
     operators, 
+    contentLibraryAssets,
     handlers,
     onNavigate,
   } = useAppDataContext();
@@ -47,6 +50,7 @@ export const SocialPosterView: React.FC = () => {
   const [instagramPostType, setInstagramPostType] = useState('Regular Post');
   const [isDragging, setIsDragging] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
 
   const [selectedPersonaId, setSelectedPersonaId] = useState('');
   const [selectedOperatorId, setSelectedOperatorId] = useState('');
@@ -84,6 +88,24 @@ export const SocialPosterView: React.FC = () => {
       setSelectedNetworks(new Set(Object.keys(draft.platform_contents) as SocialPlatformType[]));
       showToast('Draft imported ✨', 'success');
     }
+  };
+  
+  const handleSelectAssetsFromLibrary = async (assets: ContentLibraryAsset[]) => {
+      setIsLibraryModalOpen(false);
+      if (assets.length === 0) return;
+  
+      showToast(`Adding ${assets.length} file(s) from library...`, 'info');
+      try {
+          const files = await Promise.all(assets.map(async (asset) => {
+              if (!asset.publicUrl) throw new Error(`Asset '${asset.name}' has no public URL.`);
+              const fileData = await fetchFile(asset.publicUrl);
+              return new File([fileData], asset.file_name, { type: asset.file_type });
+          }));
+          setUploadedFiles(prev => [...prev, ...files]);
+          showToast('Assets added successfully!', 'success');
+      } catch (error) {
+          showToast(`Error fetching assets: ${(error as Error).message}`, 'error');
+      }
   };
 
   const handleGenerateWithAi = async () => {
@@ -315,8 +337,13 @@ export const SocialPosterView: React.FC = () => {
                   </ul>
                 )}
               </Tab>
-              <Tab label="URLs (soon)">
-                <div className="p-6 text-center text-textSecondary">Paste media URLs coming soon…</div>
+              <Tab label="From Library" icon={<PhotoIcon className="w-4 h-4"/>}>
+                <div className="p-6 text-center text-textSecondary">
+                    <p className="mb-4">Select images or videos you've already uploaded to your library.</p>
+                    <Button onClick={() => setIsLibraryModalOpen(true)}>
+                        Select from Content Library
+                    </Button>
+                </div>
               </Tab>
             </Tabs>
           </Card>
@@ -367,6 +394,15 @@ export const SocialPosterView: React.FC = () => {
           )}
         </div>
       </div>
+      {isLibraryModalOpen && (
+        <ContentLibrarySelectionModal
+            isOpen={isLibraryModalOpen}
+            onClose={() => setIsLibraryModalOpen(false)}
+            onSelect={handleSelectAssetsFromLibrary}
+            multiSelect={true}
+            allAssets={contentLibraryAssets}
+        />
+      )}
     </div>
   );
 };

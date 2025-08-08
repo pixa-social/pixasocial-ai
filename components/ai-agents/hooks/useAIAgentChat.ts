@@ -1,13 +1,16 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useChat, Message } from '@ai-sdk/react';
+import { useChat, type Message } from '@ai-sdk/react';
 import { useToast } from '../../ui/ToastProvider';
 import { supabase, supabaseUrl } from '../../../services/supabaseClient';
 import { Persona, RSTProfile, ChatSession, UserProfile, Sentiment, GroundingSource, SmartReply } from '../../../types';
-import { Database, Json } from '../../../types/supabase';
+import { Database } from '../../../types/supabase';
+import type { Json } from '../../../types/json';
 import * as dataService from '../../../services/dataService';
 import { generateJson } from '../../../services/aiService';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+
+type CoreMessage = Message & { id: string };
 
 export const useAIAgentChat = (currentUser: UserProfile, personas: Persona[]) => {
     const { showToast } = useToast();
@@ -88,7 +91,7 @@ When chatting, communicate naturally as this person would. Your goal is a realis
 
         if (sessionId && message.role === 'assistant') {
             const payload: Database['public']['Tables']['chat_messages']['Insert'] = {
-                 session_id: sessionId, 
+                session_id: sessionId, 
                 user_id: currentUser.id, 
                 role: 'assistant', 
                 content: message.content,
@@ -199,7 +202,7 @@ When chatting, communicate naturally as this person would. Your goal is a realis
         setSentiment(null); setInsights(null); setSmartReplies([]);
         const { data, error } = await supabase.from('chat_messages').select('*').eq('session_id', session.id).order('created_at', { ascending: true });
         if (error) { showToast(`Failed to load messages: ${error.message}`, 'error'); }
-        else { chatHelpers.setMessages((data || []).map(m => ({...m, role: m.role as 'user' | 'assistant'}))); }
+        else { chatHelpers.setMessages((data || []).map(m => ({...m, role: m.role as 'user' | 'assistant'} as Message))); }
     }, [personas, showToast, chatHelpers]);
 
     const handleDeleteSession = useCallback(async (e: React.MouseEvent, sessionId: string) => {

@@ -1,7 +1,6 @@
-
 import React, { useState, useCallback, useRef, useMemo } from 'react';
-import { Persona, RSTProfile, ViewName, UserProfile, LibraryPersona, AIPersonaDeepDive } from '../../types'; 
-import { Json } from '../../types/supabase';
+import { Persona, RSTProfile, ViewName, UserProfile, LibraryPersona, AIPersonaDeepDive, AdminPersona } from '../../types'; 
+import type { Json } from '../../types/json';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -40,7 +39,7 @@ interface AIPersonaSuggestion {
 }
 
 export const AudienceModelingView: React.FC = () => {
-  const { currentUser, personas, handlers, onNavigate } = useAppDataContext();
+  const { currentUser, personas, adminPersonas, handlers, onNavigate } = useAppDataContext();
   const { addPersona: onAddPersona, updatePersona: onUpdatePersona, deletePersona: onDeletePersona } = handlers;
   
   const { showToast } = useToast();
@@ -71,32 +70,32 @@ export const AudienceModelingView: React.FC = () => {
     setCurrentPage(1);
   }, []);
 
-  const handleImportAndMapPersona = useCallback(async (libraryPersona: LibraryPersona) => {
+  const handleImportAndMapPersona = useCallback(async (libraryPersona: AdminPersona) => {
     if (personas.length >= currentUser.role.max_personas) {
-      showToast(`Persona limit reached.`, "error"); return;
+      showToast(`Persona limit reached for your plan.`, "error");
+      setIsLibraryOpen(false);
+      return;
     }
-    setIsMappingPersona(true);
-    showToast("AI is analyzing...", "info");
-    const prompt = `Based on this persona data: ${JSON.stringify(libraryPersona, null, 2)}, generate a profile with "demographics", "psychographics", "initial_beliefs", "rst_profile", "suggestedVulnerabilities", "goals", and "fears".`;
-    const result = await generateJson<AIPersonaSuggestion>(prompt, currentUser);
-
-    if (result.data) {
-        const seededPersona: Partial<Persona> = {
-            name: libraryPersona.name,
-            demographics: result.data.demographics || '',
-            psychographics: result.data.psychographics || '',
-            initial_beliefs: result.data.initial_beliefs || '',
-            vulnerabilities: result.data.suggestedVulnerabilities || [],
-            goals: result.data.goals || [],
-            fears: result.data.fears || [],
-            rst_profile: result.data.rst_profile as Json,
-        };
-        setEditingPersona(seededPersona as Persona);
-        setShowForm(true);
-        setIsLibraryOpen(false);
-        showToast("Persona imported! Review and save.", "success");
-    } else { showToast(result.error || "Failed to import persona.", "error"); }
-    setIsMappingPersona(false);
+    
+    // Simple mapping: directly use the template data
+    const seededPersona: Partial<Persona> & { source_admin_persona_id: number } = {
+        name: libraryPersona.name,
+        demographics: libraryPersona.demographics,
+        psychographics: libraryPersona.psychographics,
+        initial_beliefs: libraryPersona.initial_beliefs,
+        vulnerabilities: libraryPersona.vulnerabilities,
+        goals: libraryPersona.goals,
+        fears: libraryPersona.fears,
+        rst_profile: libraryPersona.rst_profile,
+        avatar_url: libraryPersona.avatar_url,
+        source_admin_persona_id: libraryPersona.id,
+    };
+    
+    setEditingPersona(seededPersona as Persona);
+    setShowForm(true);
+    setIsLibraryOpen(false);
+    showToast("Template loaded! Customize and save your new persona.", "success");
+    
   }, [currentUser, showToast, personas, currentUser.role.max_personas]);
 
   const handleCreateOrUpdatePersona = async (personaData: Partial<Omit<Persona, 'id' | 'user_id' | 'created_at' | 'updated_at'>> & { name: string, avatar_base64?: string }) => {
@@ -106,7 +105,7 @@ export const AudienceModelingView: React.FC = () => {
         await onUpdatePersona(editingPersona.id, personaData);
       } else {
         if (personas.length >= currentUser.role.max_personas) {
-          throw new Error(`You have reached the maximum of ${currentUser.role.max_personas} personas.`);
+          throw new Error(`You have reached the maximum of ${currentUser.role.max_personas} personas for your plan.`);
         }
         await onAddPersona(personaData);
       }
@@ -210,7 +209,7 @@ export const AudienceModelingView: React.FC = () => {
 
   return (
     <div className="p-6">
-       {isLibraryOpen && <PersonaLibraryModal isOpen={isLibraryOpen} onClose={() => setIsLibraryOpen(false)} onImport={handleImportAndMapPersona} isMapping={isMappingPersona} />}
+       {isLibraryOpen && <PersonaLibraryModal isOpen={isLibraryOpen} onClose={() => setIsLibraryOpen(false)} onImport={handleImportAndMapPersona} isMapping={isMappingPersona} adminPersonas={adminPersonas} />}
        {deepDiveData && <PersonaDeepDiveModal 
           data={deepDiveData} 
           onClose={() => setDeepDiveData(null)}
@@ -285,4 +284,3 @@ export const AudienceModelingView: React.FC = () => {
       )}
     </div>
   );
-};

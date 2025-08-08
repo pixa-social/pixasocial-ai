@@ -16,9 +16,10 @@ import { SavedContentDrafts } from './content-planner/SavedContentDrafts';
 import { useAppDataContext } from './MainAppLayout';
 import { VIEW_PATH_MAP } from '../constants';
 import { UsersIcon, BeakerIcon } from './ui/Icons';
+import { ContentLibrarySelectionModal } from './content-library/ContentLibrarySelectionModal';
 
 export const ContentPlannerView: React.FC = () => {
-  const { currentUser, contentDrafts, personas, operators, handlers: appDataHandlers, onNavigate } = useAppDataContext();
+  const { currentUser, contentDrafts, personas, operators, contentLibraryAssets, handlers: appDataHandlers, onNavigate } = useAppDataContext();
   const navigate = useNavigate();
   const { showToast } = useToast();
   
@@ -117,6 +118,7 @@ export const ContentPlannerView: React.FC = () => {
                     imageUploadRef={refs.imageUploadRefs.current[key]}
                     defaultFontFamily={state.defaultFontFamily}
                     defaultFontColor={state.defaultFontColor}
+                    onOpenLibraryModal={handlers.handleOpenLibraryModal}
                   />
                 );
               })}
@@ -154,6 +156,16 @@ export const ContentPlannerView: React.FC = () => {
           onClose={() => handlers.setSchedulingPostInfo(null)}
           onSchedule={handlers.handleConfirmSchedule}
           showToast={showToast}
+        />
+      )}
+
+      {state.isLibraryModalOpen && (
+        <ContentLibrarySelectionModal
+          isOpen={state.isLibraryModalOpen}
+          onClose={() => handlers.setIsLibraryModalOpen(false)}
+          onSelect={handlers.handleSelectAssetFromLibrary}
+          multiSelect={false}
+          allAssets={contentLibraryAssets}
         />
       )}
     </div>

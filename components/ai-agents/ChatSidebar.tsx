@@ -102,6 +102,7 @@ const TemplateAgentItem: React.FC<{
     className="w-full group text-left flex justify-between items-center p-2.5 rounded-lg text-sm text-muted-foreground hover:bg-card hover:text-foreground transition-colors"
   >
     <div className="flex items-center gap-3 flex-1 truncate">
+        <Avatar name={persona?.name || '?'} imageUrl={persona?.avatar_url} size="sm" />
         <p className="font-medium truncate">{persona.name}</p>
     </div>
     <DownloadIcon className="w-4 h-4 text-muted-foreground mr-1 opacity-0 group-hover:opacity-100 transition-opacity" />

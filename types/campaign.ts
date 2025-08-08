@@ -1,27 +1,79 @@
-import { Database, Json } from './supabase';
-import { ScheduledPostStatus } from './app';
+import type { ScheduledPostStatus } from './app';
+import type { Json } from './supabase';
 
 export type RSTTraitLevel = 'Not Assessed' | 'Low' | 'Medium' | 'High';
 
 export interface RSTProfile {
-  bas: RSTTraitLevel; // Behavioral Approach System
-  bis: RSTTraitLevel; // Behavioral Inhibition System
-  fffs: RSTTraitLevel; // Fight-Flight-Freeze System
+  bas: RSTTraitLevel;
+  bis: RSTTraitLevel;
+  fffs: RSTTraitLevel;
 }
 
-// Derived type from Supabase schema
-export type Persona = Database['public']['Tables']['personas']['Row'];
+// Manually defined from supabase schema to break circular dependency
+export interface Persona {
+  id: number;
+  user_id: string;
+  name: string;
+  demographics: string | null;
+  psychographics: string | null;
+  initial_beliefs: string | null;
+  vulnerabilities: string[] | null;
+  goals: string[] | null;
+  fears: string[] | null;
+  avatar_url: string | null;
+  rst_profile: Json | null;
+  created_at: string;
+  updated_at: string | null;
+  source_admin_persona_id: number | null;
+}
 
-// AdminPersona is structurally a Persona without user-specific fields.
-// This is structurally equivalent to the admin_personas table row but helps with type compatibility.
-export type AdminPersona = Omit<Persona, 'user_id' | 'source_admin_persona_id'>;
+// Manually defined from supabase schema
+export interface AdminPersona {
+    id: number;
+    name: string;
+    demographics: string | null;
+    psychographics: string | null;
+    initial_beliefs: string | null;
+    vulnerabilities: string[] | null;
+    goals: string[] | null;
+    fears: string[] | null;
+    avatar_url: string | null;
+    rst_profile: Json | null;
+    created_at: string;
+    updated_at: string | null;
+}
 
-// Represents a persona from the imported library (Nemotron-style)
-// Derived type from Supabase schema
-export type LibraryPersona = Database['public']['Tables']['persona_library']['Row'];
+// Manually defined from supabase schema
+export interface LibraryPersona {
+    id: string;
+    name: string;
+    occupation: string;
+    age: number;
+    personality: string;
+    hobbies: string[];
+    relationship_status: string;
+    values: string[];
+    fears: string[];
+    goals: string[];
+}
 
-// Derived type from Supabase schema
-export type Operator = Database['public']['Tables']['operators']['Row'];
+// Manually defined from supabase schema
+export interface Operator {
+  id: number;
+  user_id: string;
+  name: string;
+  target_audience_id: number;
+  type: 'Hope' | 'Fear' | 'Belonging' | 'Exclusivity' | 'Curiosity' | 'Authority' | 'Novelty' | 'Pride' | 'Nostalgia' | 'Convenience' | 'Custom';
+  conditioned_stimulus: string;
+  unconditioned_stimulus:string;
+  desired_conditioned_response: string;
+  reinforcement_loop: string;
+  created_at: string;
+  updated_at: string | null;
+  effectiveness_score: number | null;
+  alignment_analysis: string | null;
+  improvement_suggestions: string[] | null;
+}
 
 export type MediaType = 'none' | 'image' | 'video';
 export type ImageSourceType = 'generate' | 'upload' | 'library';
@@ -36,7 +88,8 @@ export interface PlatformContentDetail {
   imageSourceType?: ImageSourceType;
   imagePrompt?: string;
   uploadedImageBase64?: string;
-  libraryAssetId?: string; // Changed to string for uuid
+  libraryAssetId?: string;
+  libraryAssetUrl?: string;
   memeText?: string;
   processedImageUrl?: string;
 
@@ -90,5 +143,23 @@ export interface ScheduledPost {
   resource: ScheduledPostResource;
 }
 
-// Derived type from Supabase schema
-export type ScheduledPostDbRow = Database['public']['Tables']['scheduled_posts']['Row'];
+// Manually defined from supabase schema
+export interface ScheduledPostDbRow {
+  id: number;
+  user_id: string;
+  content_draft_id: string;
+  platform_key: string;
+  status: 'Scheduled' | 'Publishing' | 'Published' | 'Failed' | 'Missed' | 'Cancelled';
+  notes: string | null;
+  scheduled_at: string; // ISO string
+  error_message: string | null;
+  last_attempted_at: string | null;
+}
+
+export interface AuditStep {
+  id: string;
+  title: string;
+  description: string;
+  content: string;
+  isCompleted: boolean;
+}

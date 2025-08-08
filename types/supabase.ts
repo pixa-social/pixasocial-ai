@@ -1,13 +1,7 @@
 // --- Supabase Schema Definition ---
 import type { PostgrestError } from '@supabase/supabase-js';
-
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[];
+import type { Json as JsonType } from './json'; // Keep original import for safety
+export type { Json } from './json'; // Re-export to make it available
 
 export interface Database {
   public: {
@@ -23,7 +17,7 @@ export interface Database {
           goals: string[] | null;
           fears: string[] | null;
           avatar_url: string | null;
-          rst_profile: Json | null;
+          rst_profile: JsonType | null;
           created_at: string;
           updated_at: string | null;
         };
@@ -37,7 +31,7 @@ export interface Database {
           goals?: string[] | null;
           fears?: string[] | null;
           avatar_url?: string | null;
-          rst_profile?: Json | null;
+          rst_profile?: JsonType | null;
           created_at?: string;
           updated_at?: string | null;
         };
@@ -51,7 +45,7 @@ export interface Database {
           goals?: string[] | null;
           fears?: string[] | null;
           avatar_url?: string | null;
-          rst_profile?: Json | null;
+          rst_profile?: JsonType | null;
           created_at?: string;
           updated_at?: string | null;
         };
@@ -66,6 +60,7 @@ export interface Database {
           updated_at: string | null;
           global_default_chat_model: string | null;
           global_default_embedding_model: string | null;
+          global_default_video_model: string | null;
         };
         Insert: {
           id?: number;
@@ -75,6 +70,7 @@ export interface Database {
           updated_at?: string | null;
           global_default_chat_model?: string | null;
           global_default_embedding_model?: string | null;
+          global_default_video_model?: string | null;
         };
         Update: {
           id?: number;
@@ -84,6 +80,7 @@ export interface Database {
           updated_at?: string | null;
           global_default_chat_model?: string | null;
           global_default_embedding_model?: string | null;
+          global_default_video_model?: string | null;
         };
         Relationships: [];
       };
@@ -138,14 +135,7 @@ export interface Database {
           role_id?: string;
           assigned_at?: string;
         };
-        Relationships: [
-           {
-            foreignKeyName: "user_roles_role_id_fkey",
-            columns: ["role_id"],
-            referencedRelation: "role_types",
-            referencedColumns: ["id"]
-          }
-        ];
+        Relationships: [];
       };
       oauth_states: {
         Row: {
@@ -171,7 +161,7 @@ export interface Database {
           name: string;
           api_key: string | null;
           is_enabled: boolean;
-          models: Json;
+          models: JsonType;
           notes: string | null;
           base_url: string | null;
           updated_at: string | null;
@@ -181,7 +171,7 @@ export interface Database {
           name: string;
           api_key?: string | null;
           is_enabled?: boolean;
-          models: Json;
+          models: JsonType;
           notes?: string | null;
           base_url?: string | null;
           updated_at?: string | null;
@@ -191,7 +181,7 @@ export interface Database {
           name?: string;
           api_key?: string | null;
           is_enabled?: boolean;
-          models?: Json;
+          models?: JsonType;
           notes?: string | null;
           base_url?: string | null;
           updated_at?: string | null;
@@ -210,7 +200,7 @@ export interface Database {
           goals: string[] | null;
           fears: string[] | null;
           avatar_url: string | null;
-          rst_profile: Json | null;
+          rst_profile: JsonType | null;
           created_at: string;
           updated_at: string | null;
           source_admin_persona_id: number | null;
@@ -225,7 +215,7 @@ export interface Database {
           goals?: string[] | null;
           fears?: string[] | null;
           avatar_url?: string | null;
-          rst_profile?: Json | null;
+          rst_profile?: JsonType | null;
           source_admin_persona_id?: number | null;
         };
         Update: {
@@ -239,19 +229,12 @@ export interface Database {
           goals?: string[] | null;
           fears?: string[] | null;
           avatar_url?: string | null;
-          rst_profile?: Json | null;
+          rst_profile?: JsonType | null;
           created_at?: string;
           updated_at?: string | null;
           source_admin_persona_id?: number | null;
         };
-        Relationships: [
-          {
-            foreignKeyName: "personas_source_admin_persona_id_fkey",
-            columns: ["source_admin_persona_id"],
-            referencedRelation: "admin_personas",
-            referencedColumns: ["id"]
-          }
-        ];
+        Relationships: [];
       };
       persona_deep_dives: {
         Row: {
@@ -285,14 +268,7 @@ export interface Database {
           created_at?: string;
           ai_model_used?: string | null;
         };
-        Relationships: [
-          {
-            foreignKeyName: "persona_deep_dives_persona_id_fkey",
-            columns: ["persona_id"],
-            referencedRelation: "personas",
-            referencedColumns: ["id"]
-          }
-        ];
+        Relationships: [];
       };
       operators: {
         Row: {
@@ -340,14 +316,7 @@ export interface Database {
           alignment_analysis?: string | null;
           improvement_suggestions?: string[] | null;
         };
-        Relationships: [
-          {
-            foreignKeyName: "operators_target_audience_id_fkey",
-            columns: ["target_audience_id"],
-            referencedRelation: "personas",
-            referencedColumns: ["id"]
-          }
-        ];
+        Relationships: [];
       };
       content_drafts: {
         Row: {
@@ -358,7 +327,7 @@ export interface Database {
           persona_id: number;
           key_message: string | null;
           custom_prompt: string;
-          platform_contents: Json;
+          platform_contents: JsonType;
           created_at: string;
           updated_at: string | null;
           tags: string[] | null;
@@ -371,7 +340,7 @@ export interface Database {
           persona_id: number;
           key_message?: string | null;
           custom_prompt: string;
-          platform_contents: Json;
+          platform_contents: JsonType;
           tags?: string[] | null;
           status?: string | null;
         };
@@ -383,26 +352,13 @@ export interface Database {
           persona_id?: number;
           key_message?: string | null;
           custom_prompt?: string;
-          platform_contents?: Json;
+          platform_contents?: JsonType;
           created_at?: string;
           updated_at?: string | null;
           tags?: string[] | null;
           status?: string | null;
         };
-        Relationships: [
-          {
-            foreignKeyName: "content_drafts_operator_id_fkey",
-            columns: ["operator_id"],
-            referencedRelation: "operators",
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "content_drafts_persona_id_fkey",
-            columns: ["persona_id"],
-            referencedRelation: "personas",
-            referencedColumns: ["id"]
-          }
-        ];
+        Relationships: [];
       };
       content_library_assets: {
         Row: {
@@ -474,14 +430,7 @@ export interface Database {
           error_message?: string | null;
           last_attempted_at?: string | null;
         };
-        Relationships: [
-          {
-            foreignKeyName: "scheduled_posts_content_draft_id_fkey",
-            columns: ["content_draft_id"],
-            referencedRelation: "content_drafts",
-            referencedColumns: ["id"]
-          }
-        ];
+        Relationships: [];
       };
       connected_accounts: {
         Row: {
@@ -566,18 +515,21 @@ export interface Database {
           header_scripts: string | null;
           footer_scripts: string | null;
           updated_at: string | null;
+          favicon_url: string | null;
         };
         Insert: {
           id: string;
           header_scripts?: string | null;
           footer_scripts?: string | null;
           updated_at?: string | null;
+          favicon_url?: string | null;
         };
         Update: {
           id?: string;
           header_scripts?: string | null;
           footer_scripts?: string | null;
           updated_at?: string | null;
+          favicon_url?: string | null;
         };
         Relationships: [];
       };
@@ -642,14 +594,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
-        Relationships: [
-          {
-            foreignKeyName: "chat_sessions_persona_id_fkey",
-            columns: ["persona_id"],
-            referencedRelation: "personas",
-            referencedColumns: ["id"]
-          }
-        ];
+        Relationships: [];
       };
       chat_messages: {
         Row: {
@@ -659,14 +604,14 @@ export interface Database {
           role: 'user' | 'assistant';
           content: string;
           created_at: string;
-          grounding_sources: Json | null;
+          grounding_sources: JsonType | null;
         };
         Insert: {
           session_id: string;
           user_id: string;
           role: 'user' | 'assistant';
           content: string;
-          grounding_sources?: Json | null;
+          grounding_sources?: JsonType | null;
         };
         Update: {
           id?: string;
@@ -675,16 +620,9 @@ export interface Database {
           role?: 'user' | 'assistant';
           content?: string;
           created_at?: string;
-          grounding_sources?: Json | null;
+          grounding_sources?: JsonType | null;
         };
-        Relationships: [
-          {
-            foreignKeyName: "chat_messages_session_id_fkey",
-            columns: ["session_id"],
-            referencedRelation: "chat_sessions",
-            referencedColumns: ["id"]
-          }
-        ];
+        Relationships: [];
       };
     };
     Views: {

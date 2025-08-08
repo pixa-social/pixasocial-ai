@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter, HashRouter } from 'react-router-dom';
+import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 
 const rootElement = document.getElementById('root');
@@ -10,11 +10,9 @@ if (!rootElement) {
 
 const root = ReactDOM.createRoot(rootElement);
 
-// Use HashRouter for development environments to handle complex sub-paths where 
-// the app is not served from the root. Build tools like Bun set NODE_ENV to 'development' for dev servers.
-// Use BrowserRouter for production builds to ensure clean URLs and proper OAuth compatibility.
-const isProduction = process.env.NODE_ENV === 'production';
-const Router = isProduction ? BrowserRouter : HashRouter;
+// Use BrowserRouter for clean URLs. This is compatible with Vercel and modern dev servers.
+// A vercel.json file with a rewrite rule is required for this to work correctly on deployment.
+const Router = BrowserRouter;
 
 root.render(
   <React.StrictMode>

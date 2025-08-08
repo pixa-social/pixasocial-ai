@@ -1,6 +1,4 @@
 
-
-
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { useForm, Controller, SubmitHandler, FieldValues } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -15,7 +13,7 @@ import { useToast } from '../ui/ToastProvider';
 import { generateJson } from '../../services/aiService';
 import { OPERATOR_TYPES, RST_TRAITS } from '../../constants';
 import RstVisualBar from '../audience-modeling/RstVisualBar';
-import { TrashIcon, LightBulbIcon } from '../ui/Icons';
+import { TrashIcon, LightBulbIcon, SparklesIcon } from '../ui/Icons';
 
 
 const operatorFormSchema = z.object({
@@ -73,6 +71,7 @@ export const OperatorForm: React.FC<OperatorFormProps> = ({
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
+  const [isAmplifyingCR, setIsAmplifyingCR] = useState(false);
   const watchTargetAudienceId = watch("target_audience_id");
   const watchType = watch("type");
   const watchDesiredCR = watch("desired_conditioned_response");
@@ -99,6 +98,27 @@ export const OperatorForm: React.FC<OperatorFormProps> = ({
     } else { showToast(result.error || "AI suggestion failed.", "error"); }
     setIsSuggesting(false);
   }, [personas, watchTargetAudienceId, watchType, watchDesiredCR, showToast, setValue, currentUser]);
+
+  const handleAmplifyCR = useCallback(async () => {
+    if (!watchTargetAudienceId || !watchDesiredCR) {
+        showToast("Please select a target audience and enter a desired response to amplify.", "error"); return;
+    }
+    const persona = personas.find(p => p.id === watchTargetAudienceId);
+    if (!persona) return;
+
+    setIsAmplifyingCR(true);
+    const prompt = `Based on this persona: ${JSON.stringify(persona)}, rewrite the following desired conditioned response to be more impactful and psychologically resonant: "${watchDesiredCR}". Return only the rewritten response as a JSON object with a single key "amplified_response".`;
+    
+    const result = await generateJson<{ amplified_response: string }>(prompt, currentUser); 
+    
+    if (result.data?.amplified_response) {
+        setValue("desired_conditioned_response", result.data.amplified_response, { shouldDirty: true });
+        showToast("Desired Response amplified!", "success");
+    } else { 
+        showToast(result.error || "AI amplification failed.", "error"); 
+    }
+    setIsAmplifyingCR(false);
+  }, [personas, watchTargetAudienceId, watchDesiredCR, showToast, setValue, currentUser]);
 
   const personaOptions = useMemo(() => personas.map(p => ({ value: p.id, label: p.name })), [personas]);
   const operatorTypeOptions = useMemo(() => OPERATOR_TYPES.map(t => ({ value: t, label: t })), []);
@@ -149,7 +169,28 @@ export const OperatorForm: React.FC<OperatorFormProps> = ({
       )}
 
       <Controller name="type" control={control} render={({ field }) => ( <Select label="Operator Type" {...field} options={operatorTypeOptions} error={errors.type?.message} /> )} />
-      <Textarea label="Desired Conditioned Response (CR)" {...register("desired_conditioned_response")} error={errors.desired_conditioned_response?.message} rows={2} />
+      <div className="relative group">
+        <Textarea 
+            label="Desired Conditioned Response (CR)" 
+            {...register("desired_conditioned_response")} 
+            error={errors.desired_conditioned_response?.message} 
+            rows={2}
+            containerClassName="mb-0"
+        />
+        <Button 
+            type="button" 
+            size="sm" 
+            variant="ghost" 
+            className="absolute top-0 right-0 text-primary opacity-60 group-hover:opacity-100 transition-opacity" 
+            onClick={handleAmplifyCR} 
+            isLoading={isAmplifyingCR} 
+            disabled={isAmplifyingCR || !watchDesiredCR || !watchTargetAudienceId || hasNoCredits} 
+            title="Amplify with AI" 
+            leftIcon={<SparklesIcon className="w-4 h-4"/>}
+        >
+            Amplify
+        </Button>
+      </div>
       
       <div className="p-4 bg-background rounded-lg border border-border">
          <h4 className="text-sm font-semibold text-muted-foreground mb-2">Operator Components</h4>

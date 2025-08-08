@@ -1,29 +1,35 @@
 import React from 'react';
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend, Tooltip } from 'recharts';
-import { OceanScores } from '../../types';
+import { BrmScores } from '../../types';
 
-interface OceanRadarChartProps {
-  scores: OceanScores | null;
+interface BrmRadarChartProps {
+  scores: BrmScores | null;
   color: string;
   gradientId: string;
 }
 
-const OceanRadarChart: React.FC<OceanRadarChartProps> = ({ scores, color, gradientId }) => {
+const BrmRadarChart: React.FC<BrmRadarChartProps> = ({ scores, color, gradientId }) => {
   if (!scores) {
     return null;
   }
 
   const data = [
-    { subject: 'Creativity', score: scores.creativity, fullMark: 1.0 },
-    { subject: 'Organization', score: scores.organization, fullMark: 1.0 },
-    { subject: 'Sociability', score: scores.sociability, fullMark: 1.0 },
-    { subject: 'Kindness', score: scores.kindness, fullMark: 1.0 },
-    { subject: 'Emotional Stability', score: scores.emotionalStability, fullMark: 1.0 },
+    { subject: 'Overconfidence', score: scores.overconfidence, fullMark: 1.0 },
+    { subject: 'Frame Exploit', score: scores.frameExploit, fullMark: 1.0 },
+    { subject: 'Existing Belief', score: scores.existingBelief, fullMark: 1.0 },
+    { subject: 'Following Crowd', score: scores.followingTheCrowd, fullMark: 1.0 },
+    { subject: 'Authority', score: scores.appealToAuthority, fullMark: 1.0 },
+    { subject: 'Anger', score: scores.anger, fullMark: 1.0 },
+    { subject: 'Moralizing', score: scores.moralizing, fullMark: 1.0 },
+    { subject: 'Simplification', score: scores.simplification, fullMark: 1.0 },
+    { subject: 'Directness', score: scores.directness, fullMark: 1.0 },
+    { subject: 'Social Pressure', score: scores.socialPressure, fullMark: 1.0 },
+    { subject: 'Self-Affirmation', score: scores.selfAffirmation, fullMark: 1.0 },
   ];
 
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <RadarChart cx="50%" cy="50%" outerRadius="80%" data={data}>
+      <RadarChart cx="50%" cy="50%" outerRadius="70%" data={data}>
         <defs>
             <radialGradient id={gradientId}>
                 <stop offset="0%" stopColor={color} stopOpacity={0.4} />
@@ -31,10 +37,10 @@ const OceanRadarChart: React.FC<OceanRadarChartProps> = ({ scores, color, gradie
             </radialGradient>
         </defs>
         <PolarGrid stroke="rgba(255, 255, 255, 0.2)" />
-        <PolarAngleAxis dataKey="subject" tick={{ fill: '#f9fafb', fontSize: 14 }} />
+        <PolarAngleAxis dataKey="subject" tick={{ fill: '#f9fafb', fontSize: 11 }} />
         <PolarRadiusAxis angle={30} domain={[0, 1]} tick={{ fill: 'rgba(255, 255, 255, 0.5)', fontSize: 12 }} />
         <Radar 
-            name="Persona Personality Profile" 
+            name="Persona BRM Profile" 
             dataKey="score" 
             stroke={color} 
             fill={`url(#${gradientId})`}
@@ -51,10 +57,9 @@ const OceanRadarChart: React.FC<OceanRadarChartProps> = ({ scores, color, gradie
             labelStyle={{ color: '#cbd5e1' }}
             formatter={(value: number) => [value.toFixed(2), 'Score']}
         />
-        <Legend wrapperStyle={{ color: '#F3F4F6', paddingTop: '20px' }} />
       </RadarChart>
     </ResponsiveContainer>
   );
 };
 
-export default OceanRadarChart;
+export default BrmRadarChart;

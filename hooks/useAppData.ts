@@ -1,6 +1,3 @@
-
-
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { useToast } from '../components/ui/ToastProvider';
@@ -13,7 +10,8 @@ import { UserProfile } from '../types/user';
 import { CustomChannel } from '../types/chat';
 import { ConnectedAccount, ContentLibraryAsset } from '../types/social';
 import { SocialPlatformType, ScheduledPostStatus } from '../types/app';
-import { Database, Json, TablesInsert, TablesUpdate } from '../types/supabase';
+import { Database, TablesInsert, TablesUpdate } from '../types/supabase';
+import type { Json } from '../types/json';
 import { CONTENT_PLATFORMS } from '../constants';
 
 const dataURLtoBlob = (dataurl: string) => {

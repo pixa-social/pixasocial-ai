@@ -22,9 +22,9 @@ export const Card: React.FC<CardProps> = ({ children, className = '', title, act
   };
   
   return (
-    <div className={`bg-card/70 backdrop-blur-sm border border-border/50 rounded-xl p-6 md:p-7 ${shadowClass[shadow]} ${className}`}>
+    <div className={`bg-card/40 backdrop-blur-lg border border-border/30 rounded-xl p-6 md:p-7 ${shadowClass[shadow]} ${className}`}>
       {(title || actions || icon) && (
-        <div className="flex justify-between items-center mb-4 pb-4 border-b border-border">
+        <div className="flex justify-between items-center mb-4 pb-4 border-b border-border/50">
           <div className="flex items-center">
             {icon && <span className="mr-2 text-primary">{icon}</span>}
             {title && <h3 className="text-xl font-semibold text-card-foreground">{title}</h3>}

@@ -7,6 +7,7 @@ import { Breadcrumbs } from './ui/Breadcrumbs';
 import { useAppData } from '../hooks/useAppData';
 import { Bars3Icon } from './ui/Icons';
 import { AnimatePresence, motion } from 'framer-motion';
+import { cn } from '../lib/utils';
 
 interface MainAppLayoutProps {
   currentUser: UserProfile; 
@@ -24,6 +25,7 @@ export const MainAppLayout: React.FC<MainAppLayoutProps> = ({
   const appData = useAppData(currentUser);
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   
   const handleNavigate = (view: ViewName) => {
     const path = VIEW_PATH_MAP[view];
@@ -43,48 +45,21 @@ export const MainAppLayout: React.FC<MainAppLayoutProps> = ({
   };
 
   return (
-    <div className="min-h-screen flex bg-background text-foreground">
-      {/* Sidebar for desktop */}
-      <div className="hidden lg:block">
-          <Sidebar
-            currentUser={currentUser}
-            onLogout={onLogout}
-            onNavigate={handleNavigate}
-          />
-      </div>
-
-       {/* Mobile menu overlay */}
-       <AnimatePresence>
-        {isMobileMenuOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="fixed inset-0 bg-black/60 z-40 lg:hidden"
-              onClick={() => setIsMobileMenuOpen(false)}
-            />
-            <motion.div
-              initial={{ x: '-100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '-100%' }}
-              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              className="fixed top-0 left-0 bottom-0 z-50 lg:hidden"
-            >
-              <Sidebar
-                currentUser={currentUser}
-                onLogout={onLogout}
-                onNavigate={handleNavigate}
-                isMobile
-              />
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
-
-      <div className="flex-1 flex flex-col min-w-0">
+    <div className="min-h-screen bg-background text-foreground">
+      <Sidebar
+        currentUser={currentUser}
+        onLogout={onLogout}
+        onNavigate={handleNavigate}
+        isCollapsed={isSidebarCollapsed}
+        setIsCollapsed={setIsSidebarCollapsed}
+        isMobileMenuOpen={isMobileMenuOpen}
+        setIsMobileMenuOpen={setIsMobileMenuOpen}
+      />
+      
+      <div className={cn(
+          "flex flex-col min-w-0 transition-all duration-300 ease-in-out",
+          isSidebarCollapsed ? "lg:pl-20" : "lg:pl-64"
+      )}>
         <header className="flex-shrink-0 bg-background/80 backdrop-blur-sm border-b border-border/50 sticky top-0 z-30">
           <div className="flex items-center justify-between h-16 px-4 sm:px-6">
             <button
@@ -97,7 +72,6 @@ export const MainAppLayout: React.FC<MainAppLayoutProps> = ({
             <div className="flex-1 hidden lg:block">
               <Breadcrumbs />
             </div>
-            {/* Can add user menu or actions for mobile header here if needed */}
           </div>
         </header>
 

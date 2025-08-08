@@ -1,20 +1,20 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Card } from './ui/Card';
-import { Button } from './ui/Button';
-import { Input } from './ui/Input';
-import { Select, SelectOption } from './ui/Select';
-import { AiProviderConfig, AiProviderType, RoleType, RoleName, AdminUserView } from '../types';
-import { Database } from '../types/supabase';
-import type { Json } from '../types/json';
-import { EyeIcon, EyeSlashIcon, ExclamationTriangleIcon, WrenchScrewdriverIcon, ServerStackIcon, UsersIcon, ShieldCheckIcon } from './ui/Icons';
-import { useToast } from './ui/ToastProvider';
-import { getStoredAiProviderConfigs, getGlobalAiSettings } from '../services/ai/aiUtils';
-import { Tabs, Tab } from './ui/Tabs';
-import { supabase } from '../services/supabaseClient';
-import { LoadingSpinner } from './ui/LoadingSpinner';
-import { Textarea } from './ui/Textarea';
+import { Card } from '../ui/Card';
+import { Button } from '../ui/Button';
+import { Input } from '../ui/Input';
+import { Select, SelectOption } from '../ui/Select';
+import { AiProviderConfig, AiProviderType, RoleType, RoleName, AdminUserView } from '../../types';
+import { Database } from '../../types/supabase';
+import type { Json } from '../../types/json';
+import { EyeIcon, EyeSlashIcon, ExclamationTriangleIcon, WrenchScrewdriverIcon, ServerStackIcon, UsersIcon, ShieldCheckIcon } from '../ui/Icons';
+import { useToast } from '../ui/ToastProvider';
+import { getStoredAiProviderConfigs, getGlobalAiSettings } from '../../services/ai/aiUtils';
+import { Tabs, Tab } from '../ui/Tabs';
+import { supabase } from '../../services/supabaseClient';
+import { LoadingSpinner } from '../ui/LoadingSpinner';
+import { Textarea } from '../ui/Textarea';
 import { SeoSettingsTab } from './admin/SeoSettingsTab';
-import { AI_PROVIDERS_CONFIG_TEMPLATE } from '../constants';
+import { AI_PROVIDERS_CONFIG_TEMPLATE } from '../../constants';
 import { AdminPersonasTab } from './admin/AdminPersonasTab';
 
 // --- AI Provider Config Tab ---

@@ -1,13 +1,15 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Message } from '@ai-sdk/react';
+import { type Message } from '@ai-sdk/react';
 import { Avatar } from '../ui/Avatar';
 import { UserProfile, Persona, GroundingSource } from '../../types';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { ExternalLinkIcon } from '../ui/Icons';
 
+type CustomMessage = Message & { grounding_sources?: GroundingSource[] };
+
 interface ChatMessageProps {
-  message: Message & { grounding_sources?: GroundingSource[] };
+  message: CustomMessage;
   currentUser: UserProfile;
   activePersona: Persona | null;
 }

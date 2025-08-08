@@ -51,7 +51,7 @@ export const AdminPersonasTab: React.FC = () => {
         // Destructure to remove fields not present in admin_personas and the base64 helper
         const { avatar_base64, source_admin_persona_id, ...restOfData } = personaData as any;
         
-        let payload: Database['public']['Tables']['admin_personas']['Insert'] = { ...restOfData };
+        let payload: Database['public']['Tables']['admin_personas']['Update'] = { ...restOfData };
         
         // Handle avatar upload if a new one is provided
         if (avatar_base64) {
@@ -75,7 +75,7 @@ export const AdminPersonasTab: React.FC = () => {
         
         const promise = editingPersona
             ? updateAdminPersona(editingPersona.id, payload)
-            : addAdminPersona(payload);
+            : addAdminPersona(payload as Database['public']['Tables']['admin_personas']['Insert']);
 
         const { error } = await promise;
 
@@ -135,10 +135,7 @@ export const AdminPersonasTab: React.FC = () => {
                                 onEdit={() => handleEdit(persona)}
                                 onDelete={() => handleDelete(persona.id)}
                                 currentUser={currentUser}
-                                // Disable AI features for templates
-                                onRefreshVulnerabilities={() => {}} 
                                 isRefreshingVulnerabilities={false}
-                                onDeepDiveRequest={() => {}}
                                 isDiving={false}
                             />
                         ))}

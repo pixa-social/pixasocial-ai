@@ -1,10 +1,5 @@
-
-
-
-
-
 import React, { useState, useCallback, useRef, useMemo } from 'react';
-import { Persona, RSTProfile, ViewName, UserProfile, LibraryPersona, AIPersonaDeepDive } from '../types'; 
+import { Persona, RSTProfile, ViewName, UserProfile, AdminPersona, AIPersonaDeepDive } from '../types'; 
 import { Json } from '../types/supabase';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
@@ -20,8 +15,8 @@ import { useToast } from '../ui/ToastProvider';
 import { PersonaForm } from './audience-modeling/PersonaForm';
 import { PersonaCard } from './audience-modeling/PersonaCard';
 import { PersonaDeepDiveModal } from './audience-modeling/PersonaDeepDiveModal';
-import { ArrowPathIcon, AdjustmentsHorizontalIcon, ChevronUpIcon, ChevronDownIcon, ArrowDownOnSquareIcon } from '../ui/Icons';
-import { PrerequisiteMessageCard } from '../ui/PrerequisiteMessageCard';
+import { ArrowPathIcon, AdjustmentsHorizontalIcon, ChevronUpIcon, ChevronDownIcon, ArrowDownOnSquareIcon } from './ui/Icons';
+import { PrerequisiteMessageCard } from './ui/PrerequisiteMessageCard';
 import { PersonaLibraryModal } from './audience-modeling/PersonaLibraryModal';
 
 const ITEMS_PER_PAGE_OPTIONS = [
@@ -34,6 +29,7 @@ const ITEMS_PER_PAGE_OPTIONS = [
 interface AudienceModelingViewProps { 
   currentUser: UserProfile;
   personas: Persona[];
+  adminPersonas: AdminPersona[];
   onAddPersona: (personaData: Partial<Omit<Persona, 'id' | 'user_id' | 'created_at' | 'updated_at'>> & { name: string, avatar_base64?: string }) => void;
   onUpdatePersona: (personaId: number, personaData: Partial<Omit<Persona, 'id' | 'user_id' | 'created_at'>> & { avatar_base64?: string }) => void;
   onDeletePersona: (personaId: number) => void;
@@ -50,7 +46,7 @@ interface AIPersonaSuggestion {
   rst_profile?: { bas: string; bis: string; fffs: string; };
 }
 
-export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ currentUser, personas, onAddPersona, onUpdatePersona, onDeletePersona, onNavigate }) => {
+export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ currentUser, personas, adminPersonas, onAddPersona, onUpdatePersona, onDeletePersona, onNavigate }) => {
   const { showToast } = useToast();
   const [showForm, setShowForm] = useState(false);
   const [editingPersona, setEditingPersona] = useState<Persona | undefined>(undefined);
@@ -79,7 +75,7 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ curr
     setCurrentPage(1);
   }, []);
 
-  const handleImportAndMapPersona = useCallback(async (libraryPersona: LibraryPersona) => {
+  const handleImportAndMapPersona = useCallback(async (libraryPersona: AdminPersona) => {
     if (personas.length >= currentUser.role.max_personas) {
       showToast(`Persona limit reached.`, "error"); return;
     }
@@ -181,7 +177,7 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ curr
             media_habits: result.data.mediaHabits,
             motivations: result.data.motivations,
             marketing_hooks: result.data.marketingHooks,
-        });
+        } as any);
         setDeepDiveData({ persona, analysis: result.data });
         if (isRefresh) showToast("Analysis refreshed!", "success");
     } else {
@@ -218,7 +214,7 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ curr
 
   return (
     <div className="p-6">
-       {isLibraryOpen && <PersonaLibraryModal isOpen={isLibraryOpen} onClose={() => setIsLibraryOpen(false)} onImport={handleImportAndMapPersona} isMapping={isMappingPersona} />}
+       {isLibraryOpen && <PersonaLibraryModal isOpen={isLibraryOpen} onClose={() => setIsLibraryOpen(false)} onImport={handleImportAndMapPersona} isMapping={isMappingPersona} adminPersonas={adminPersonas} />}
        {deepDiveData && <PersonaDeepDiveModal 
           data={deepDiveData} 
           onClose={() => setDeepDiveData(null)}

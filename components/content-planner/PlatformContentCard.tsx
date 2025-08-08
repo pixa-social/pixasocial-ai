@@ -1,5 +1,3 @@
-
-
 // PlatformContentCard.tsx
 import React, { useMemo, useState } from 'react';
 import type { PlatformContentDetail, MediaType, ImageSourceType } from '../../types';
@@ -36,6 +34,7 @@ interface Props {
   onProcessImage: (k: string) => void;
   onDownloadImage: (k: string) => void;
   onPushToLibrary: (k: string) => void;
+  onOpenLibraryModal: (platformKey: string) => void;
   imageUploadRef: React.RefObject<HTMLInputElement>;
   defaultFontFamily: string;
   defaultFontColor: string;
@@ -63,6 +62,7 @@ export const PlatformContentCard: React.FC<Props> = React.memo(
     onProcessImage,
     onDownloadImage,
     onPushToLibrary,
+    onOpenLibraryModal,
     imageUploadRef,
     defaultFontFamily,
     defaultFontColor,
@@ -159,7 +159,7 @@ export const PlatformContentCard: React.FC<Props> = React.memo(
                   <h5 className="text-sm font-semibold">{platform.isPoster ? 'Poster Generation' : 'Image & Meme'}</h5>
                   {!platform.isPoster && (
                     <fieldset className="flex gap-4"><legend className="sr-only">Image source</legend>
-                      {(['generate', 'upload'] as ImageSourceType[]).map((t) => (
+                      {(['generate', 'upload', 'library'] as ImageSourceType[]).map((t) => (
                         <label key={t} className="flex items-center gap-1 cursor-pointer">
                           <input type="radio" name={`imgSrc-${platform.key}`} value={t} checked={platformData.imageSourceType === t} onChange={() => onImageSourceTypeChange(platform.key, t)} className="form-radio h-4 w-4 text-primary" />
                           <span className="text-sm capitalize">{t}</span>
@@ -168,7 +168,15 @@ export const PlatformContentCard: React.FC<Props> = React.memo(
                     </fieldset>
                   )}
                   {platformData.imageSourceType === 'generate' && (<Textarea label="AI Image Prompt" value={platformData.imagePrompt || ''} onChange={(e) => onFieldChange(platform.key, 'imagePrompt', e.target.value)} placeholder="e.g., neon cyberpunk cat wearing sunglasses" disabled={isProcessingMedia} rows={2}/>)}
-                  {platformData.imageSourceType === 'upload' && (<><label htmlFor={`imgUp-${platform.key}`} className="block text-xs font-medium mb-1">Upload image (max {MAX_FILE_UPLOAD_SIZE_MB}MB)</label><input id={`imgUp-${platform.key}`} ref={imageUploadRef} type="file" accept={ACCEPTED_IMAGE_TYPES.join(',')} onChange={(e) => onCustomImageUpload(platform.key, e)} disabled={isProcessingMedia} className="file-input w-full text-sm" />{platformData.uploadedImageBase64 && (<img src={platformData.uploadedImageBase64} alt="Preview" className="max-w-[150px] max-h-24 rounded border object-contain" />)}</>)}
+                  {platformData.imageSourceType === 'upload' && (<><label htmlFor={`imgUp-${platform.key}`} className="block text-xs font-medium mb-1">Upload image (max {MAX_FILE_UPLOAD_SIZE_MB}MB)</label><input id={`imgUp-${platform.key}`} ref={imageUploadRef} type="file" accept={ACCEPTED_IMAGE_TYPES.join(',')} onChange={(e) => onCustomImageUpload(platform.key, e)} disabled={isProcessingMedia} className="file-input w-full text-sm" />{platformData.uploadedImageBase64 && (<img src={platformData.uploadedImageBase64} alt="Preview" className="mt-2 max-w-[150px] max-h-24 rounded border object-contain" />)}</>)}
+                  {platformData.imageSourceType === 'library' && (
+                      <div className="animate-fadeIn">
+                          <Button size="sm" variant="outline" className="w-full" onClick={() => onOpenLibraryModal(platform.key)}>Choose from Library</Button>
+                          {platformData.libraryAssetUrl && (
+                              <img src={platformData.libraryAssetUrl} alt="Library preview" className="mt-2 max-w-[150px] max-h-24 rounded border object-contain" />
+                          )}
+                      </div>
+                  )}
                   <Textarea label="Meme / Overlay Text" value={platformData.memeText || ''} onChange={(e) => onFieldChange(platform.key, 'memeText', e.target.value)} placeholder="Top text / bottom text" rows={2}/>
                   <div className="grid grid-cols-2 gap-2"><Select label="Font" options={CURATED_FONT_OPTIONS} value={platformData.fontFamily || defaultFontFamily} onChange={(e) => onFieldChange(platform.key, 'fontFamily', e.target.value)} /><Select label="Color" options={MEME_TEXT_COLOR_OPTIONS} value={platformData.fontColor || defaultFontColor} onChange={(e) => onFieldChange(platform.key, 'fontColor', e.target.value)} /></div>
                   <Button size="sm" variant="secondary" onClick={() => onProcessImage(platform.key)} disabled={isProcessingMedia || (platformData.imageSourceType === 'generate' && !platformData.imagePrompt) || (platformData.imageSourceType === 'upload' && !platformData.uploadedImageBase64)} leftIcon={<PhotoIcon className="w-4 h-4" />}>

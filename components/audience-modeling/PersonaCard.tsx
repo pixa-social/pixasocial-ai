@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Persona, RSTProfile, UserProfile } from '../../types';
 import { Card } from '../ui/Card';
@@ -12,8 +11,8 @@ interface PersonaCardProps {
   persona: Persona;
   onEdit: (persona: Persona) => void;
   onDelete: (personaId: number) => void;
-  onRefreshVulnerabilities: (persona: Persona) => void;
-  onDeepDiveRequest: (persona: Persona) => void;
+  onRefreshVulnerabilities?: (persona: Persona) => void;
+  onDeepDiveRequest?: (persona: Persona) => void;
   isRefreshingVulnerabilities: boolean;
   isDiving: boolean;
   currentUser: UserProfile;
@@ -46,12 +45,12 @@ const PersonaCardComponent: React.FC<PersonaCardProps> = ({
 
   const handleRefreshClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onRefreshVulnerabilities(persona);
+    onRefreshVulnerabilities?.(persona);
   };
   
   const handleDeepDiveClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onDeepDiveRequest(persona);
+    onDeepDiveRequest?.(persona);
   };
 
   return (
@@ -95,29 +94,33 @@ const PersonaCardComponent: React.FC<PersonaCardProps> = ({
       </div>
 
       <div className="mt-4 pt-4 border-t border-border/50 flex justify-between items-center flex-wrap gap-2">
-        <Button 
-            size="sm" 
-            variant="secondary" 
-            onClick={handleDeepDiveClick}
-            isLoading={isDiving}
-            disabled={hasNoCredits}
-            title={hasNoCredits ? "You have no AI credits remaining." : "Get a deep dive analysis"}
-            leftIcon={<EyeIcon className="w-4 h-4"/>}
-        >
-            Deep Dive
-        </Button>
-        <div className="flex gap-2">
-            <Button size="sm" variant="ghost" onClick={() => onEdit(persona)} title="Edit Persona"><PencilIcon className="w-4 h-4"/></Button>
+        {onDeepDiveRequest && (
             <Button 
                 size="sm" 
-                variant="ghost" 
-                onClick={handleRefreshClick} 
-                isLoading={isRefreshingVulnerabilities}
+                variant="secondary" 
+                onClick={handleDeepDiveClick}
+                isLoading={isDiving}
                 disabled={hasNoCredits}
-                title={hasNoCredits ? "No AI credits remaining" : "Refresh vulnerabilities with AI"}
+                title={hasNoCredits ? "You have no AI credits remaining." : "Get a deep dive analysis"}
+                leftIcon={<EyeIcon className="w-4 h-4"/>}
             >
-                <SparklesIcon className="w-4 h-4"/>
+                Deep Dive
             </Button>
+        )}
+        <div className="flex gap-2">
+            <Button size="sm" variant="ghost" onClick={() => onEdit(persona)} title="Edit Persona"><PencilIcon className="w-4 h-4"/></Button>
+            {onRefreshVulnerabilities && (
+                 <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    onClick={handleRefreshClick} 
+                    isLoading={isRefreshingVulnerabilities}
+                    disabled={hasNoCredits}
+                    title={hasNoCredits ? "No AI credits remaining" : "Refresh vulnerabilities with AI"}
+                >
+                    <SparklesIcon className="w-4 h-4"/>
+                </Button>
+            )}
             <Button size="sm" variant="ghost" onClick={() => onDelete(persona.id)} title="Delete Persona" className="text-destructive/70 hover:text-destructive hover:bg-destructive/10">
                 <TrashIcon className="w-4 h-4"/>
             </Button>
