@@ -155,6 +155,9 @@ export const SettingsView: React.FC = () => {
           case SocialPlatformType.GoogleBusiness:
               functionName = 'connect-google-business';
               break;
+          case SocialPlatformType.Facebook:
+              functionName = 'connect-facebook';
+              break;
           default:
               // Fallback for simulated connections
               const displayName = `${currentUser.name}'s ${connectionType} ${platform}`;
