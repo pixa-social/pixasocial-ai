@@ -158,6 +158,9 @@ export const SettingsView: React.FC = () => {
           case SocialPlatformType.Facebook:
               functionName = 'connect-facebook';
               break;
+          case SocialPlatformType.X:
+              functionName = 'connect-twitter';
+              break;
           default:
               // Fallback for simulated connections
               const displayName = `${currentUser.name}'s ${connectionType} ${platform}`;

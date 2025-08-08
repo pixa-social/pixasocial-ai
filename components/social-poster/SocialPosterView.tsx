@@ -140,6 +140,9 @@ export const SocialPosterView: React.FC = () => {
         } else if (n === SocialPlatformType.Facebook) {
             const { data, error } = await supabase.functions.invoke('post-to-facebook', { body: { text: postText, imageData: img } });
             if (error || data?.error) throw new Error(data?.error || error?.message);
+        } else if (n === SocialPlatformType.X) {
+            const { data, error } = await supabase.functions.invoke('post-to-twitter', { body: { text: postText } });
+            if (error || data?.error) throw new Error(data?.error || error?.message);
         } else {
           showToast(`${n} publishing placeholder`, 'info');
           // To avoid breaking the loop for simulated platforms, we'll count this as an "ok" for now
