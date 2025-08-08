@@ -125,8 +125,8 @@ The application will be available at `http://localhost:3000` by default.
 ## Available Scripts
 
 *   `bun dev`: Starts the development server with hot-reloading.
-*   `bun build`: Creates a production-ready, optimized build in the `./dist` directory.
-*   `bun start`: Serves the production build from the `./dist` directory.
+*   `bun build`: Creates a production-ready, optimized build in the `./public` directory.
+*   `bun start`: Serves the production build from the `./public` directory.
 *   `bun lint`: Lints the entire codebase using Biome.
 *   `bun format`: Formats the entire codebase using Biome.
 

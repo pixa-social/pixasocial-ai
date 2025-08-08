@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "bun --hot",
-    "build": "bun build ./index.html --outdir ./dist",
-    "start": "bun run ./dist/index.html",
+    "build": "bun build ./index.html --outdir ./public",
+    "start": "bun run ./public/index.html",
     "lint": "bunx @biomejs/biome lint ./",
     "format": "bunx @biomejs/biome format --write ./"
   },
