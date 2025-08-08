@@ -1,7 +1,4 @@
 
-
-
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { AuthLayout } from './components/auth/AuthLayout';
@@ -12,11 +9,11 @@ import { Database, TablesUpdate } from './types/supabase';
 import { VIEW_PATH_MAP } from './constants';
 import { ToastProvider, useToast } from './components/ui/ToastProvider';
 import { supabase } from './services/supabaseClient';
-import type { AuthSession } from '@supabase/supabase-js';
+import type { Session } from '@supabase/supabase-js';
 
 import { DashboardView } from './components/DashboardView';
-import { AIAgentsView } from './components/ai-agents/AIAgentsView';
-import { AudienceModelingView } from './components/audience-modeling/AudienceModelingView';
+import { AIAgentsView } from './components/AIAgentsView';
+import { AudienceModelingView } from './components/AudienceModelingView';
 import { AnalyticsView } from './components/AnalyticsView';
 import { OperatorBuilderView } from './components/OperatorBuilderView';
 import { ContentPlannerView } from './components/ContentPlannerView';
@@ -33,7 +30,7 @@ import { MethodologyView } from './components/MethodologyView';
 import { PaymentsView } from './components/PaymentsView';
 
 const AppContent: React.FC = () => {
-  const [session, setSession] = useState<AuthSession | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { showToast } = useToast();

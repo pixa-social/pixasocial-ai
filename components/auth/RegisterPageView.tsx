@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -40,17 +41,15 @@ export const RegisterPageView: React.FC<RegisterPageViewProps> = ({ setAuthView 
     setServerError(null);
     setIsLoading(true);
 
-    const { data, error } = await supabase.auth.signUp(
-      {
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            name: formData.name,
-          }
+    const { data, error } = await supabase.auth.signUp({
+      email: formData.email,
+      password: formData.password,
+      options: {
+        data: {
+          name: formData.name,
         }
       }
-    );
+    });
 
     if (error) {
       setServerError(error.message);

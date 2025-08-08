@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useRef, useMemo } from 'react';
 import { Persona, RSTProfile, ViewName, UserProfile, AdminPersona, AIPersonaDeepDive } from '../types'; 
 import { Json } from '../types/supabase';
@@ -7,17 +8,20 @@ import { Input } from './ui/Input';
 import { Select, SelectOption } from './ui/Select';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { generateJson, generateImages } from '../services/aiService';
-import { getExecutionConfig } from '../../services/ai/aiUtils';
-import { supabase } from '../../services/supabaseClient';
-import { RST_TRAITS, DEFAULT_PERSONA_AVATAR, RST_FILTER_OPTIONS, ITEMS_PER_PAGE, RST_TRAIT_LEVELS } from '../../constants'; 
-import RstIntroductionGraphic from '../RstIntroductionGraphic';
-import { useToast } from '../ui/ToastProvider'; 
+import { getExecutionConfig } from '../services/ai/aiUtils';
+import { supabase } from '../services/supabaseClient';
+import { RST_TRAITS, DEFAULT_PERSONA_AVATAR, RST_FILTER_OPTIONS, ITEMS_PER_PAGE, RST_TRAIT_LEVELS } from '../constants'; 
+import RstIntroductionGraphic from './RstIntroductionGraphic';
+import { useToast } from './ui/ToastProvider'; 
 import { PersonaForm } from './audience-modeling/PersonaForm';
 import { PersonaCard } from './audience-modeling/PersonaCard';
 import { PersonaDeepDiveModal } from './audience-modeling/PersonaDeepDiveModal';
 import { ArrowPathIcon, AdjustmentsHorizontalIcon, ChevronUpIcon, ChevronDownIcon, ArrowDownOnSquareIcon } from './ui/Icons';
 import { PrerequisiteMessageCard } from './ui/PrerequisiteMessageCard';
 import { PersonaLibraryModal } from './audience-modeling/PersonaLibraryModal';
+import { useAppDataContext } from './MainAppLayout';
+import { EmptyState } from './ui/EmptyState';
+import { UsersIcon } from './ui/Icons';
 
 const ITEMS_PER_PAGE_OPTIONS = [
     { value: "6", label: "6 per page"},
@@ -25,16 +29,6 @@ const ITEMS_PER_PAGE_OPTIONS = [
     { value: "12", label: "12 per page"},
     { value: "24", label: "24 per page"},
 ];
-
-interface AudienceModelingViewProps { 
-  currentUser: UserProfile;
-  personas: Persona[];
-  adminPersonas: AdminPersona[];
-  onAddPersona: (personaData: Partial<Omit<Persona, 'id' | 'user_id' | 'created_at' | 'updated_at'>> & { name: string, avatar_base64?: string }) => void;
-  onUpdatePersona: (personaId: number, personaData: Partial<Omit<Persona, 'id' | 'user_id' | 'created_at'>> & { avatar_base64?: string }) => void;
-  onDeletePersona: (personaId: number) => void;
-  onNavigate?: (view: ViewName) => void; 
-}
 
 interface AIPersonaSuggestion {
   demographics: string;
@@ -46,7 +40,10 @@ interface AIPersonaSuggestion {
   rst_profile?: { bas: string; bis: string; fffs: string; };
 }
 
-export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ currentUser, personas, adminPersonas, onAddPersona, onUpdatePersona, onDeletePersona, onNavigate }) => {
+export const AudienceModelingView: React.FC = () => {
+  const { currentUser, personas, adminPersonas, handlers, onNavigate } = useAppDataContext();
+  const { addPersona: onAddPersona, updatePersona: onUpdatePersona, deletePersona: onDeletePersona } = handlers;
+  
   const { showToast } = useToast();
   const [showForm, setShowForm] = useState(false);
   const [editingPersona, setEditingPersona] = useState<Persona | undefined>(undefined);
@@ -238,6 +235,13 @@ export const AudienceModelingView: React.FC<AudienceModelingViewProps> = ({ curr
         <Card title={editingPersona ? "Edit Persona" : "Create New Persona"}>
           <PersonaForm initialPersona={editingPersona} onSubmit={handleCreateOrUpdatePersona} onCancel={() => setShowForm(false)} isLoading={isSubmitting} currentUser={currentUser} />
         </Card>
+      ) : personas.length === 0 ? (
+        <EmptyState
+          icon={<UsersIcon className="w-8 h-8 text-primary" />}
+          title="Create Your First Audience Persona"
+          description="Personas are the foundation of your strategy. Define your target audience to start generating tailored content."
+          action={{ label: 'Create New Persona', onClick: () => { setShowForm(true); setEditingPersona(undefined); } }}
+        />
       ) : (
         <>
         <Card title="Filters & Sorting" className="mb-6" icon={<AdjustmentsHorizontalIcon className="w-5 h-5"/>}>
